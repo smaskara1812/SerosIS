@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+vectorstore/
+data/manuals/
+db.sqlite3
+venv/
+data/manuals/
+.claude/
+script_mssql.sql
+*.sql
+Seros_Data_full.sql
+Seros_Data_schema.sql
+count_all_tables.sql

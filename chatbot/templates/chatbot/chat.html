@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seros AI Assistant</title>
+  <script>
+    /* Minimal inline markdown renderer */
+    const marked = {
+      parse(text) {
+        const lines = text.split('\n');
+        let html = '', inUl = false, inOl = false;
+        const close = () => {
+          if (inUl) { html += '</ul>'; inUl = false; }
+          if (inOl) { html += '</ol>'; inOl = false; }
+        };
+        const inline = t => t
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          .replace(/`(.*?)`/g, '<code>$1</code>');
+        for (const line of lines) {
+          const ul = line.match(/^[\*\-] (.+)/), ol = line.match(/^\d+\. (.+)/);
+          const h3 = line.match(/^### (.+)/), h2 = line.match(/^## (.+)/), h1 = line.match(/^# (.+)/);
+          if (ul)        { if (!inUl) { close(); html += '<ul>'; inUl = true; } html += `<li>${inline(ul[1])}</li>`; }
+          else if (ol)   { if (!inOl) { close(); html += '<ol>'; inOl = true; } html += `<li>${inline(ol[1])}</li>`; }
+          else if (h3)   { close(); html += `<h3>${inline(h3[1])}</h3>`; }
+          else if (h2)   { close(); html += `<h2>${inline(h2[1])}</h2>`; }
+          else if (h1)   { close(); html += `<h1>${inline(h1[1])}</h1>`; }
+          else if (!line.trim()) { close(); }
+          else           { close(); html += `<p>${inline(line)}</p>`; }
+        }
+        close();
+        return html;
+      }
+    };
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 260px;
+      min-width: 260px;
+      background: #1a3f7a;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #sidebar-header {
+      padding: 18px 16px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    #sidebar-header h2 {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    #new-chat-btn {
+      width: 100%;
+      padding: 9px 14px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 7px;
+      color: #fff;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #new-chat-btn:hover { background: rgba(255,255,255,0.18); }
+    #new-chat-btn::before { content: "+"; font-size: 1.1rem; font-weight: 300; }
+
+    /* ── Search box ── */
+    #search-wrap {
+      padding: 0 8px 6px;
+      position: relative;
+    }
+    #search-input {
+      width: 100%;
+      padding: 7px 28px 7px 10px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.825rem;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    #search-input::placeholder { color: rgba(255,255,255,0.3); }
+    #search-input:focus { border-color: rgba(255,255,255,0.28); background: rgba(255,255,255,0.13); }
+    #search-clear {
+      position: absolute;
+      right: 14px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none;
+      color: rgba(255,255,255,0.4);
+      cursor: pointer; font-size: 1rem; line-height: 1;
+      display: none; padding: 2px;
+    }
+    #search-clear:hover { color: rgba(255,255,255,0.8); }
+
+    #convo-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 8px;
+    }
+
+    #convo-list::-webkit-scrollbar { width: 4px; }
+    #convo-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+    .convo-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      color: rgba(255,255,255,0.75);
+      font-size: 0.875rem;
+      transition: background 0.15s;
+      gap: 6px;
+    }
+    .convo-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .convo-item.active { background: rgba(255,255,255,0.15); color: #fff; }
+
+    .convo-title {
+      flex: 1;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Right-click context menu ── */
+    #ctx-menu {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+      padding: 5px;
+      min-width: 148px;
+    }
+    .ctx-item {
+      padding: 8px 14px;
+      font-size: 0.875rem;
+      color: #1a3f7a;
+      cursor: pointer;
+      border-radius: 5px;
+      user-select: none;
+    }
+    .ctx-item:hover { background: #f1f5f9; }
+    .ctx-item.danger { color: #dc2626; }
+    .ctx-item.danger:hover { background: #fee2e2; }
+
+    #sidebar-footer {
+      padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    #sidebar-footer a {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.4);
+      text-decoration: none;
+    }
+    #sidebar-footer a:hover { color: rgba(255,255,255,0.7); }
+
+    /* ── Main chat area ── */
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      background: #f0f2f5;
+    }
+
+    #chat-header {
+      padding: 14px 24px;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #1a3f7a;
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+    }
+
+    #chat-window {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* Empty state */
+    #empty-state {
+      margin: auto;
+      text-align: center;
+      color: #94a3b8;
+    }
+    #empty-state h3 { font-size: 1.1rem; font-weight: 600; color: #475569; margin-bottom: 6px; }
+    #empty-state p  { font-size: 0.875rem; }
+
+    .message {
+      max-width: 76%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      line-height: 1.6;
+      font-size: 0.925rem;
+    }
+    .message.user {
+      background: #1a3f7a;
+      color: #fff;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .message.assistant {
+      background: #fff;
+      color: #1a1a1a;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .message.thinking {
+      background: #fff;
+      color: #94a3b8;
+      align-self: flex-start;
+      font-style: italic;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+
+    .message.assistant p  { margin: 0 0 8px; }
+    .message.assistant p:last-child { margin-bottom: 0; }
+    .message.assistant ul, .message.assistant ol { margin: 4px 0 8px 20px; }
+    .message.assistant li { margin-bottom: 3px; }
+    .message.assistant h2, .message.assistant h3 { margin: 10px 0 4px; }
+    .message.assistant code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-size: 0.875em; }
+
+    .sources {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #e5f0f0;
+      font-size: 0.78rem;
+      color: #94a3b8;
+    }
+    .sources strong { color: #64748b; }
+
+    /* ── Dashboard panel ── */
+    .dashboard-panel {
+      align-self: flex-start;
+      width: 100%;
+      max-width: 860px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.09);
+      overflow: hidden;
+      font-size: 0.875rem;
+    }
+    .dash-header {
+      background: #1a3f7a;
+      color: #fff;
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dash-header span { opacity: 0.6; font-weight: 400; font-size: 0.8rem; }
+    .dash-stats {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .dash-stat {
+      flex: 1;
+      padding: 14px 18px;
+      border-right: 1px solid #e5e7eb;
+      text-align: center;
+    }
+    .dash-stat:last-child { border-right: none; }
+    .dash-stat-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1a3f7a;
+      line-height: 1.1;
+    }
+    .dash-stat-value.good  { color: #16a34a; }
+    .dash-stat-value.warn  { color: #d97706; }
+    .dash-stat-value.bad   { color: #dc2626; }
+    .dash-stat-label {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      margin-top: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .dash-table-wrap {
+      overflow-x: auto;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+    .dash-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .dash-table thead th {
+      background: #f8fafc;
+      color: #64748b;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      padding: 9px 14px;
+      text-align: right;
+      border-bottom: 1px solid #e5e7eb;
+      white-space: nowrap;
+    }
+    .dash-table thead th:first-child,
+    .dash-table thead th:nth-child(2) { text-align: left; }
+    .dash-table tbody tr { border-bottom: 1px solid #f1f5f9; }
+    .dash-table tbody tr:last-child { border-bottom: none; }
+    .dash-table tbody tr:hover { background: #f8fafc; }
+    .dash-table td {
+      padding: 8px 14px;
+      color: #374151;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .dash-table td:first-child,
+    .dash-table td:nth-child(2) { text-align: left; color: #1a3f7a; font-weight: 500; }
+    .util-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+    .util-good { background: #dcfce7; color: #16a34a; }
+    .util-warn { background: #fef3c7; color: #d97706; }
+    .util-bad  { background: #fee2e2; color: #dc2626; }
+    .dash-best-worst {
+      display: flex;
+      gap: 1px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .dash-bw-card {
+      flex: 1;
+      padding: 10px 18px;
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+    .dash-bw-card strong { color: #1a3f7a; }
+
+    #input-area {
+      padding: 16px 24px;
+      background: #fff;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 10px;
+    }
+
+    #question-input {
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 0.925rem;
+      outline: none;
+      resize: none;
+      max-height: 120px;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+    #question-input:focus { border-color: #1a3f7a; }
+
+    #send-btn {
+      padding: 10px 20px;
+      background: #1a3f7a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.925rem;
+      cursor: pointer;
+      align-self: flex-end;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    #send-btn:hover    { background: #0f2a6a; }
+    #send-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<!-- ── Right-click context menu ── -->
+<div id="ctx-menu">
+  <div class="ctx-item" id="ctx-rename">Rename</div>
+  <div class="ctx-item danger" id="ctx-delete">Delete</div>
+</div>
+
+<!-- ── Sidebar ── -->
+<aside id="sidebar">
+  <div id="sidebar-header">
+    <h2>Seros AI</h2>
+    <button id="new-chat-btn">New Chat</button>
+  </div>
+  <div id="search-wrap">
+    <input id="search-input" type="text" placeholder="Search conversations…" autocomplete="off" />
+    <button id="search-clear" title="Clear search">×</button>
+  </div>
+  <div id="convo-list"></div>
+  <div id="sidebar-footer">
+    <a href="/dashboard/">Dashboard</a>
+    <a href="/health/" style="margin-left:14px;">Health</a>
+    <a href="/manuals/" style="margin-left:14px;">Manuals</a>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<div id="main">
+  <div id="chat-header">New Chat</div>
+
+  <div id="chat-window">
+    <div id="empty-state">
+      <h3>Seros Service Manual Assistant</h3>
+      <p>Ask a question about the service manuals to get started.</p>
+    </div>
+  </div>
+
+  <div id="input-area">
+    <textarea
+      id="question-input"
+      placeholder="Ask a question about the service manuals…"
+      rows="1"
+      autocomplete="off"
+    ></textarea>
+    <button id="send-btn">Send</button>
+  </div>
+</div>
+
+<script>
+  const chatWindow    = document.getElementById("chat-window");
+  const chatHeader    = document.getElementById("chat-header");
+  const input         = document.getElementById("question-input");
+  const sendBtn       = document.getElementById("send-btn");
+  const convoList     = document.getElementById("convo-list");
+  const newChatBtn    = document.getElementById("new-chat-btn");
+  const emptyState    = document.getElementById("empty-state");
+
+  let activeConvoId = null;
+  let oldestMessageId = null;   // cursor for lazy-load pagination
+  let hasMoreMessages = false;
+  let loadingMore = false;
+
+  /* ── Auto-resize textarea ── */
+  input.addEventListener("input", () => {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 120) + "px";
+  });
+
+  /* ── Sidebar: load conversation list ── */
+  async function loadConversations() {
+    const res  = await fetch("/api/conversations/");
+    const data = await res.json();
+    // Don't overwrite search results if a search is active
+    if (!isSearching) renderSidebar(data.conversations);
+  }
+
+  function renderSidebar(convos) {
+    convoList.innerHTML = "";
+    for (const c of convos) {
+      const item  = document.createElement("div");
+      item.className = "convo-item" + (c.id === activeConvoId ? " active" : "");
+      item.dataset.id = c.id;
+
+      const title = document.createElement("span");
+      title.className = "convo-title";
+      title.textContent = c.title || "New Chat";
+
+      item.appendChild(title);
+      item.addEventListener("click", () => loadConversation(c.id));
+      item.addEventListener("contextmenu", e => showCtxMenu(e, c.id, title));
+      convoList.appendChild(item);
+    }
+  }
+
+  /* ── Load a conversation (initial — last 50 messages) ── */
+  async function loadConversation(id) {
+    activeConvoId    = id;
+    oldestMessageId  = null;
+    hasMoreMessages  = false;
+    localStorage.setItem("lastConvoId", id);
+
+    const res  = await fetch(`/api/conversations/${id}/`);
+    const data = await res.json();
+
+    chatHeader.textContent = data.title || "New Chat";
+    chatWindow.innerHTML   = "";
+
+    hasMoreMessages = data.has_more;
+    oldestMessageId = data.oldest_message_id;
+
+    if (hasMoreMessages) _renderLoadMoreBtn();
+
+    for (const msg of data.messages) {
+      appendMessage(msg.content, msg.role, msg.sources || []);
+    }
+
+    if (data.messages.length === 0) showEmptyState();
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+    loadConversations();
+  }
+
+  /* ── Lazy-load earlier messages ── */
+  async function loadMoreMessages() {
+    if (!activeConvoId || !hasMoreMessages || loadingMore) return;
+    loadingMore = true;
+
+    const btn = document.getElementById("load-more-btn");
+    if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
+
+    // Remember scroll height before prepending so we can keep position stable
+    const prevHeight = chatWindow.scrollHeight;
+
+    try {
+      const res  = await fetch(`/api/conversations/${activeConvoId}/?before=${oldestMessageId}`);
+      const data = await res.json();
+
+      hasMoreMessages = data.has_more;
+      oldestMessageId = data.oldest_message_id;
+
+      // Remove the button before prepending messages
+      document.getElementById("load-more-btn")?.remove();
+
+      if (hasMoreMessages) _renderLoadMoreBtn();
+
+      // Prepend messages in order (oldest first within the batch)
+      const anchor = chatWindow.firstChild;
+      for (const msg of data.messages) {
+        const el = _buildMessageEl(msg.content, msg.role, msg.sources || []);
+        chatWindow.insertBefore(el, anchor);
+      }
+
+      // Restore scroll position so the view doesn't jump
+      chatWindow.scrollTop = chatWindow.scrollHeight - prevHeight;
+    } finally {
+      loadingMore = false;
+    }
+  }
+
+  function _renderLoadMoreBtn() {
+    const btn = document.createElement("button");
+    btn.id        = "load-more-btn";
+    btn.textContent = "Load earlier messages";
+    btn.style.cssText = [
+      "display:block", "margin:0 auto 18px", "padding:7px 18px",
+      "background:transparent", "border:1px solid #d1d5db", "border-radius:20px",
+      "font-size:0.8rem", "color:#64748b", "cursor:pointer", "transition:background 0.15s",
+    ].join(";");
+    btn.onmouseover = () => { btn.style.background = "#f1f5f9"; };
+    btn.onmouseout  = () => { btn.style.background = "transparent"; };
+    btn.addEventListener("click", loadMoreMessages);
+    chatWindow.insertBefore(btn, chatWindow.firstChild);
+  }
+
+  /* ── Start a new chat ── */
+  async function startNewChat() {
+    const res  = await fetch("/api/conversations/new/", { method: "POST" });
+    const data = await res.json();
+    activeConvoId   = data.id;
+    oldestMessageId = null;
+    hasMoreMessages = false;
+    chatHeader.textContent = "New Chat";
+    chatWindow.innerHTML   = "";
+    showEmptyState();
+    loadConversations();
+  }
+
+  function showEmptyState() {
+    const div   = document.createElement("div");
+    div.id      = "empty-state";
+    div.innerHTML = `<h3>Seros Service Manual Assistant</h3><p>Ask a question about the service manuals to get started.</p>`;
+    chatWindow.appendChild(div);
+  }
+
+  /* ── Send a message ── */
+  async function sendMessage() {
+    const question = input.value.trim();
+    if (!question || !activeConvoId) return;
+
+    document.getElementById("empty-state")?.remove();
+    input.value = "";
+    input.style.height = "auto";
+    sendBtn.disabled = true;
+
+    appendMessage(question, "user");
+    const thinking = appendMessage("Thinking…", "thinking");
+
+    try {
+      const res  = await fetch(`/api/conversations/${activeConvoId}/chat/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+      const data = await res.json();
+      thinking.remove();
+
+      if (data.error) {
+        appendMessage("Error: " + data.error, "assistant");
+      } else {
+        appendMessage(data.answer, "assistant", data.sources);
+        if (data.dashboard_data) {
+          const dashEl = _buildDashboardEl(data.dashboard_data);
+          chatWindow.appendChild(dashEl);
+          chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+        if (data.title) {
+          chatHeader.textContent = data.title;
+          loadConversations();
+        }
+      }
+    } catch {
+      thinking.remove();
+      appendMessage("Network error — please try again.", "assistant");
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  /* ── Build a message bubble element (does not append) ── */
+  function _buildMessageEl(text, role, sources) {
+    const div = document.createElement("div");
+    div.className = `message ${role}`;
+
+    if (role === "assistant") {
+      div.innerHTML = marked.parse(text);
+    } else {
+      div.textContent = text;
+    }
+
+    if (sources && sources.length > 0) {
+      const src = document.createElement("div");
+      src.className = "sources";
+      const citations = sources.map(s => {
+        const pages = s.pages && s.pages.length ? ` (p. ${s.pages.join(", ")})` : "";
+        return `${s.file}${pages}`;
+      }).join(" &nbsp;|&nbsp; ");
+      src.innerHTML = `<strong>Sources:</strong> ${citations}`;
+      div.appendChild(src);
+    }
+    return div;
+  }
+
+  /* ── Append a message bubble to the chat window ── */
+  function appendMessage(text, role, sources) {
+    const el = _buildMessageEl(text, role, sources);
+    chatWindow.appendChild(el);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+    return el;
+  }
+
+  /* ── Dashboard panel renderer ── */
+  function _utilClass(pct) {
+    if (pct === null || pct === undefined) return "";
+    return pct >= 80 ? "good" : pct >= 60 ? "warn" : "bad";
+  }
+  function _utilBadgeClass(pct) {
+    if (pct === null || pct === undefined) return "";
+    return pct >= 80 ? "util-good" : pct >= 60 ? "util-warn" : "util-bad";
+  }
+  function _fmt(v, suffix) {
+    if (v === null || v === undefined) return "—";
+    return v + (suffix || "");
+  }
+
+  function _buildDashboardEl(data) {
+    const tool = data.tool;
+
+    if (tool === "get_rig_utilisation") {
+      const s   = data.summary || {};
+      const mo  = data.monthly || [];
+      const f   = data.filters || {};
+      const best  = data.best_month;
+      const worst = data.worst_month;
+
+      const filterParts = [];
+      if (f.rig)   filterParts.push(f.rig);
+      if (f.year)  filterParts.push(f.year);
+      if (f.month) filterParts.push("month " + f.month);
+      const filterStr = filterParts.length ? filterParts.join(" · ") : "All rigs";
+
+      const avgPct = s.avg_utilisation_pct;
+      const avgClass = _utilClass(avgPct);
+
+      const panel = document.createElement("div");
+      panel.className = "dashboard-panel";
+
+      // Header
+      panel.innerHTML = `
+        <div class="dash-header">
+          Rig Utilisation <span>${filterStr}</span>
+        </div>
+        <div class="dash-stats">
+          <div class="dash-stat">
+            <div class="dash-stat-value ${avgClass}">${_fmt(avgPct, "%")}</div>
+            <div class="dash-stat-label">Avg Utilisation</div>
+          </div>
+          <div class="dash-stat">
+            <div class="dash-stat-value">${_fmt(s.total_operating_hrs, " hrs")}</div>
+            <div class="dash-stat-label">Operating</div>
+          </div>
+          <div class="dash-stat">
+            <div class="dash-stat-value">${_fmt(s.total_standby_hrs, " hrs")}</div>
+            <div class="dash-stat-label">Standby</div>
+          </div>
+          <div class="dash-stat">
+            <div class="dash-stat-value">${_fmt(s.total_repair_hrs, " hrs")}</div>
+            <div class="dash-stat-label">Repair</div>
+          </div>
+          <div class="dash-stat">
+            <div class="dash-stat-value">${_fmt(s.total_zero_rate_hrs, " hrs")}</div>
+            <div class="dash-stat-label">Zero Rate</div>
+          </div>
+          <div class="dash-stat">
+            <div class="dash-stat-value">${_fmt(s.rigs_covered)}</div>
+            <div class="dash-stat-label">Rigs</div>
+          </div>
+        </div>
+      `;
+
+      // Monthly table
+      if (mo.length) {
+        const wrap = document.createElement("div");
+        wrap.className = "dash-table-wrap";
+
+        const tbl = document.createElement("table");
+        tbl.className = "dash-table";
+        tbl.innerHTML = `
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Rig</th>
+              <th>Days</th>
+              <th>Operating</th>
+              <th>Standby</th>
+              <th>Repair</th>
+              <th>Zero Rate</th>
+              <th>Rig Move</th>
+              <th>Utilisation</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${mo.map(r => `
+              <tr>
+                <td>${r.month || "—"}</td>
+                <td>${r.Rig_Name || "—"}</td>
+                <td>${_fmt(r.days_logged)}</td>
+                <td>${_fmt(r.operating_hrs, " h")}</td>
+                <td>${_fmt(r.standby_hrs, " h")}</td>
+                <td>${_fmt(r.repair_hrs, " h")}</td>
+                <td>${_fmt(r.zero_rate_hrs, " h")}</td>
+                <td>${_fmt(r.rig_move_hrs, " h")}</td>
+                <td><span class="util-badge ${_utilBadgeClass(r.utilisation_pct)}">${_fmt(r.utilisation_pct, "%")}</span></td>
+              </tr>
+            `).join("")}
+          </tbody>
+        `;
+        wrap.appendChild(tbl);
+        panel.appendChild(wrap);
+      }
+
+      // Best / worst footer
+      if (best || worst) {
+        const bw = document.createElement("div");
+        bw.className = "dash-best-worst";
+        bw.innerHTML = `
+          ${best  ? `<div class="dash-bw-card">Best month: <strong>${best.month} (${best.rig})</strong> — ${_fmt(best.utilisation_pct, "%")}</div>`  : ""}
+          ${worst ? `<div class="dash-bw-card">Worst month: <strong>${worst.month} (${worst.rig})</strong> — ${_fmt(worst.utilisation_pct, "%")}</div>` : ""}
+        `;
+        panel.appendChild(bw);
+      }
+
+      return panel;
+    }
+
+    // Fallback for unknown dashboard tools
+    const pre = document.createElement("pre");
+    pre.style.cssText = "background:#f8fafc;padding:12px;border-radius:8px;font-size:0.8rem;overflow-x:auto;";
+    pre.textContent = JSON.stringify(data, null, 2);
+    return pre;
+  }
+
+  /* ── Right-click context menu ── */
+  const ctxMenu   = document.getElementById("ctx-menu");
+  let ctxConvoId  = null;
+  let ctxTitleEl  = null;
+
+  function showCtxMenu(e, convoId, titleEl) {
+    e.preventDefault();
+    e.stopPropagation();
+    ctxConvoId = convoId;
+    ctxTitleEl = titleEl;
+
+    // Position menu so it never overflows the viewport
+    ctxMenu.style.display = "block";
+    const mw = ctxMenu.offsetWidth, mh = ctxMenu.offsetHeight;
+    const vw = window.innerWidth,    vh = window.innerHeight;
+    ctxMenu.style.left = Math.min(e.clientX, vw - mw - 6) + "px";
+    ctxMenu.style.top  = Math.min(e.clientY, vh - mh - 6) + "px";
+  }
+
+  function hideCtxMenu() {
+    ctxMenu.style.display = "none";
+    ctxConvoId = null;
+    ctxTitleEl = null;
+  }
+
+  document.getElementById("ctx-rename").addEventListener("click", () => {
+    if (!ctxConvoId || !ctxTitleEl) return;
+    const id = ctxConvoId, el = ctxTitleEl;
+    hideCtxMenu();
+
+    // Inline edit: make the span editable
+    const original = el.textContent;
+    el.contentEditable = "true";
+    el.style.outline = "none";
+    el.focus();
+
+    // Select all text
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+
+    async function commit() {
+      el.contentEditable = "false";
+      const newTitle = el.textContent.trim();
+      if (!newTitle || newTitle === original) { el.textContent = original; return; }
+      try {
+        const res = await fetch(`/api/conversations/${id}/rename/`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: newTitle }),
+        });
+        if (!res.ok) { el.textContent = original; return; }
+        if (id === activeConvoId) chatHeader.textContent = newTitle;
+      } catch { el.textContent = original; }
+    }
+
+    el.addEventListener("keydown", function handler(e) {
+      if (e.key === "Enter")  { e.preventDefault(); el.removeEventListener("keydown", handler); commit(); }
+      if (e.key === "Escape") { el.contentEditable = "false"; el.textContent = original; el.removeEventListener("keydown", handler); }
+    });
+    el.addEventListener("blur", function handler() {
+      el.removeEventListener("blur", handler);
+      commit();
+    }, { once: true });
+  });
+
+  document.getElementById("ctx-delete").addEventListener("click", async () => {
+    if (!ctxConvoId) return;
+    const id = ctxConvoId;
+    hideCtxMenu();
+    await fetch(`/api/conversations/${id}/delete/`, { method: "DELETE" });
+    if (activeConvoId === id) startNewChat();
+    else loadConversations();
+  });
+
+  // Close menu on any outside click or Escape
+  document.addEventListener("click", e => {
+    if (!ctxMenu.contains(e.target)) hideCtxMenu();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") hideCtxMenu();
+  });
+
+  /* ── Search ── */
+  const searchInput = document.getElementById("search-input");
+  const searchClear = document.getElementById("search-clear");
+  let searchTimer   = null;
+  let isSearching   = false;
+
+  searchInput.addEventListener("input", () => {
+    const q = searchInput.value.trim();
+    searchClear.style.display = q ? "block" : "none";
+    clearTimeout(searchTimer);
+    if (!q) { isSearching = false; loadConversations(); return; }
+    searchTimer = setTimeout(() => runSearch(q), 280);
+  });
+
+  searchClear.addEventListener("click", () => {
+    searchInput.value = "";
+    searchClear.style.display = "none";
+    isSearching = false;
+    loadConversations();
+    searchInput.focus();
+  });
+
+  async function runSearch(q) {
+    isSearching = true;
+    const res  = await fetch(`/api/conversations/search/?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    // Bail if user already cleared or typed something else
+    if (!isSearching) return;
+    renderSearchResults(data.conversations, data.query);
+  }
+
+  function renderSearchResults(convos, query) {
+    convoList.innerHTML = "";
+
+    if (!convos.length) {
+      const empty = document.createElement("div");
+      empty.style.cssText = "color:rgba(255,255,255,0.3);font-size:0.8rem;padding:16px 10px;text-align:center;";
+      empty.textContent = "No results found";
+      convoList.appendChild(empty);
+      return;
+    }
+
+    for (const c of convos) {
+      const item = document.createElement("div");
+      item.className = "convo-item" + (c.id === activeConvoId ? " active" : "");
+      item.dataset.id = c.id;
+
+      const title = document.createElement("span");
+      title.className = "convo-title";
+      title.innerHTML = _highlight(c.title || "New Chat", query);
+
+      item.appendChild(title);
+
+      if (c.snippet) {
+        const snip = document.createElement("span");
+        snip.style.cssText = [
+          "display:block", "font-size:0.75rem", "color:rgba(255,255,255,0.4)",
+          "white-space:nowrap", "overflow:hidden", "text-overflow:ellipsis",
+          "margin-top:2px",
+        ].join(";");
+        snip.innerHTML = _highlight(c.snippet, query);
+        item.appendChild(snip);
+        item.style.alignItems = "flex-start";
+        item.style.flexDirection = "column";
+      }
+
+      item.addEventListener("click", () => loadConversation(c.id));
+      item.addEventListener("contextmenu", e => showCtxMenu(e, c.id, title));
+      convoList.appendChild(item);
+    }
+  }
+
+  function _highlight(text, query) {
+    if (!query) return escSidebar(text);
+    const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+    return escSidebar(text).replace(re, '<mark style="background:#f59e0b;color:#1a3f7a;border-radius:2px;padding:0 1px;">$1</mark>');
+  }
+
+  function escSidebar(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  /* ── Event listeners ── */
+  newChatBtn.addEventListener("click", startNewChat);
+  sendBtn.addEventListener("click", sendMessage);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  /* ── Init: restore last session or open most recent conversation ── */
+  (async () => {
+    await loadConversations();
+
+    const lastId = localStorage.getItem("lastConvoId");
+    if (lastId) {
+      // Verify it still exists before restoring
+      try {
+        await loadConversation(lastId);
+        return;
+      } catch {
+        localStorage.removeItem("lastConvoId");
+      }
+    }
+
+    // Fall back to most recent conversation, create new only if none exist
+    const res  = await fetch("/api/conversations/");
+    const data = await res.json();
+    if (data.conversations.length > 0) {
+      await loadConversation(data.conversations[0].id);
+    } else {
+      await startNewChat();
+    }
+  })();
+</script>
+
+</body>
+</html>

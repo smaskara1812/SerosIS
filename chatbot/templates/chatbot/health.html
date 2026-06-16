@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seros — System Health</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding: 40px 24px;
+    }
+
+    .container { max-width: 680px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 700; color: #1a3f7a; }
+    header a   { font-size: 0.85rem; color: #64748b; text-decoration: none; }
+    header a:hover { color: #1a3f7a; }
+
+    /* Overall banner */
+    .overall {
+      padding: 16px 20px;
+      border-radius: 10px;
+      margin-bottom: 24px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f1f5f9;
+      color: #64748b;
+    }
+    .overall.ok   { background: #dcfce7; color: #166534; }
+    .overall.fail { background: #fee2e2; color: #991b1b; }
+
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #cbd5e1;
+    }
+    .dot.ok   { background: #22c55e; }
+    .dot.fail { background: #ef4444; }
+
+    /* Cards */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #1a3f7a;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: #e2e8f0;
+      color: #64748b;
+    }
+    .badge.ok   { background: #dcfce7; color: #166534; }
+    .badge.fail { background: #fee2e2; color: #991b1b; }
+
+    .card-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 0.875rem;
+      margin-top: 4px;
+    }
+    .card-row .label {
+      font-weight: 600;
+      color: #334155;
+      min-width: 82px;
+      flex-shrink: 0;
+    }
+    .card-row .value { color: #64748b; word-break: break-all; }
+    .card-row .value.warn { color: #b45309; }
+
+    /* Skeleton shimmer for loading state */
+    .skeleton {
+      display: inline-block;
+      height: 0.875em;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      min-width: 120px;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    footer { margin-top: 32px; text-align: center; font-size: 0.8rem; color: #94a3b8; }
+
+    .refresh-btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 9px 22px;
+      background: #1a3f7a;
+      color: #fff;
+      border-radius: 7px;
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+    }
+    .refresh-btn:hover { background: #0f2a6a; }
+    .refresh-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>System Health</h1>
+    <a href="/">← Back to chat</a>
+  </header>
+
+  <div class="overall" id="overall-banner">
+    <span class="dot" id="overall-dot"></span>
+    <span id="overall-text">Running checks…</span>
+  </div>
+
+  <!-- LLM -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">LLM (Chat Model)</span>
+      <span class="badge" id="llm-badge">Checking</span>
+    </div>
+    <div class="card-row"><span class="label">Provider</span><span class="value" id="llm-provider"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+    <div class="card-row"><span class="label">Model</span><span class="value" id="llm-model"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+    <div class="card-row"><span class="label">Status</span><span class="value" id="llm-detail"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+  </div>
+
+  <!-- Embeddings -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Embeddings Model</span>
+      <span class="badge" id="emb-badge">Checking</span>
+    </div>
+    <div class="card-row"><span class="label">Model</span><span class="value" id="emb-model"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+    <div class="card-row"><span class="label">Status</span><span class="value" id="emb-detail"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+  </div>
+
+  <!-- DB 1 — Operational -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">DB 1 — Operational Data</span>
+      <span class="badge" id="opdb-badge">Checking</span>
+    </div>
+    <div class="card-row"><span class="label">Purpose</span><span class="value">Rig / equipment / workforce data &mdash; read-only, Phase 2</span></div>
+    <div class="card-row"><span class="label">Engine</span><span class="value" id="opdb-engine"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+    <div class="card-row"><span class="label">Database</span><span class="value" id="opdb-database"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+    <div class="card-row"><span class="label">Status</span><span class="value" id="opdb-detail"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+  </div>
+
+  <!-- DB 2 — Chat History -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">DB 2 — Chat History</span>
+      <span class="badge" id="chdb-badge">Checking</span>
+    </div>
+    <div class="card-row"><span class="label">Purpose</span><span class="value">Conversations &amp; messages &mdash; tables: cb_conversations, cb_messages</span></div>
+    <div class="card-row"><span class="label">Engine</span><span class="value" id="chdb-engine"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+    <div class="card-row"><span class="label">Database</span><span class="value" id="chdb-database"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+    <div class="card-row"><span class="label">Status</span><span class="value" id="chdb-detail"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+  </div>
+
+  <!-- Vectorstore -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Vectorstore (Manuals)</span>
+      <span class="badge" id="vs-badge">Checking</span>
+    </div>
+    <div class="card-row"><span class="label">Status</span><span class="value" id="vs-detail"><span class="skeleton">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></div>
+  </div>
+
+  <div style="text-align:center">
+    <button class="refresh-btn" id="refresh-btn" onclick="runChecks()">Refresh</button>
+  </div>
+
+  <footer>Seros AI · Internal tool · Checks run after page load</footer>
+
+</div>
+
+<script>
+  function setBadge(id, ok) {
+    const el = document.getElementById(id);
+    el.className = "badge " + (ok ? "ok" : "fail");
+    el.textContent = ok ? "OK" : "Failed";
+  }
+
+  function setText(id, text, warn) {
+    const el = document.getElementById(id);
+    el.innerHTML = "";
+    el.textContent = text;
+    el.className = "value" + (warn ? " warn" : "");
+  }
+
+  async function runChecks() {
+    const btn = document.getElementById("refresh-btn");
+    btn.disabled = true;
+    btn.textContent = "Checking…";
+
+    // Reset banner to loading state
+    const banner = document.getElementById("overall-banner");
+    banner.className = "overall";
+    document.getElementById("overall-dot").className = "dot";
+    document.getElementById("overall-text").textContent = "Running checks…";
+
+    try {
+      const res  = await fetch("/api/health/");
+      const data = await res.json();
+
+      // LLM
+      setBadge("llm-badge", data.llm.ok);
+      setText("llm-provider", data.llm.provider);
+      setText("llm-model",    data.llm.model);
+      setText("llm-detail",   data.llm.detail, !data.llm.ok);
+
+      // Embeddings
+      setBadge("emb-badge", data.embeddings.ok);
+      setText("emb-model",   data.embeddings.model);
+      setText("emb-detail",  data.embeddings.detail, !data.embeddings.ok);
+
+      // Operational DB
+      setBadge("opdb-badge", data.operational_db.ok);
+      setText("opdb-engine",   data.operational_db.engine);
+      setText("opdb-database", data.operational_db.database);
+      setText("opdb-detail",   data.operational_db.detail, !data.operational_db.ok);
+
+      // Chat History DB
+      setBadge("chdb-badge", data.chat_db.ok);
+      setText("chdb-engine",   data.chat_db.engine);
+      setText("chdb-database", data.chat_db.database);
+      setText("chdb-detail",   data.chat_db.detail, !data.chat_db.ok);
+
+      // Vectorstore
+      setBadge("vs-badge", data.vectorstore.ok);
+      setText("vs-detail", data.vectorstore.detail, !data.vectorstore.ok);
+
+      // Overall banner
+      banner.className = "overall " + (data.overall_ok ? "ok" : "fail");
+      document.getElementById("overall-dot").className = "dot " + (data.overall_ok ? "ok" : "fail");
+      document.getElementById("overall-text").textContent = data.overall_ok
+        ? "All systems operational"
+        : "One or more systems need attention";
+
+    } catch (err) {
+      banner.className = "overall fail";
+      document.getElementById("overall-dot").className = "dot fail";
+      document.getElementById("overall-text").textContent = "Could not reach health API";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Refresh";
+    }
+  }
+
+  // Run automatically after page has painted
+  window.addEventListener("load", runChecks);
+</script>
+
+</body>
+</html>

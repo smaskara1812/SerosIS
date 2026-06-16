@@ -1,0 +1,22 @@
+django==5.2.15
+
+langchain==0.3.25
+langchain-community==0.3.24
+langchain-core==0.3.63
+langchain-chroma==0.1.4
+langchain-ollama==0.2.3
+langchain-google-genai>=2.0.0,<3.0.0
+sentence-transformers
+
+chromadb==0.5.23
+
+pypdf==6.13.1
+docx2txt
+python-docx
+python-dotenv==1.2.2
+
+# ── Database drivers ──────────────────────────────────────────────────────────
+sqlalchemy>=2.0
+pymysql                  # MySQL (dev)
+pyodbc                   # MSSQL via ODBC (production)
+mssql-django             # Django backend for SQL Server

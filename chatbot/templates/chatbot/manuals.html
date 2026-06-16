@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seros — Manual Management</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding: 40px 24px;
+    }
+
+    .container { max-width: 760px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 700; color: #1a3f7a; }
+    .nav-links { display: flex; gap: 18px; }
+    .nav-links a { font-size: 0.85rem; color: #64748b; text-decoration: none; }
+    .nav-links a:hover { color: #1a3f7a; }
+
+    /* ── Section cards ── */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .card-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #1a3f7a;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 18px;
+    }
+
+    /* ── Upload zone ── */
+    #drop-zone {
+      border: 2px dashed #d1d5db;
+      border-radius: 8px;
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    #drop-zone.dragover { border-color: #1a3f7a; background: #f8fafc; }
+    #drop-zone p { color: #64748b; font-size: 0.9rem; margin-bottom: 10px; }
+    #drop-zone span { font-size: 0.8rem; color: #94a3b8; }
+
+    #file-input { display: none; }
+
+    .browse-btn {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 8px 20px;
+      background: #1a3f7a;
+      color: #fff;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s;
+    }
+    .browse-btn:hover { background: #0f2a6a; }
+
+    /* Upload queue */
+    #upload-queue { margin-top: 16px; }
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: #f8fafc;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 0.875rem;
+    }
+    .queue-item .q-name { flex: 1; color: #1a3f7a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .queue-item .q-size { color: #94a3b8; font-size: 0.8rem; flex-shrink: 0; }
+    .queue-item .q-status { font-size: 0.8rem; flex-shrink: 0; }
+    .q-status.ok   { color: #16a34a; }
+    .q-status.err  { color: #dc2626; }
+    .q-status.pending { color: #94a3b8; }
+
+    #upload-btn {
+      margin-top: 14px;
+      padding: 9px 24px;
+      background: #1a3f7a;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: none;
+    }
+    #upload-btn:hover    { background: #0f2a6a; }
+    #upload-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    /* ── File list table ── */
+    .file-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .file-table th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .file-table td {
+      padding: 11px 12px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+      vertical-align: middle;
+    }
+    .file-table tr:last-child td { border-bottom: none; }
+    .file-table tr:hover td { background: #f8fafc; }
+
+    .del-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .del-btn:hover { color: #dc2626; background: #fee2e2; }
+
+    .empty-row td { color: #94a3b8; text-align: center; padding: 28px; font-style: italic; }
+
+    /* ── Ingest section ── */
+    .ingest-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    #ingest-btn {
+      padding: 10px 24px;
+      background: #1a3f7a;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    #ingest-btn:hover    { background: #0f2a6a; }
+    #ingest-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .ingest-status-box {
+      flex: 1;
+      min-width: 200px;
+      padding: 10px 14px;
+      border-radius: 7px;
+      font-size: 0.875rem;
+      background: #f1f5f9;
+      color: #64748b;
+    }
+    .ingest-status-box.running { background: #eff6ff; color: #1d4ed8; }
+    .ingest-status-box.success { background: #dcfce7; color: #166534; }
+    .ingest-status-box.error   { background: #fee2e2; color: #991b1b; }
+
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .ingest-note {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    footer { margin-top: 32px; text-align: center; font-size: 0.8rem; color: #94a3b8; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Manual Management</h1>
+    <div class="nav-links">
+      <a href="/">← Back to chat</a>
+      <a href="/health/">System Health</a>
+    </div>
+  </header>
+
+  <!-- ── Upload ── -->
+  <div class="card">
+    <div class="card-title">Upload Manuals</div>
+
+    <div id="drop-zone">
+      <p>Drag &amp; drop PDF or DOCX files here</p>
+      <span>Max 50 MB per file</span><br/>
+      <button class="browse-btn" onclick="document.getElementById('file-input').click()">Browse files</button>
+    </div>
+    <input type="file" id="file-input" multiple accept=".pdf,.docx" />
+
+    <div id="upload-queue"></div>
+    <button id="upload-btn">Upload</button>
+  </div>
+
+  <!-- ── Existing files ── -->
+  <div class="card">
+    <div class="card-title">Uploaded Manuals</div>
+    <table class="file-table">
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th>Size</th>
+          <th>Last modified</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="file-list-body">
+        <tr class="empty-row"><td colspan="4">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Re-index ── -->
+  <div class="card">
+    <div class="card-title">Re-index Vectorstore</div>
+    <div class="ingest-row">
+      <button id="ingest-btn" onclick="startIngest()">Re-index All</button>
+      <div class="ingest-status-box" id="ingest-status-box">Status unknown</div>
+    </div>
+    <p class="ingest-note">
+      Re-indexing clears the existing vectorstore and re-processes all uploaded files.
+      This may take several minutes for large document sets. The chat assistant will
+      automatically use the new index once complete.
+    </p>
+  </div>
+
+  <footer>Seros AI · Internal tool</footer>
+</div>
+
+<script>
+  /* ── Helpers ── */
+  function fmtSize(bytes) {
+    if (bytes < 1024)       return bytes + ' B';
+    if (bytes < 1048576)    return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  function fmtDate(iso) {
+    return new Date(iso).toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  }
+
+  /* ── File list ── */
+  async function loadFiles() {
+    const res  = await fetch('/api/manuals/');
+    const data = await res.json();
+    renderFiles(data.files);
+  }
+
+  function renderFiles(files) {
+    const tbody = document.getElementById('file-list-body');
+    if (!files.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No manuals uploaded yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = files.map(f => `
+      <tr>
+        <td>${escHtml(f.name)}</td>
+        <td>${fmtSize(f.size)}</td>
+        <td>${fmtDate(f.modified)}</td>
+        <td><button class="del-btn" onclick="deleteFile(${JSON.stringify(f.name)}, this)">Delete</button></td>
+      </tr>
+    `).join('');
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  async function deleteFile(name, btn) {
+    if (!confirm(`Delete "${name}"? This does not re-index automatically.`)) return;
+    btn.disabled = true;
+    const res = await fetch(`/api/manuals/${encodeURIComponent(name)}/delete/`, { method: 'DELETE' });
+    if (res.ok) loadFiles();
+    else { alert('Delete failed.'); btn.disabled = false; }
+  }
+
+  /* ── Upload ── */
+  let pendingFiles = [];
+
+  const dropZone   = document.getElementById('drop-zone');
+  const fileInput  = document.getElementById('file-input');
+  const uploadBtn  = document.getElementById('upload-btn');
+  const uploadQueue = document.getElementById('upload-queue');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    addToQueue([...e.dataTransfer.files]);
+  });
+  fileInput.addEventListener('change', () => {
+    addToQueue([...fileInput.files]);
+    fileInput.value = '';
+  });
+
+  function addToQueue(files) {
+    const allowed = ['.pdf', '.docx'];
+    files.forEach(f => {
+      const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
+      if (!allowed.includes(ext)) {
+        showQueueItem(f.name, f.size, 'err', 'Not a PDF or DOCX');
+        return;
+      }
+      if (f.size > 50 * 1024 * 1024) {
+        showQueueItem(f.name, f.size, 'err', 'Exceeds 50 MB');
+        return;
+      }
+      pendingFiles.push(f);
+      showQueueItem(f.name, f.size, 'pending', 'Ready to upload');
+    });
+    uploadBtn.style.display = pendingFiles.length ? 'inline-block' : 'none';
+  }
+
+  function showQueueItem(name, size, statusClass, statusText) {
+    const div = document.createElement('div');
+    div.className = 'queue-item';
+    div.innerHTML = `
+      <span class="q-name">${escHtml(name)}</span>
+      <span class="q-size">${fmtSize(size)}</span>
+      <span class="q-status ${statusClass}">${statusText}</span>
+    `;
+    uploadQueue.appendChild(div);
+  }
+
+  uploadBtn.addEventListener('click', async () => {
+    if (!pendingFiles.length) return;
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading…';
+
+    const fd = new FormData();
+    pendingFiles.forEach(f => fd.append('files', f));
+
+    try {
+      const res  = await fetch('/api/manuals/upload/', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      // Update queue item statuses
+      const items = uploadQueue.querySelectorAll('.queue-item');
+      let i = 0;
+      pendingFiles.forEach((f, idx) => {
+        const item = items[idx];
+        if (!item) return;
+        const st = item.querySelector('.q-status');
+        if (data.saved && data.saved.includes(f.name)) {
+          st.className = 'q-status ok'; st.textContent = 'Uploaded';
+        } else {
+          const err = data.errors?.find(e => e.name === f.name);
+          st.className = 'q-status err'; st.textContent = err?.error || 'Failed';
+        }
+      });
+
+      pendingFiles = [];
+      uploadBtn.style.display = 'none';
+      loadFiles();
+    } catch {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Upload';
+      alert('Upload failed — please try again.');
+    } finally {
+      uploadBtn.disabled  = false;
+      uploadBtn.textContent = 'Upload';
+    }
+  });
+
+  /* ── Ingest ── */
+  let ingestPollTimer = null;
+
+  async function loadIngestStatus() {
+    const res  = await fetch('/api/manuals/ingest/status/');
+    const data = await res.json();
+    renderIngestStatus(data);
+    return data;
+  }
+
+  function renderIngestStatus(data) {
+    const box = document.getElementById('ingest-status-box');
+    const btn = document.getElementById('ingest-btn');
+
+    if (data.running) {
+      box.className = 'ingest-status-box running';
+      box.innerHTML = '<span class="spinner"></span> Indexing in progress…';
+      btn.disabled  = true;
+    } else if (data.last_result === 'success') {
+      box.className = 'ingest-status-box success';
+      box.textContent = `✓ ${data.last_message} — ${fmtDate(data.last_run)}`;
+      btn.disabled = false;
+    } else if (data.last_result === 'error') {
+      box.className = 'ingest-status-box error';
+      box.textContent = `Error: ${data.last_message}`;
+      btn.disabled = false;
+    } else {
+      box.className = 'ingest-status-box';
+      box.textContent = data.last_message || 'Not yet run';
+      btn.disabled = false;
+    }
+  }
+
+  async function startIngest() {
+    const res = await fetch('/api/manuals/ingest/', { method: 'POST' });
+    if (!res.ok) {
+      const d = await res.json();
+      alert(d.error || 'Could not start ingestion.');
+      return;
+    }
+    // Start polling until done
+    renderIngestStatus({ running: true });
+    document.getElementById('ingest-btn').disabled = true;
+    schedulePoll();
+  }
+
+  function schedulePoll() {
+    clearTimeout(ingestPollTimer);
+    ingestPollTimer = setTimeout(async () => {
+      const data = await loadIngestStatus();
+      if (data.running) schedulePoll();   // keep polling
+    }, 2500);
+  }
+
+  /* ── Init ── */
+  loadFiles();
+  loadIngestStatus().then(data => {
+    if (data.running) schedulePoll();
+  });
+</script>
+</body>
+</html>

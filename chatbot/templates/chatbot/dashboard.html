@@ -1,0 +1,2837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seros Operations Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+    }
+
+    /* ── Nav ── */
+    .nav {
+      background: #1a3f7a;
+      color: #fff;
+      padding: 0 28px;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    }
+    .nav-brand {
+      font-size: 0.95rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .nav-brand span { opacity: 0.45; font-weight: 400; font-size: 0.8rem; }
+    .nav-links { display: flex; gap: 20px; align-items: center; }
+    .nav-links a {
+      color: rgba(255,255,255,0.55);
+      text-decoration: none;
+      font-size: 0.85rem;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover, .nav-links a.active { color: #fff; }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 10px 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 54px;
+      z-index: 100;
+    }
+    .filter-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .filter-sep { width: 1px; height: 24px; background: #e5e7eb; }
+
+    /* Year select */
+    #year-select {
+      appearance: none;
+      background: #f8fafc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+      border: 1px solid #e2e8f0;
+      color: #1a3f7a;
+      padding: 6px 32px 6px 12px;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      outline: none;
+      font-family: inherit;
+      min-width: 120px;
+      transition: border-color 0.15s;
+    }
+    #year-select:focus { border-color: #1a3f7a; }
+
+    /* ── Multi-select rig dropdown ── */
+    .rig-dropdown {
+      position: relative;
+    }
+    .rig-trigger {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      color: #1a3f7a;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.15s, background 0.15s;
+      min-width: 180px;
+      font-family: inherit;
+    }
+    .rig-trigger:hover { border-color: #1a3f7a; background: #f1f5f9; }
+    .rig-trigger.open  { border-color: #1a3f7a; background: #fff; }
+    .rig-trigger-label { flex: 1; }
+    .rig-trigger-badge {
+      background: #1a3f7a;
+      color: #fff;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 1px 7px;
+      min-width: 18px;
+      text-align: center;
+    }
+    .rig-trigger-badge.hidden { display: none; }
+    .rig-trigger-arrow {
+      width: 12px;
+      height: 8px;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center;
+      flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+    .rig-trigger.open .rig-trigger-arrow { transform: rotate(180deg); }
+
+    .rig-panel {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      width: 280px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      z-index: 999;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .rig-panel.open { display: flex; }
+
+    .rig-search-wrap {
+      padding: 10px 10px 6px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .rig-search {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      outline: none;
+      font-family: inherit;
+      color: #1a3f7a;
+    }
+    .rig-search:focus { border-color: #1a3f7a; }
+
+    .rig-actions {
+      display: flex;
+      gap: 6px;
+      padding: 6px 10px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .rig-action-btn {
+      font-size: 0.75rem;
+      color: #3dbdb0;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+    .rig-action-btn:hover { background: #e8f6f5; }
+
+    .rig-list {
+      overflow-y: auto;
+      max-height: 240px;
+    }
+    .rig-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background 0.1s;
+      border-bottom: 1px solid #f8fafc;
+    }
+    .rig-item:hover { background: #f8fafc; }
+    .rig-item:last-child { border-bottom: none; }
+    .rig-item input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: #1a3f7a;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .rig-item-name {
+      font-size: 0.85rem;
+      color: #1a3f7a;
+      font-weight: 500;
+      flex: 1;
+    }
+    .rig-item-short {
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+    .rig-item-badge {
+      font-size: 0.68rem;
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .rig-active-badge   { background: #dcfce7; color: #16a34a; }
+    .rig-inactive-badge { background: #f1f5f9; color: #94a3b8; }
+
+    .rig-empty {
+      padding: 16px 12px;
+      font-size: 0.82rem;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    /* Apply button */
+    .rig-footer {
+      padding: 8px 10px;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .rig-apply-btn {
+      background: #1a3f7a;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .rig-apply-btn:hover { background: #0f2a6a; }
+
+    /* Refresh + timestamp */
+    .filter-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-left: auto;
+    }
+    #refresh-btn {
+      background: #1a3f7a;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    #refresh-btn:hover { background: #0f2a6a; }
+    .last-updated { font-size: 0.75rem; color: #94a3b8; }
+
+    /* ── Page content ── */
+    .page { padding: 22px 28px; max-width: 1400px; margin: 0 auto; }
+
+    /* ── KPI cards ── */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    /* ── KPI / chart info icon & tooltip ── */
+    .kpi-card { position: relative; }
+    .kpi-info, .chart-info {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px;
+      border-radius: 50%;
+      background: #e2e8f0; color: #64748b;
+      font-size: 9px; font-weight: 600; font-style: normal !important; letter-spacing: 0;
+      cursor: default; user-select: none;
+      transition: background 0.15s, color 0.15s;
+      line-height: 1; flex-shrink: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .kpi-info {
+      position: absolute; top: 10px; right: 12px;
+    }
+    .kpi-info:hover, .chart-info:hover { background: #1a3f7a; color: #fff; }
+    .chart-info { margin-left: 6px; vertical-align: middle; }
+
+    #kpi-tooltip {
+      position: fixed;
+      z-index: 9999;
+      max-width: 280px;
+      background: #1e293b;
+      color: #f1f5f9;
+      font-size: 0.78rem;
+      line-height: 1.55;
+      padding: 10px 13px;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      pointer-events: none;
+      display: none;
+    }
+    #kpi-tooltip b { color: #3dbdb0; }
+
+    .kpi-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .kpi-value { font-size: 1.65rem; font-weight: 700; color: #1a3f7a; line-height: 1; }
+    .kpi-value.good { color: #16a34a; }
+    .kpi-value.warn { color: #d97706; }
+    .kpi-value.bad  { color: #dc2626; }
+    .kpi-label {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 6px;
+    }
+
+    /* ── Charts ── */
+    .chart-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .chart-grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+    .chart-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      padding: 18px 20px 12px;
+      margin-bottom: 16px;
+    }
+    .chart-card.no-mb { margin-bottom: 0; }
+    .chart-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #1a3f7a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chart-title span {
+      font-weight: 400;
+      color: #94a3b8;
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 0.78rem;
+    }
+    .chart-body { width: 100%; }
+
+    /* ── Loading overlay ── */
+    #loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(240,242,245,0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+      gap: 12px;
+    }
+    #loading-overlay.hidden { display: none; }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #1a3f7a;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-overlay p { font-size: 0.875rem; color: #64748b; }
+
+    /* ── Dashboard layout: sidebar + main ── */
+    .dashboard-layout {
+      display: flex;
+      min-height: calc(100vh - 114px);
+    }
+
+    .sidebar {
+      width: 216px;
+      flex-shrink: 0;
+      background: #fff;
+      border-right: 1px solid #e5e7eb;
+      padding: 0 0 32px;
+      position: sticky;
+      top: 114px;
+      height: calc(100vh - 114px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      transition: width 0.22s ease;
+    }
+    .sidebar.collapsed {
+      width: 44px;
+    }
+
+    /* Toggle button */
+    .sidebar-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 10px 10px 6px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .sidebar-toggle-btn {
+      width: 28px;
+      height: 28px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.12s;
+      color: #64748b;
+      font-size: 13px;
+    }
+    .sidebar-toggle-btn:hover { background: #e2e8f0; }
+
+    .sidebar-body {
+      overflow: hidden;
+      transition: opacity 0.18s ease;
+    }
+    .sidebar.collapsed .sidebar-body {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .sidebar-section-label {
+      padding: 14px 16px 4px;
+      font-size: 0.67rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      white-space: nowrap;
+    }
+
+    .sidebar-item {
+      display: block;
+      padding: 8px 18px 8px 20px;
+      font-size: 0.855rem;
+      color: #64748b;
+      cursor: pointer;
+      text-decoration: none;
+      border-left: 3px solid transparent;
+      transition: color 0.12s, background 0.12s;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .sidebar-item:hover { color: #1a3f7a; background: #f8fafc; }
+    .sidebar-item.active {
+      color: #1a3f7a;
+      font-weight: 600;
+      border-left-color: #1a3f7a;
+      background: #e8f5f4;
+    }
+    .sidebar-item.coming-soon {
+      color: #cbd5e1;
+      cursor: default;
+      font-style: italic;
+      font-size: 0.78rem;
+      padding-left: 24px;
+    }
+
+    .main-content { flex: 1; min-width: 0; padding: 22px 28px; transition: padding 0.22s ease; }
+
+    /* ── Insight sections ── */
+    .insight-section { display: none; }
+    .insight-section.active { display: block; }
+
+    @media (max-width: 900px) {
+      .chart-grid-2, .chart-grid-3 { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <p>Loading dashboard…</p>
+</div>
+
+<!-- ── Nav ── -->
+<nav class="nav">
+  <div class="nav-brand">Seros AI <span>/ Operations Dashboard</span></div>
+  <div class="nav-links">
+    <a href="/">Chat</a>
+    <a href="/dashboard/" class="active">Dashboard</a>
+    <a href="/health/">Health</a>
+    <a href="/manuals/">Manuals</a>
+  </div>
+</nav>
+
+<!-- ── Filter bar ── -->
+<div class="filter-bar">
+  <span class="filter-label">Filters</span>
+  <div class="filter-sep"></div>
+
+  <!-- Year -->
+  <span class="filter-label" style="color:#64748b;text-transform:none;font-weight:500;">Year</span>
+  <select id="year-select">
+    <option value="">All years</option>
+  </select>
+
+  <div class="filter-sep"></div>
+
+  <!-- Rig multi-select -->
+  <span class="filter-label" style="color:#64748b;text-transform:none;font-weight:500;">Rigs</span>
+  <div class="rig-dropdown" id="rig-dropdown">
+    <div class="rig-trigger" id="rig-trigger">
+      <span class="rig-trigger-label" id="rig-trigger-label">All rigs</span>
+      <span class="rig-trigger-badge hidden" id="rig-badge">0</span>
+      <span class="rig-trigger-arrow"></span>
+    </div>
+    <div class="rig-panel" id="rig-panel">
+      <div class="rig-search-wrap">
+        <input class="rig-search" id="rig-search" type="text" placeholder="Search rigs…" autocomplete="off" />
+      </div>
+      <div class="rig-actions">
+        <button class="rig-action-btn" id="rig-select-all">Select all</button>
+        <button class="rig-action-btn" id="rig-clear">Clear</button>
+      </div>
+      <div class="rig-list" id="rig-list">
+        <div class="rig-empty">Loading rigs…</div>
+      </div>
+      <div class="rig-footer">
+        <button class="rig-apply-btn" id="rig-apply">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-right">
+    <button id="refresh-btn">↻ Refresh</button>
+    <span class="last-updated" id="last-updated"></span>
+  </div>
+</div>
+
+<!-- ── Dashboard layout ── -->
+<div class="dashboard-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-toggle">
+      <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="Collapse sidebar">&#x2715;</button>
+    </div>
+    <div class="sidebar-body" id="sidebar-body">
+      <div class="sidebar-section-label">Operations</div>
+      <a class="sidebar-item active" data-insight="utilisation">Rig Utilisation</a>
+      <a class="sidebar-item" data-insight="drilling">Drilling Performance</a>
+      <a class="sidebar-item" data-insight="npt">NPT Analysis</a>
+
+      <div class="sidebar-section-label">HSE</div>
+      <a class="sidebar-item" data-insight="hse">HSE Overview</a>
+
+      <div class="sidebar-section-label">Workforce</div>
+      <span class="sidebar-item coming-soon">Coming soon</span>
+
+      <div class="sidebar-section-label">Finance</div>
+      <span class="sidebar-item coming-soon">Coming soon</span>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main-content">
+
+    <!-- ══ Insight 1: Rig Utilisation ══ -->
+    <div id="insight-utilisation" class="insight-section active">
+
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-utilisation">i</span>
+          <div class="kpi-value" id="kpi-utilisation">—</div><div class="kpi-label">Avg Utilisation</div></div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-active-rigs">i</span>
+          <div class="kpi-value" id="kpi-active-rigs">—</div><div class="kpi-label">Active Rigs</div></div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-total-rigs">i</span>
+          <div class="kpi-value" id="kpi-total-rigs">—</div><div class="kpi-label">Total Rigs</div></div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-employees">i</span>
+          <div class="kpi-value" id="kpi-employees">—</div><div class="kpi-label">Active Employees</div></div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-crew">i</span>
+          <div class="kpi-value" id="kpi-crew">—</div><div class="kpi-label">Crew Posted Today</div></div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-incidents">i</span>
+          <div class="kpi-value" id="kpi-incidents">—</div><div class="kpi-label">Incidents</div></div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-npt">i</span>
+          <div class="kpi-value" id="kpi-npt">—</div><div class="kpi-label">NPT Hours</div></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Rig Utilisation <span id="util-chart-subtitle">% by month per rig</span><span class="chart-info" data-kpi="chart-info-utilisation">i</span></div>
+        <div class="chart-body" id="chart-utilisation" style="height:340px;"></div>
+      </div>
+
+      <div class="chart-grid-2">
+        <div class="chart-card no-mb">
+          <div class="chart-title">
+            Hours Breakdown
+            <span id="hours-title-sub">stacked by category · click a bar to drill into a month</span>
+            <button id="hours-back-btn" style="display:none;margin-left:auto;font-size:0.75rem;font-family:inherit;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;padding:3px 10px;cursor:pointer;color:#1a3f7a;">← Back</button><span class="chart-info" data-kpi="chart-info-hours">i</span></div>
+          <div class="chart-body" id="chart-hours" style="height:280px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">
+            Incidents by Year
+            <span id="inc-year-title-sub">click a bar for monthly breakdown</span>
+            <button id="inc-year-back-btn" style="display:none;margin-left:auto;font-size:0.75rem;font-family:inherit;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;padding:3px 10px;cursor:pointer;color:#1a3f7a;">← Back</button><span class="chart-info" data-kpi="chart-info-inc-year">i</span></div>
+          <div class="chart-body" id="chart-incidents-year" style="height:280px;"></div>
+        </div>
+      </div>
+      <div style="margin-bottom:16px;"></div>
+
+      <div class="chart-grid-2">
+        <div class="chart-card no-mb">
+          <div class="chart-title">
+            Incidents by Rig
+            <span id="inc-rig-title-sub">click a rig for year trend</span>
+            <button id="inc-rig-back-btn" style="display:none;margin-left:auto;font-size:0.75rem;font-family:inherit;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;padding:3px 10px;cursor:pointer;color:#1a3f7a;">← Back</button><span class="chart-info" data-kpi="chart-info-inc-rig">i</span></div>
+          <div class="chart-body" id="chart-incidents-rig" style="height:260px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">
+            Field Crew by Rig
+            <span>current postings · not year-filtered</span>
+          </div>
+          <div class="chart-body" id="chart-headcount" style="height:260px;"></div>
+        </div>
+      </div>
+
+    </div><!-- /#insight-utilisation -->
+
+    <!-- ══ Insight 2: Drilling Performance ══ -->
+    <div id="insight-drilling" class="insight-section">
+
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-rop">i</span>
+          <div class="kpi-value" id="kpi-rop">—</div>
+          <div class="kpi-label">ROP (m/hr)</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-metres">i</span>
+          <div class="kpi-value" id="kpi-metres">—</div>
+          <div class="kpi-label">Metres Drilled</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-drill-hrs">i</span>
+          <div class="kpi-value" id="kpi-drill-hrs">—</div>
+          <div class="kpi-label">Drilling Hours</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-drill-ops">i</span>
+          <div class="kpi-value" id="kpi-drill-ops">—</div>
+          <div class="kpi-label">Drill Operations</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-flat-hrs">i</span>
+          <div class="kpi-value" id="kpi-flat-hrs">—</div>
+          <div class="kpi-label">Flat Time Hours</div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Rate of Penetration — Year on Year <span>m/hr · drilling ops only (Depth_To > Depth_From)</span><span class="chart-info" data-kpi="chart-info-rop-yoy">i</span></div>
+        <div class="chart-body" id="chart-rop-yoy" style="height:300px;"></div>
+      </div>
+
+      <div class="chart-grid-2">
+        <div class="chart-card no-mb">
+          <div class="chart-title">ROP by Hole Section <span>metres drilled &amp; rate</span><span class="chart-info" data-kpi="chart-info-rop-section">i</span></div>
+          <div class="chart-body" id="chart-rop-section" style="height:300px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">Operations Time Breakdown <span>all op types · hours</span><span class="chart-info" data-kpi="chart-info-ops-breakdown">i</span></div>
+          <div class="chart-body" id="chart-ops-breakdown" style="height:300px;"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;"></div>
+
+      <div class="chart-grid-2">
+        <div class="chart-card no-mb">
+          <div class="chart-title">
+            ROP by Rig
+            <span>all rigs · drilling actual · selected year · weighted avg</span>
+          </div>
+          <div class="chart-body" id="chart-rop-by-rig" style="height:320px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">
+            Metres Drilled by Rig
+            <span id="metres-rig-sub">total depth progress · selected year · click a rig to see locations</span>
+            <button id="metres-rig-back-btn" style="display:none;margin-left:auto;font-size:0.75rem;font-family:inherit;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;padding:3px 10px;cursor:pointer;color:#1a3f7a;">← Back</button><span class="chart-info" data-kpi="chart-info-metres-rig">i</span></div>
+          <div class="chart-body" id="chart-metres-by-rig" style="height:320px;"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;"></div>
+
+      <div class="chart-card">
+        <div class="chart-title">
+          Flat Time Breakdown
+          <span id="flat-title-sub">zero-depth-progress ops · hours by type · click a bar to see per-rig split</span>
+          <button id="flat-back-btn" style="display:none;margin-left:auto;font-size:0.75rem;font-family:inherit;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;padding:3px 10px;cursor:pointer;color:#1a3f7a;">← Back</button><span class="chart-info" data-kpi="chart-info-flat-time">i</span></div>
+        <div class="chart-body" id="chart-flat-time" style="height:340px;"></div>
+      </div>
+
+    </div><!-- /#insight-drilling -->
+
+    <!-- ══ Insight 3: NPT Analysis ══ -->
+    <div id="insight-npt" class="insight-section">
+
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-npt-hrs">i</span>
+          <div class="kpi-value" id="kpi-npt-hrs">—</div>
+          <div class="kpi-label">Total NPT Days</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-npt-pct">i</span>
+          <div class="kpi-value" id="kpi-npt-pct">—</div>
+          <div class="kpi-label">NPT % of Rig Time</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-npt-events">i</span>
+          <div class="kpi-value" id="kpi-npt-events">—</div>
+          <div class="kpi-label">NPT Events</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-npt-avg">i</span>
+          <div class="kpi-value" id="kpi-npt-avg">—</div>
+          <div class="kpi-label">Avg Event Duration</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-npt-incident">i</span>
+          <div class="kpi-value" id="kpi-npt-incident">—</div>
+          <div class="kpi-label">Incident NPT Days</div>
+        </div>
+      </div>
+
+      <!-- YoY trend full width -->
+      <div class="chart-card">
+        <div class="chart-title">NPT Hours — Year on Year <span>total hours &amp; event count · source: drilling ops (Op ID 24)</span><span class="chart-info" data-kpi="chart-info-npt-yoy">i</span></div>
+        <div class="chart-body" id="chart-npt-yoy" style="height:280px;"></div>
+      </div>
+
+      <!-- Monthly + by rig -->
+      <div class="chart-grid-2">
+        <div class="chart-card no-mb">
+          <div class="chart-title">Monthly NPT Trend <span>hours &amp; events · selected year</span><span class="chart-info" data-kpi="chart-info-npt-monthly">i</span></div>
+          <div class="chart-body" id="chart-npt-monthly" style="height:300px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">NPT by Rig <span>total hours · selected year</span>
+            <button id="npt-by-rig-back-btn" style="display:none;margin-left:auto;font-size:0.75rem;font-family:inherit;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;padding:3px 10px;cursor:pointer;color:#1a3f7a;">← Back</button><span class="chart-info" data-kpi="chart-info-npt-rig">i</span></div>
+          <div class="chart-body" id="chart-npt-by-rig" style="height:300px;"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;"></div>
+
+      <!-- Top causes full width -->
+      <div class="chart-card">
+        <div class="chart-title">Top NPT Causes <span>grouped by downtime reason · hours · top 15</span>
+          <button id="npt-reasons-back-btn" style="display:none;margin-left:auto;font-size:0.75rem;font-family:inherit;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;padding:3px 10px;cursor:pointer;color:#1a3f7a;">← Back</button><span class="chart-info" data-kpi="chart-info-npt-causes">i</span></div>
+        <div class="chart-body" id="chart-npt-reasons" style="height:380px;"></div>
+      </div>
+
+    </div><!-- /#insight-npt -->
+
+
+    <!-- ══ Insight 4: HSE Overview ══ -->
+    <div id="insight-hse" class="insight-section">
+
+      <div id="hse-spinner" style="display:none;justify-content:center;align-items:center;height:120px;gap:10px;color:#64748b;font-size:0.875rem;">
+        <div style="width:18px;height:18px;border:2px solid #3dbdb0;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
+        Loading HSE data…
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-hse-open-cards">i</span>
+          <div class="kpi-value" id="kpi-hse-open-cards">—</div>
+          <div class="kpi-label">Open Hazard Cards</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-hse-card-close">i</span>
+          <div class="kpi-value" id="kpi-hse-card-close">—</div>
+          <div class="kpi-label">Card Close Rate</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-hse-overdue">i</span>
+          <div class="kpi-value" id="kpi-hse-overdue">—</div>
+          <div class="kpi-label">Overdue Actions</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-hse-closure-rate">i</span>
+          <div class="kpi-value" id="kpi-hse-closure-rate">—</div>
+          <div class="kpi-label">Action Closure Rate</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-hse-tfs">i</span>
+          <div class="kpi-value" id="kpi-hse-tfs">—</div>
+          <div class="kpi-label">Timeout for Safety</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-hse-max-age">i</span>
+          <div class="kpi-value" id="kpi-hse-max-age">—</div>
+          <div class="kpi-label">Oldest Open Card</div>
+        </div>
+      </div>
+
+      <!-- Submission Trend — full width, stacked by type -->
+      <div class="chart-card">
+        <div class="chart-title">Monthly Submission Trend <span>stacked by hazard type · TFS dashed line · last 6 years</span><span class="chart-info" data-kpi="chart-info-chart-hse-submission">i</span></div>
+        <div class="chart-body" id="chart-hse-submission" style="height:300px;"></div>
+      </div>
+
+      <!-- Hazard Profile Row: Type + Work Location + Dept -->
+      <div class="chart-grid-3" style="margin-bottom:16px;">
+        <div class="chart-card no-mb">
+          <div class="chart-title">Hazard Type <span>all submissions</span><span class="chart-info" data-kpi="chart-info-chart-hse-type">i</span></div>
+          <div class="chart-body" id="chart-hse-type" style="height:260px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">Top Work Locations <span>by card count</span><span class="chart-info" data-kpi="chart-info-chart-hse-location">i</span></div>
+          <div class="chart-body" id="chart-hse-location" style="height:260px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">Responsible Department <span>cards by dept</span><span class="chart-info" data-kpi="chart-info-chart-hse-dept">i</span></div>
+          <div class="chart-body" id="chart-hse-dept" style="height:260px;"></div>
+        </div>
+      </div>
+
+      <!-- Close-out Health: Ageing + Closure by Rig -->
+      <div class="chart-grid-2" style="margin-bottom:16px;">
+        <div class="chart-card no-mb">
+          <div class="chart-title">Open Card Ageing <span>current snapshot · not year-filtered</span><span class="chart-info" data-kpi="chart-info-chart-hse-ageing">i</span></div>
+          <div class="chart-body" id="chart-hse-ageing" style="height:260px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">Action Closure by Rig <span>closed vs overdue corrective actions</span><span class="chart-info" data-kpi="chart-info-chart-hse-closure">i</span></div>
+          <div class="chart-body" id="chart-hse-closure" style="height:260px;"></div>
+        </div>
+      </div>
+
+      <!-- Incidents vs Hazard Cards — full width -->
+      <div class="chart-card">
+        <div class="chart-title">Incidents vs Hazard Cards <span>monthly · leading vs lagging indicator</span><span class="chart-info" data-kpi="chart-info-chart-hse-inc-haz">i</span></div>
+        <div class="chart-body" id="chart-hse-inc-haz" style="height:260px;"></div>
+      </div>
+
+      <!-- TFS Breakdown — 2 columns -->
+      <div class="chart-grid-2" style="margin-bottom:16px;">
+        <div class="chart-card">
+          <div class="chart-title">Timeout for Safety — by Rig <span>count + TFS rate %</span><span class="chart-info" data-kpi="chart-info-chart-tfs-rig">i</span></div>
+          <div class="chart-body" id="chart-tfs-rig" style="height:260px;"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Timeout for Safety — by Work Location <span>top locations by TFS count</span><span class="chart-info" data-kpi="chart-info-chart-tfs-location">i</span></div>
+          <div class="chart-body" id="chart-tfs-location" style="height:260px;"></div>
+        </div>
+      </div>
+
+    </div><!-- /#insight-hse -->
+
+  </main>
+</div><!-- /.dashboard-layout -->
+
+<div id="kpi-tooltip"></div>
+<script>
+  const PALETTE = [
+    "#1a3f7a","#3dbdb0","#2b7cb8","#f59e0b","#ef4444",
+    "#8b5cf6","#06b6d4","#f97316","#84cc16","#ec4899",
+    "#64748b","#0ea5e9","#d946ef","#14b8a6","#f43f5e",
+  ];
+
+  const charts = {};
+  let allRigs = [];          // full list from /api/dashboard/meta/
+  let selectedRigs = [];     // currently selected (empty = all)
+  let monthlyDetail = [];    // per-rig per-month data for drill-down
+  let hoursOverviewData = null; // saved overview data for back-navigation
+
+  /* ── ECharts helpers ── */
+  function initChart(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    if (charts[id]) return charts[id];
+    const c = echarts.init(el, null, { renderer: "svg" });
+    charts[id] = c;
+    return c;
+  }
+
+  window.addEventListener("resize", () => Object.values(charts).forEach(c => c.resize()));
+
+  /* ── KPI helpers ── */
+  function setKpi(id, value, suffix, classRule) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (value === null || value === undefined) { el.textContent = "—"; el.className = "kpi-value"; return; }
+    el.textContent = value + (suffix || "");
+    el.className   = "kpi-value" + (classRule ? " " + classRule(+value) : "");
+  }
+  function utilClass(v) { return v >= 80 ? "good" : v >= 60 ? "warn" : "bad"; }
+
+  /* ── Chart renderers ── */
+  function renderUtilisation(data) {
+    const c = initChart("chart-utilisation");
+    if (!c) return;
+    const months = data.months || [];
+    const series = (data.series || []).map((s, i) => ({
+      name: s.name,
+      type: "line",
+      smooth: true,
+      symbol: "circle",
+      symbolSize: 5,
+      data: s.data,
+      itemStyle: { color: PALETTE[i % PALETTE.length] },
+      lineStyle: { width: 2.5 },
+      connectNulls: false,
+    }));
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        formatter(params) {
+          let s = `<b>${params[0].axisValue}</b><br/>`;
+          for (const p of params) {
+            const v = p.value !== null && p.value !== undefined ? p.value + "%" : "—";
+            s += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:5px;"></span>${p.seriesName}: <b>${v}</b><br/>`;
+          }
+          return s;
+        },
+      },
+      legend: { type: "scroll", bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+      grid: { top: 16, left: 52, right: 20, bottom: 56 },
+      xAxis: { type: "category", data: months, axisLabel: { fontSize: 11, rotate: 30 } },
+      yAxis: {
+        type: "value", min: 0, max: 100,
+        axisLabel: { formatter: "{value}%", fontSize: 11 },
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+      },
+      series,
+    }, true);
+    // Update subtitle
+    const sub = document.getElementById("util-chart-subtitle");
+    if (sub) sub.textContent = `% by month${selectedRigs.length ? " · " + selectedRigs.join(", ") : " · all rigs"}`;
+  }
+
+  const HOUR_CATS = [
+    { key: "operating",  label: "Operating",  color: "#16a34a" },
+    { key: "standby",    label: "Standby",    color: "#3dbdb0" },
+    { key: "repair",     label: "Repair",     color: "#f59e0b" },
+    { key: "zero_rate",  label: "Zero Rate",  color: "#ef4444" },
+    { key: "rig_move",   label: "Rig Move",   color: "#8b5cf6" },
+  ];
+
+  function renderHours(data, detail) {
+    // detail is the per-rig per-month array — capture it in the closure now
+    hoursOverviewData = data;
+    const capturedDetail = detail || [];   // closed over in the click handler
+    const c = initChart("chart-hours");
+    if (!c) return;
+
+    document.getElementById("hours-back-btn").style.display = "none";
+    document.getElementById("hours-title-sub").textContent = "stacked by category · click a bar to drill in";
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter(params) {
+          let s = `<b>${params[0].axisValue}</b><br/>`;
+          let total = 0;
+          for (const p of params) {
+            const v = parseFloat(p.value) || 0;
+            s += `<span style="display:inline-block;width:10px;height:10px;background:${p.color};margin-right:5px;border-radius:2px;"></span>${p.seriesName}: <b>${v.toFixed(1)} h</b><br/>`;
+            total += v;
+          }
+          s += `<br/><b>Total: ${total.toFixed(1)} h</b>`;
+          return s;
+        },
+      },
+      legend: { bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+      grid: { top: 16, left: 58, right: 16, bottom: 56 },
+      xAxis: { type: "category", data: data.months || [], axisLabel: { fontSize: 11, rotate: 30 } },
+      yAxis: {
+        type: "value",
+        axisLabel: { formatter: v => v >= 1000 ? (v/1000).toFixed(1)+"k h" : v+" h", fontSize: 11 },
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+      },
+      series: HOUR_CATS.map(cat => ({
+        name: cat.label, type: "bar", stack: "hours",
+        data: data[cat.key] || [],
+        itemStyle: { color: cat.color },
+        cursor: "pointer",
+      })),
+    }, true);
+
+    c.off("click");
+    c.on("click", params => {
+      // params.name = x-axis category value for bar clicks
+      // params.axisValue also works but name is more reliable
+      const month = params.name || (params.axisValue);
+      console.log("[Drilldown] clicked:", month, "detail rows:", capturedDetail.length,
+                  "sample months:", capturedDetail.slice(0,3).map(r => r.month));
+      if (month) _renderHoursDrilldown(c, month, capturedDetail, data);
+    });
+  }
+
+  function _renderHoursDrilldown(c, month, detail, overviewData) {
+    document.getElementById("hours-back-btn").style.display = "inline-flex";
+
+    const rows = detail.filter(r => String(r.month).trim() === String(month).trim());
+    console.log("[Drilldown] month=", JSON.stringify(month), "matched rows:", rows.length);
+
+    if (!rows.length) {
+      document.getElementById("hours-title-sub").textContent = `No rig breakdown available for ${month}`;
+      return;
+    }
+
+    document.getElementById("hours-title-sub").textContent = `by rig · ${month}`;
+
+    // Sort rigs by total hours descending
+    const total = r => (parseFloat(r.operating)||0)+(parseFloat(r.standby)||0)+(parseFloat(r.repair)||0)+(parseFloat(r.zero_rate)||0)+(parseFloat(r.rig_move)||0);
+    rows.sort((a, b) => total(b) - total(a));
+    const rigs = rows.map(r => r.rig);
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter(params) {
+          let s = `<b>${params[0].axisValue}</b> <span style="color:#94a3b8;font-size:11px;">${month}</span><br/>`;
+          let total = 0;
+          for (const p of params) {
+            const v = parseFloat(p.value) || 0;
+            s += `<span style="display:inline-block;width:10px;height:10px;background:${p.color};margin-right:5px;border-radius:2px;"></span>${p.seriesName}: <b>${v.toFixed(1)} h</b><br/>`;
+            total += v;
+          }
+          s += `<br/><b>Total: ${total.toFixed(1)} h</b>`;
+          return s;
+        },
+      },
+      legend: { bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+      grid: { top: 16, left: 58, right: 16, bottom: 56 },
+      xAxis: { type: "category", data: rigs, axisLabel: { fontSize: 11, rotate: 30 } },
+      yAxis: {
+        type: "value",
+        axisLabel: { formatter: v => v >= 1000 ? (v/1000).toFixed(1)+"k h" : v+" h", fontSize: 11 },
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+      },
+      series: HOUR_CATS.map(cat => ({
+        name: cat.label, type: "bar", stack: "hours",
+        data: rows.map(r => parseFloat(r[cat.key]) || 0),
+        itemStyle: { color: cat.color },
+        cursor: "default",
+      })),
+    }, true);
+
+    c.off("click");
+    // Allow clicking a rig bar to zoom → no-op for now, just show back
+  }
+
+  const INC_SEV_CATS = [
+    { key: "high",    label: "High",   color: "#ef4444" },
+    { key: "medium",  label: "Medium", color: "#f59e0b" },
+    { key: "low_sev", label: "Low",    color: "#16a34a" },
+  ];
+
+  function renderIncidentsYear(data, capturedDetail) {
+    const detail = capturedDetail || [];
+    const c = initChart("chart-incidents-year");
+    if (!c) return;
+
+    document.getElementById("inc-year-back-btn").style.display = "none";
+    document.getElementById("inc-year-title-sub").textContent  = "click a bar for monthly breakdown";
+
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      grid: { top: 24, left: 44, right: 16, bottom: 36 },
+      xAxis: { type: "category", data: data.years || [], axisLabel: { fontSize: 11 } },
+      yAxis: {
+        type: "value", minInterval: 1,
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+        axisLabel: { fontSize: 11 },
+      },
+      series: [{
+        type: "bar",
+        data: (data.counts || []).map((v, i) => ({
+          value: v,
+          itemStyle: { color: PALETTE[i % PALETTE.length], borderRadius: [4,4,0,0] },
+        })),
+        label: { show: true, position: "top", fontSize: 11 },
+        cursor: "pointer",
+      }],
+    }, true);
+
+    c.off("click");
+    c.on("click", params => {
+      const yr = params.name;
+      if (yr) _renderIncYearDrilldown(c, parseInt(yr), detail);
+    });
+  }
+
+  function _renderIncYearDrilldown(c, yr, detail) {
+    const rows = detail.filter(r => r.yr === yr).sort((a, b) => a.month.localeCompare(b.month));
+
+    document.getElementById("inc-year-back-btn").style.display = "inline-flex";
+    if (!rows.length) {
+      document.getElementById("inc-year-title-sub").textContent = `No data for ${yr}`;
+      return;
+    }
+    document.getElementById("inc-year-title-sub").textContent = `${yr} · by month and severity`;
+
+    const months   = rows.map(r => r.month);
+    const injuries = rows.map(r => r.injuries);
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter(params) {
+          const row = rows[params[0].dataIndex] || {};
+          let s = `<b>${params[0].axisValue}</b><br/>`;
+          for (const p of params) s += `<span style="display:inline-block;width:10px;height:10px;background:${p.color};margin-right:5px;border-radius:2px;"></span>${p.seriesName}: <b>${p.value}</b><br/>`;
+          if (row.injuries) s += `<br/>🚑 Injuries: <b>${row.injuries}</b>`;
+          if (row.npt_hours) s += `<br/>⏱ NPT: <b>${row.npt_hours} h</b>`;
+          return s;
+        },
+      },
+      legend: { bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+      grid: { top: 16, left: 44, right: 16, bottom: 52 },
+      xAxis: { type: "category", data: months, axisLabel: { fontSize: 11, rotate: 30 } },
+      yAxis: {
+        type: "value", minInterval: 1,
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+        axisLabel: { fontSize: 11 },
+      },
+      series: INC_SEV_CATS.map(cat => ({
+        name: cat.label, type: "bar", stack: "inc",
+        data: rows.map(r => r[cat.key] || 0),
+        itemStyle: { color: cat.color },
+      })),
+    }, true);
+
+    c.off("click");
+  }
+
+  function renderIncidentsRig(data, capturedRigYear) {
+    const rigYearDetail = capturedRigYear || [];
+    const c = initChart("chart-incidents-rig");
+    if (!c) return;
+
+    document.getElementById("inc-rig-back-btn").style.display = "none";
+    document.getElementById("inc-rig-title-sub").textContent  = "click a rig for year trend";
+
+    const rigs   = (data.by_rig_names  || []).slice().reverse();
+    const counts = (data.by_rig_counts || []).slice().reverse();
+
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      grid: { top: 10, left: 90, right: 44, bottom: 30 },
+      xAxis: {
+        type: "value", minInterval: 1,
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+        axisLabel: { fontSize: 11 },
+      },
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 11 } },
+      series: [{
+        type: "bar", data: counts,
+        itemStyle: { color: "#ef4444", borderRadius: [0,4,4,0] },
+        label: { show: true, position: "right", fontSize: 11 },
+        cursor: "pointer",
+      }],
+    }, true);
+
+    c.off("click");
+    c.on("click", params => {
+      const rig = params.name;
+      if (rig) _renderIncRigDrilldown(c, rig, rigYearDetail);
+    });
+  }
+
+  function _renderIncRigDrilldown(c, rig, rigYearDetail) {
+    const rows = rigYearDetail.filter(r => r.rig === rig).sort((a, b) => a.yr - b.yr);
+
+    document.getElementById("inc-rig-back-btn").style.display = "inline-flex";
+    if (!rows.length) {
+      document.getElementById("inc-rig-title-sub").textContent = `No data for ${rig}`;
+      return;
+    }
+    document.getElementById("inc-rig-title-sub").textContent = `${rig} · incidents by year`;
+
+    const years = rows.map(r => String(r.yr));
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter(params) {
+          let s = `<b>${rig} — ${params[0].axisValue}</b><br/>`;
+          for (const p of params) s += `<span style="display:inline-block;width:10px;height:10px;background:${p.color};margin-right:5px;border-radius:2px;"></span>${p.seriesName}: <b>${p.value}</b><br/>`;
+          return s;
+        },
+      },
+      legend: { bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+      grid: { top: 16, left: 44, right: 16, bottom: 52 },
+      xAxis: { type: "category", data: years, axisLabel: { fontSize: 11 } },
+      yAxis: {
+        type: "value", minInterval: 1,
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+        axisLabel: { fontSize: 11 },
+      },
+      series: INC_SEV_CATS.map(cat => ({
+        name: cat.label, type: "bar", stack: "inc",
+        data: rows.map(r => r[cat.key] || 0),
+        itemStyle: { color: cat.color },
+      })),
+    }, true);
+
+    c.off("click");
+  }
+
+  function renderHeadcount(data) {
+    const c = initChart("chart-headcount");
+    if (!c) return;
+    const rigs   = (data.rigs   || []).slice().reverse();
+    const counts = (data.counts || []).slice().reverse();
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      grid: { top: 10, left: 90, right: 44, bottom: 30 },
+      xAxis: {
+        type: "value", minInterval: 1,
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+        axisLabel: { fontSize: 11 },
+      },
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 11 } },
+      series: [{
+        type: "bar",
+        data: counts,
+        itemStyle: { color: "#1a3f7a", borderRadius: [0,4,4,0] },
+        label: { show: true, position: "right", fontSize: 11 },
+      }],
+    }, true);
+  }
+
+  /* ── Insight 2: Drilling Performance renderers ── */
+
+  function renderRopYoy(yoy) {
+    const c = initChart("chart-rop-yoy");
+    if (!c) return;
+    if (!yoy || !yoy.length) {
+      c.setOption({ title: { text: "No data available", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    const years   = yoy.map(r => String(r.yr));
+    const rops    = yoy.map(r => +(r.rop_mhr  || 0).toFixed(2));
+    const metres  = yoy.map(r => +(r.total_metres || 0).toFixed(0));
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "cross" },
+        formatter(params) {
+          let s = `<b>${params[0].axisValue}</b><br/>`;
+          for (const p of params) {
+            const v = parseFloat(p.value) || 0;
+            const unit = p.seriesName.includes("ROP") ? " m/hr" : " m";
+            s += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:5px;"></span>${p.seriesName}: <b>${v.toLocaleString()}${unit}</b><br/>`;
+          }
+          return s;
+        },
+      },
+      legend: { bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+      grid: { top: 28, left: 60, right: 60, bottom: 48 },
+      xAxis: { type: "category", data: years, axisLabel: { fontSize: 11 } },
+      yAxis: [
+        {
+          type: "value", name: "ROP (m/hr)", nameTextStyle: { fontSize: 10, color: "#1a3f7a" },
+          axisLabel: { formatter: "{value} m/hr", fontSize: 10 },
+          splitLine: { lineStyle: { color: "#f1f5f9" } },
+        },
+        {
+          type: "value", name: "Metres", nameTextStyle: { fontSize: 10, color: "#3dbdb0" },
+          axisLabel: { formatter: v => v >= 1000 ? (v/1000).toFixed(1)+"k" : v, fontSize: 10 },
+          splitLine: { show: false },
+        },
+      ],
+      series: [
+        {
+          name: "ROP", type: "line", yAxisIndex: 0,
+          data: rops, smooth: true, symbol: "circle", symbolSize: 7,
+          itemStyle: { color: "#1a3f7a" }, lineStyle: { width: 2.5 },
+          label: { show: true, formatter: p => p.value.toFixed(1), fontSize: 11, color: "#1a3f7a" },
+        },
+        {
+          name: "Metres Drilled", type: "bar", yAxisIndex: 1,
+          data: metres,
+          itemStyle: { color: "rgba(59,130,246,0.25)", borderColor: "#3dbdb0", borderWidth: 1, borderRadius: [4,4,0,0] },
+        },
+      ],
+    }, true);
+  }
+
+  function renderRopSection(bySection) {
+    const c = initChart("chart-rop-section");
+    if (!c) return;
+    if (!bySection || !bySection.length) {
+      c.setOption({ title: { text: "No section data", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    const sorted   = [...bySection].sort((a, b) => (b.metres || 0) - (a.metres || 0));
+    const sections = sorted.map(r => r.section);
+    const metresD  = sorted.map(r => +(r.metres || 0).toFixed(1));
+    const ropD     = sorted.map(r => +(r.rop_mhr || 0).toFixed(2));
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter(params) {
+          const row = sorted[params[0].dataIndex] || {};
+          return `<b>${params[0].axisValue}</b><br/>
+            Metres: <b>${(row.metres || 0).toFixed(1)} m</b><br/>
+            Drill hrs: <b>${(row.drill_hrs || 0).toFixed(1)} h</b><br/>
+            ROP: <b>${(row.rop_mhr || 0).toFixed(2)} m/hr</b>`;
+        },
+      },
+      legend: { bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+      grid: { top: 16, left: 100, right: 60, bottom: 40 },
+      xAxis: [
+        { type: "value", name: "Metres", nameTextStyle: { fontSize: 10 }, axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+        { type: "value", name: "ROP (m/hr)", nameTextStyle: { fontSize: 10 }, axisLabel: { fontSize: 10 }, splitLine: { show: false } },
+      ],
+      yAxis: { type: "category", data: sections.slice().reverse(), axisLabel: { fontSize: 11 } },
+      series: [
+        {
+          name: "Metres", type: "bar", xAxisIndex: 0,
+          data: metresD.slice().reverse(),
+          itemStyle: { color: "#1a3f7a", borderRadius: [0,4,4,0] },
+          label: { show: true, position: "right", fontSize: 10, formatter: p => p.value.toFixed(0)+" m" },
+        },
+        {
+          name: "ROP", type: "scatter", xAxisIndex: 1,
+          data: ropD.slice().reverse(),
+          symbolSize: 10,
+          itemStyle: { color: "#f59e0b" },
+          label: { show: true, position: "right", fontSize: 10, formatter: p => p.value+" m/hr", color: "#f59e0b" },
+        },
+      ],
+    }, true);
+  }
+
+  function renderOpsBreakdown(ops) {
+    const c = initChart("chart-ops-breakdown");
+    if (!c) return;
+    if (!ops || !ops.length) {
+      c.setOption({ title: { text: "No data available", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    const sorted = [...ops].sort((a, b) => (b.hours || 0) - (a.hours || 0));
+    const pieData = sorted.map((r, i) => ({
+      name: r.operation,
+      value: +(r.hours || 0).toFixed(1),
+      itemStyle: { color: PALETTE[i % PALETTE.length] },
+    }));
+
+    c.setOption({
+      tooltip: {
+        trigger: "item",
+        formatter(p) {
+          return `<b>${p.name}</b><br/>${p.value.toFixed(1)} h &nbsp; <b>${p.percent}%</b>`;
+        },
+      },
+      legend: {
+        type: "scroll", orient: "vertical", right: 8, top: "middle",
+        textStyle: { fontSize: 10 }, itemWidth: 10, itemHeight: 10,
+        formatter: name => name.length > 18 ? name.slice(0, 18) + "…" : name,
+      },
+      series: [{
+        type: "pie",
+        radius: ["38%", "66%"],
+        center: ["38%", "50%"],
+        data: pieData,
+        label: { show: false },
+        emphasis: { label: { show: true, fontSize: 12, fontWeight: "bold" } },
+      }],
+    }, true);
+  }
+
+  /* ── Sidebar navigation ── */
+  function switchInsight(name) {
+    document.querySelectorAll(".insight-section").forEach(s => s.classList.remove("active"));
+    document.querySelectorAll(".sidebar-item[data-insight]").forEach(a => a.classList.remove("active"));
+    const section = document.getElementById("insight-" + name);
+    if (section) section.classList.add("active");
+    const navItem = document.querySelector(`.sidebar-item[data-insight="${name}"]`);
+    if (navItem) navItem.classList.add("active");
+    // Persist active section so page reload restores it
+    try { localStorage.setItem("lastDashInsight", name); } catch(e) {}
+    // Lazy-load HSE data on first visit
+    if (name === "hse") loadHse();
+    // Resize charts so they fill the newly visible containers
+    setTimeout(() => Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} }), 60);
+  }
+
+  document.querySelectorAll(".sidebar-item[data-insight]").forEach(item => {
+    item.addEventListener("click", () => switchInsight(item.dataset.insight));
+  });
+
+  function renderRopByRig(ropByRig) {
+    const c = initChart("chart-rop-by-rig");
+    if (!c) return;
+    if (!ropByRig || !ropByRig.length) {
+      c.setOption({ title: { text: "No data available", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    const sorted = [...ropByRig].sort((a, b) => (a.rop_mhr || 0) - (b.rop_mhr || 0));
+    const rigs   = sorted.map(r => r.rig);
+    const rops   = sorted.map(r => +(r.rop_mhr  || 0).toFixed(2));
+    const metres = sorted.map(r => +(r.metres    || 0).toFixed(0));
+
+    // Colour bars by relative ROP — top third green, bottom third red, middle amber
+    const maxRop = Math.max(...rops);
+    const barColours = rops.map(v => {
+      const pct = maxRop > 0 ? v / maxRop : 0;
+      return pct >= 0.66 ? "#16a34a" : pct >= 0.33 ? "#f59e0b" : "#ef4444";
+    });
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter(params) {
+          const row = sorted[params[0].dataIndex] || {};
+          return `<b>${params[0].axisValue}</b><br/>
+            ROP: <b>${(row.rop_mhr || 0).toFixed(2)} m/hr</b><br/>
+            Metres: <b>${(row.metres || 0).toFixed(0)} m</b><br/>
+            Drill hrs: <b>${(row.drill_hrs || 0).toFixed(1)} h</b>`;
+        },
+      },
+      grid: { top: 12, left: 110, right: 72, bottom: 28 },
+      xAxis: {
+        type: "value",
+        name: "ROP (m/hr)", nameTextStyle: { fontSize: 10 },
+        axisLabel: { formatter: "{value} m/hr", fontSize: 10 },
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+      },
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 11 } },
+      series: [{
+        type: "bar",
+        data: rops.map((v, i) => ({ value: v, itemStyle: { color: barColours[i], borderRadius: [0,4,4,0] } })),
+        label: { show: true, position: "right", fontSize: 11, formatter: p => p.value.toFixed(2)+" m/hr" },
+      }],
+    }, true);
+  }
+
+  let _metresRigOverviewData = null;
+  let _metresLocDetail       = null;
+
+  function renderMetresByRig(ropByRig, locDetail) {
+    _metresRigOverviewData = ropByRig;
+    _metresLocDetail       = locDetail || [];
+
+    const c = initChart("chart-metres-by-rig");
+    if (!c) return;
+
+    document.getElementById("metres-rig-back-btn").style.display = "none";
+    document.getElementById("metres-rig-sub").textContent = "total depth progress · selected year · click a rig to see locations";
+
+    if (!ropByRig || !ropByRig.length) {
+      c.setOption({ title: { text: "No data available", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+
+    const sorted = [...ropByRig].sort((a, b) => (a.metres || 0) - (b.metres || 0));
+    _renderMetresOverview(c, sorted);
+
+    c.off("click");
+    c.on("click", params => {
+      const rig = sorted[params.dataIndex]?.rig;
+      if (rig) _renderMetresLocationDrilldown(c, rig, _metresLocDetail);
+    });
+  }
+
+  function _renderMetresOverview(c, sorted) {
+    const rigs   = sorted.map(r => r.rig);
+    const metres = sorted.map(r => +(r.metres || 0).toFixed(0));
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter(params) {
+          const row = sorted[params[0].dataIndex] || {};
+          return `<b>${params[0].axisValue}</b><br/>
+            Metres: <b>${(+row.metres || 0).toLocaleString()} m</b><br/>
+            ROP: <b>${(row.rop_mhr || 0).toFixed(2)} m/hr</b><br/>
+            Drill hrs: <b>${(row.drill_hrs || 0).toFixed(1)} h</b><br/>
+            <span style="color:#94a3b8;font-size:11px;">Click to see locations drilled</span>`;
+        },
+      },
+      grid: { top: 12, left: 110, right: 88, bottom: 28 },
+      xAxis: {
+        type: "value",
+        axisLabel: { formatter: v => v >= 1000 ? (v/1000).toFixed(1)+"k m" : v+" m", fontSize: 10 },
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+      },
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 11 } },
+      series: [{
+        type: "bar", cursor: "pointer",
+        data: metres.map((v, i) => ({
+          value: v,
+          itemStyle: { color: PALETTE[i % PALETTE.length], borderRadius: [0,4,4,0] },
+        })),
+        label: {
+          show: true, position: "right", fontSize: 10,
+          formatter: p => (+p.value >= 1000 ? (+p.value/1000).toFixed(1)+"k" : (+p.value).toFixed(0)) + " m",
+        },
+      }],
+    }, true);
+  }
+
+  function _renderMetresLocationDrilldown(c, rig, locDetail) {
+    document.getElementById("metres-rig-back-btn").style.display = "inline-flex";
+    document.getElementById("metres-rig-sub").textContent = `${rig} · metres by location`;
+
+    const rows = locDetail
+      .filter(r => r.rig === rig)
+      .sort((a, b) => (a.metres || 0) - (b.metres || 0));
+
+    if (!rows.length) {
+      document.getElementById("metres-rig-sub").textContent = `${rig} · no location data available`;
+      return;
+    }
+
+    const locs   = rows.map(r => r.location);
+    const metres = rows.map(r => +(r.metres || 0).toFixed(0));
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter(params) {
+          const row = rows[params[0].dataIndex] || {};
+          const status = row.completion_dt
+            ? `Completed ${row.completion_dt}`
+            : `<span style="color:#16a34a;font-weight:600;">Ongoing</span>`;
+          return `<b>${rig} — ${row.location}</b><br/>
+            Metres drilled: <b>${(+row.metres || 0).toLocaleString()} m</b><br/>
+            ROP: <b>${(row.rop_mhr || 0).toFixed(2)} m/hr</b><br/>
+            Drill hrs: <b>${(row.drill_hrs || 0).toFixed(1)} h</b><br/>
+            Spud: <b>${row.spud_dt || "—"}</b><br/>
+            Status: ${status}`;
+        },
+      },
+      grid: { top: 12, left: 90, right: 88, bottom: 28 },
+      xAxis: {
+        type: "value",
+        axisLabel: { formatter: v => v >= 1000 ? (v/1000).toFixed(1)+"k m" : v+" m", fontSize: 10 },
+        splitLine: { lineStyle: { color: "#f1f5f9" } },
+      },
+      yAxis: { type: "category", data: locs, axisLabel: { fontSize: 11 } },
+      series: [{
+        type: "bar",
+        data: rows.map((row, i) => ({
+          value: +(row.metres || 0).toFixed(0),
+          itemStyle: {
+            color: row.completion_dt ? PALETTE[i % PALETTE.length] : "#16a34a",
+            borderRadius: [0,4,4,0],
+          },
+        })),
+        label: {
+          show: true, position: "right", fontSize: 10,
+          formatter: p => (+p.value >= 1000 ? (+p.value/1000).toFixed(1)+"k" : (+p.value).toFixed(0)) + " m",
+        },
+      }],
+    }, true);
+
+    c.off("click");
+  }
+
+  let _flatOverviewData    = null;
+  let _flatRigDetailData   = null;
+  let _flatTotalHrs        = 0;
+
+  function renderFlatTime(flatTime, totalFlatHrs, rigDetail) {
+    _flatOverviewData  = flatTime;
+    _flatRigDetailData = rigDetail || [];
+    _flatTotalHrs      = totalFlatHrs;
+
+    const c = initChart("chart-flat-time");
+    if (!c) return;
+
+    document.getElementById("flat-back-btn").style.display  = "none";
+    document.getElementById("flat-title-sub").textContent   = "zero-depth-progress ops · hours by type · click a bar to see per-rig split";
+
+    if (!flatTime || !flatTime.length) {
+      c.setOption({ title: { text: "No flat time recorded", left: "center", top: "center", textStyle: { color: "#16a34a", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+
+    const rows = [...flatTime].slice(0, 15).sort((a, b) => (a.hours || 0) - (b.hours || 0));
+    _renderFlatOverview(c, rows, totalFlatHrs);
+
+    c.off("click");
+    c.on("click", params => {
+      const opName = rows[params.dataIndex]?.operation;
+      if (opName) _renderFlatDrilldown(c, opName, _flatRigDetailData);
+    });
+  }
+
+  function _renderFlatOverview(c, rows, totalFlatHrs) {
+    const ops = rows.map(r => r.operation.length > 28 ? r.operation.slice(0, 28) + "…" : r.operation);
+    const hrs = rows.map(r => +(r.hours || 0).toFixed(1));
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter(params) {
+          const row = rows[params[0].dataIndex] || {};
+          return `<b>${row.operation}</b><br/>
+            Hours: <b>${(row.hours||0).toFixed(1)} h</b>  (${(row.pct||0).toFixed(1)}% of flat time)<br/>
+            <span style="color:#94a3b8;font-size:11px;">Total flat time: ${totalFlatHrs.toFixed(1)} h · click to see per-rig split</span>`;
+        },
+      },
+      grid: { top: 12, left: 196, right: 80, bottom: 28 },
+      xAxis: { type: "value", axisLabel: { formatter: v => v+" h", fontSize: 10 }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+      yAxis: { type: "category", data: ops, axisLabel: { fontSize: 10 } },
+      series: [{
+        type: "bar", cursor: "pointer",
+        data: hrs.map((v, i) => ({ value: v, itemStyle: { color: PALETTE[(i+3) % PALETTE.length], borderRadius: [0,4,4,0] } })),
+        label: { show: true, position: "right", fontSize: 10, formatter: p => (+p.value).toFixed(1)+" h" },
+      }],
+    }, true);
+  }
+
+  function _renderFlatDrilldown(c, opName, rigDetail) {
+    document.getElementById("flat-back-btn").style.display = "inline-flex";
+    document.getElementById("flat-title-sub").textContent  = `${opName} · hours by rig`;
+
+    const rows = rigDetail
+      .filter(r => r.operation === opName)
+      .sort((a, b) => (a.hours || 0) - (b.hours || 0));
+
+    if (!rows.length) {
+      document.getElementById("flat-title-sub").textContent = `${opName} · no rig breakdown available`;
+      return;
+    }
+
+    const rigs = rows.map(r => r.rig);
+    const hrs  = rows.map(r => +(r.hours || 0).toFixed(1));
+    const total = hrs.reduce((s, v) => s + v, 0);
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter(params) {
+          const v   = parseFloat(params[0].value) || 0;
+          const pct = total > 0 ? (v / total * 100).toFixed(1) : "0.0";
+          return `<b>${params[0].axisValue}</b><br/>${opName}<br/>Hours: <b>${v.toFixed(1)} h</b> (${pct}%)`;
+        },
+      },
+      grid: { top: 12, left: 110, right: 80, bottom: 28 },
+      xAxis: { type: "value", axisLabel: { formatter: v => v+" h", fontSize: 10 }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 11 } },
+      series: [{
+        type: "bar",
+        data: hrs.map((v, i) => ({ value: v, itemStyle: { color: PALETTE[i % PALETTE.length], borderRadius: [0,4,4,0] } })),
+        label: { show: true, position: "right", fontSize: 10, formatter: p => (+p.value).toFixed(1)+" h" },
+      }],
+    }, true);
+
+    c.off("click");
+  }
+
+  /* ── Insight 3: NPT Analysis renderers ── */
+
+  const _h2d = h => +(h / 24).toFixed(2);  // hours → days, 2dp
+  const _fmtD = v => v < 1 ? v.toFixed(2)+"d" : v.toFixed(1)+"d";
+
+  function renderNptYoy(yoy) {
+    const c = initChart("chart-npt-yoy");
+    if (!c) return;
+    if (!yoy || !yoy.length) {
+      c.setOption({ title: { text: "No data", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    const years  = yoy.map(r => String(r.yr));
+    const days   = yoy.map(r => _h2d(r.npt_hrs || 0));
+    const events = yoy.map(r => r.events || 0);
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "cross" },
+        formatter(params) {
+          let s = `<b>${params[0].axisValue}</b><br/>`;
+          for (const p of params) {
+            const val = p.seriesName === "Events" ? p.value : _fmtD(+p.value);
+            s += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:5px;"></span>${p.seriesName}: <b>${val}</b><br/>`;
+          }
+          return s;
+        },
+      },
+      legend: { bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+      grid: { top: 28, left: 60, right: 60, bottom: 48 },
+      xAxis: { type: "category", data: years, axisLabel: { fontSize: 11 } },
+      yAxis: [
+        { type: "value", name: "NPT days", nameTextStyle: { fontSize: 10, color: "#ef4444" }, axisLabel: { formatter: v => v+"d", fontSize: 10 }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+        { type: "value", name: "Events",   nameTextStyle: { fontSize: 10, color: "#f59e0b" }, axisLabel: { fontSize: 10 }, splitLine: { show: false } },
+      ],
+      series: [
+        {
+          name: "NPT Days", type: "bar", yAxisIndex: 0,
+          data: days,
+          itemStyle: { color: "rgba(239,68,68,0.7)", borderRadius: [4,4,0,0] },
+          label: { show: true, position: "top", fontSize: 10, formatter: p => _fmtD(+p.value) },
+        },
+        {
+          name: "Events", type: "line", yAxisIndex: 1,
+          data: events, smooth: true, symbol: "circle", symbolSize: 7,
+          itemStyle: { color: "#f59e0b" }, lineStyle: { width: 2 },
+        },
+      ],
+    }, true);
+  }
+
+  function renderNptMonthly(monthly) {
+    const c = initChart("chart-npt-monthly");
+    if (!c) return;
+    if (!monthly || !monthly.length) {
+      c.setOption({ title: { text: "No data for selected period", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    const months = monthly.map(r => r.month);
+    const days   = monthly.map(r => _h2d(r.npt_hrs || 0));
+    const events = monthly.map(r => r.events || 0);
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter(params) {
+          const i = params[0].dataIndex;
+          const avgHrs = events[i] > 0 ? ((monthly[i].npt_hrs||0) / events[i]).toFixed(1) : "—";
+          return `<b>${params[0].axisValue}</b><br/>
+            NPT: <b>${_fmtD(days[i])}</b><br/>
+            Events: <b>${events[i]}</b><br/>
+            Avg per event: <b>${avgHrs} h</b>`;
+        },
+      },
+      grid: { top: 28, left: 52, right: 52, bottom: 48 },
+      xAxis: { type: "category", data: months, axisLabel: { fontSize: 10, rotate: 30 } },
+      yAxis: [
+        { type: "value", name: "NPT days", nameTextStyle: { fontSize: 10 }, axisLabel: { formatter: v => v+"d", fontSize: 10 }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+        { type: "value", name: "Events",   nameTextStyle: { fontSize: 10 }, axisLabel: { fontSize: 10 }, splitLine: { show: false } },
+      ],
+      series: [
+        {
+          name: "NPT Days", type: "bar", yAxisIndex: 0,
+          data: days.map(v => ({ value: v, itemStyle: { color: "#ef4444", borderRadius: [3,3,0,0] } })),
+          label: { show: days.length <= 6, position: "top", fontSize: 10, formatter: p => _fmtD(+p.value) },
+        },
+        {
+          name: "Events", type: "line", yAxisIndex: 1,
+          data: events, smooth: true, symbol: "circle", symbolSize: 6,
+          itemStyle: { color: "#f59e0b" }, lineStyle: { width: 2 },
+        },
+      ],
+      legend: { bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+    }, true);
+  }
+
+  function renderNptByRig(nptByRig, monthlyRigDetail) {
+    const c       = initChart("chart-npt-by-rig");
+    const backBtn = document.getElementById("npt-by-rig-back-btn");
+    if (!c) return;
+    if (!nptByRig || !nptByRig.length) {
+      c.setOption({ title: { text: "No data", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    const sorted = [...nptByRig].sort((a, b) => (a.npt_hrs||0) - (b.npt_hrs||0));
+
+    function _renderOverview() {
+      c.off("click");
+      backBtn.style.display = "none";
+      c.setOption({
+        title: { show: false },
+        tooltip: {
+          trigger: "axis", axisPointer: { type: "shadow" },
+          formatter(params) {
+            const row = sorted[params[0].dataIndex] || {};
+            return `<b>${params[0].axisValue}</b><br/>
+              NPT: <b>${_fmtD(_h2d(row.npt_hrs||0))}</b><br/>
+              Events: <b>${row.events}</b><br/>
+              Avg/event: <b>${(row.avg_hrs||0).toFixed(1)} h</b><br/>
+              <span style="font-size:10px;color:#94a3b8;">Click to see monthly breakdown</span>`;
+          },
+        },
+        grid: { top: 12, left: 110, right: 76, bottom: 28 },
+        xAxis: { type: "value", axisLabel: { formatter: v => v+"d", fontSize: 10 }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+        yAxis: { type: "category", data: sorted.map(r => r.rig), axisLabel: { fontSize: 11 } },
+        series: [{
+          type: "bar",
+          data: sorted.map((r, i) => ({
+            value: _h2d(r.npt_hrs||0),
+            itemStyle: { color: PALETTE[(i+2) % PALETTE.length], borderRadius: [0,4,4,0] },
+          })),
+          label: { show: true, position: "right", fontSize: 10, formatter: p => _fmtD(+p.value) },
+        }],
+      }, true);
+
+      c.on("click", params => {
+        const rigName = sorted[params.dataIndex]?.rig;
+        if (rigName) _renderRigMonthly(rigName);
+      });
+    }
+
+    function _renderRigMonthly(rigName) {
+      c.off("click");
+      backBtn.style.display = "inline-flex";
+
+      const rows = (monthlyRigDetail || []).filter(r => r.rig === rigName).sort((a,b) => a.month.localeCompare(b.month));
+      if (!rows.length) {
+        c.setOption({ title: { text: `No monthly data for ${rigName}`, left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+        return;
+      }
+
+      const months = rows.map(r => r.month);
+      const days   = rows.map(r => _h2d(r.npt_hrs||0));
+      const events = rows.map(r => r.events || 0);
+
+      c.setOption({
+        title: {
+          show: true,
+          text: `${rigName} — Monthly NPT`,
+          subtext: "NPT days & events by month",
+          left: "center", top: 4,
+          textStyle: { fontSize: 12, color: "#3d3d3d" },
+          subtextStyle: { fontSize: 10, color: "#64748b" },
+        },
+        tooltip: {
+          trigger: "axis", axisPointer: { type: "shadow" },
+          formatter(params) {
+            const i = params[0].dataIndex;
+            const avgHrs = events[i] > 0 ? ((rows[i].npt_hrs||0)/events[i]).toFixed(1) : "—";
+            return `<b>${rigName} · ${months[i]}</b><br/>
+              NPT: <b>${_fmtD(days[i])}</b><br/>
+              Events: <b>${events[i]}</b><br/>
+              Avg/event: <b>${avgHrs} h</b>`;
+          },
+        },
+        grid: { top: 56, left: 52, right: 52, bottom: 44 },
+        xAxis: { type: "category", data: months, axisLabel: { fontSize: 10, rotate: 30 } },
+        yAxis: [
+          { type: "value", name: "NPT days", nameTextStyle: { fontSize: 10 }, axisLabel: { formatter: v => v+"d", fontSize: 10 }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+          { type: "value", name: "Events",   nameTextStyle: { fontSize: 10 }, axisLabel: { fontSize: 10 }, splitLine: { show: false } },
+        ],
+        series: [
+          {
+            name: "NPT Days", type: "bar", yAxisIndex: 0,
+            data: days.map(v => ({ value: v, itemStyle: { color: "#ef4444", borderRadius: [3,3,0,0] } })),
+            label: { show: days.length <= 6, position: "top", fontSize: 10, formatter: p => _fmtD(+p.value) },
+          },
+          {
+            name: "Events", type: "line", yAxisIndex: 1,
+            data: events, smooth: true, symbol: "circle", symbolSize: 6,
+            itemStyle: { color: "#f59e0b" }, lineStyle: { width: 2 },
+          },
+        ],
+        legend: { bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+      }, true);
+    }
+
+    backBtn.onclick = _renderOverview;
+    _renderOverview();
+  }
+
+  function renderNptReasons(reasons, rigDetail, rigMonthly) {
+    const c = initChart("chart-npt-reasons");
+    if (!c) return;
+    const backBtn = document.getElementById("npt-reasons-back-btn");
+
+    if (!reasons || !reasons.length) {
+      c.setOption({ title: { text: "No downtime reason data", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+
+    const totalHrs = reasons.reduce((s, r) => s + (r.npt_hrs||0), 0);
+    let _currentReason = null;
+    let _currentRig    = null;
+
+    /* ── Layer 0: top-15 causes overview ── */
+    function _showOverview() {
+      c.off("click");
+      _currentReason = null;
+      backBtn.style.display = "none";
+
+      const sorted = [...reasons].sort((a, b) => (a.npt_hrs||0) - (b.npt_hrs||0));
+      const labels = sorted.map(r => r.reason.length > 38 ? r.reason.slice(0,38)+"…" : r.reason);
+      const days   = sorted.map(r => _h2d(r.npt_hrs||0));
+
+      c.setOption({
+        title: { show: false },
+        tooltip: {
+          trigger: "axis", axisPointer: { type: "shadow" },
+          formatter(params) {
+            const row = sorted[params[0].dataIndex] || {};
+            const pct = totalHrs > 0 ? (row.npt_hrs/totalHrs*100).toFixed(1) : "0";
+            return `<b>${row.reason}</b><br/>
+              NPT: <b>${_fmtD(_h2d(row.npt_hrs||0))}</b> (${pct}% of total)<br/>
+              Events: <b>${row.events}</b><br/>
+              <span style="font-size:10px;color:#94a3b8;">Click to see rig breakdown</span>`;
+          },
+        },
+        grid: { top: 12, left: 300, right: 84, bottom: 28 },
+        xAxis: { type: "value", axisLabel: { formatter: v => v+"d", fontSize: 10 }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+        yAxis: { type: "category", data: labels, axisLabel: { fontSize: 10 } },
+        series: [{
+          type: "bar",
+          data: days.map((v, i) => ({
+            value: v,
+            itemStyle: { color: PALETTE[(i+5) % PALETTE.length], borderRadius: [0,4,4,0] },
+          })),
+          label: { show: true, position: "right", fontSize: 10, formatter: p => _fmtD(+p.value) },
+        }],
+      }, true);
+
+      c.on("click", params => {
+        const row = sorted[params.dataIndex];
+        if (row) _showRigBreakdown(row.reason);
+      });
+    }
+
+    /* ── Layer 1: rig breakdown for a reason ── */
+    function _showRigBreakdown(reason) {
+      c.off("click");
+      _currentReason = reason;
+      _currentRig    = null;
+      backBtn.style.display = "inline-flex";
+
+      const rows = (rigDetail || [])
+        .filter(r => r.reason === reason)
+        .sort((a, b) => (a.npt_hrs||0) - (b.npt_hrs||0));
+
+      if (!rows.length) {
+        c.setOption({ title: { text: `No rig data for: ${reason}`, left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 12 } } }, true);
+        return;
+      }
+
+      const reasonTotal = rows.reduce((s, r) => s + (r.npt_hrs||0), 0);
+      const label = reason.length > 55 ? reason.slice(0,55)+"…" : reason;
+
+      c.setOption({
+        title: {
+          show: true, text: label, subtext: "Click a rig bar to see its monthly trend",
+          left: "center", top: 4,
+          textStyle: { fontSize: 11, color: "#3d3d3d" },
+          subtextStyle: { fontSize: 10, color: "#64748b" },
+        },
+        tooltip: {
+          trigger: "axis", axisPointer: { type: "shadow" },
+          formatter(params) {
+            const row = rows[params[0].dataIndex] || {};
+            const pct = reasonTotal > 0 ? (row.npt_hrs/reasonTotal*100).toFixed(1) : "0";
+            return `<b>${row.rig}</b><br/>
+              NPT: <b>${_fmtD(_h2d(row.npt_hrs||0))}</b> (${pct}% of cause)<br/>
+              Events: <b>${row.events}</b><br/>
+              <span style="font-size:10px;color:#94a3b8;">Click to see monthly trend</span>`;
+          },
+        },
+        grid: { top: 56, left: 110, right: 84, bottom: 28 },
+        xAxis: { type: "value", axisLabel: { formatter: v => v+"d", fontSize: 10 }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+        yAxis: { type: "category", data: rows.map(r => r.rig), axisLabel: { fontSize: 11 } },
+        series: [{
+          type: "bar",
+          data: rows.map((r, i) => ({
+            value: _h2d(r.npt_hrs||0),
+            itemStyle: { color: PALETTE[(i+2) % PALETTE.length], borderRadius: [0,4,4,0] },
+          })),
+          label: { show: true, position: "right", fontSize: 10, formatter: p => _fmtD(+p.value) },
+        }],
+      }, true);
+
+      c.on("click", params => {
+        const row = rows[params.dataIndex];
+        if (row) _showRigMonthly(reason, row.rig);
+      });
+    }
+
+    /* ── Layer 2: monthly trend for reason + rig ── */
+    function _showRigMonthly(reason, rig) {
+      c.off("click");
+      _currentRig = rig;
+      backBtn.style.display = "inline-flex";
+
+      const rows = (rigMonthly || [])
+        .filter(r => r.reason === reason && r.rig === rig)
+        .sort((a, b) => a.month.localeCompare(b.month));
+
+      if (!rows.length) {
+        c.setOption({ title: { text: `No monthly data for ${rig}`, left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 12 } } }, true);
+        return;
+      }
+
+      const months = rows.map(r => r.month);
+      const days   = rows.map(r => _h2d(r.npt_hrs||0));
+      const events = rows.map(r => r.events || 0);
+      const label  = reason.length > 40 ? reason.slice(0,40)+"…" : reason;
+
+      c.setOption({
+        title: {
+          show: true,
+          text: `${rig} — ${label}`,
+          subtext: "Monthly NPT days & events",
+          left: "center", top: 4,
+          textStyle: { fontSize: 11, color: "#3d3d3d" },
+          subtextStyle: { fontSize: 10, color: "#64748b" },
+        },
+        tooltip: {
+          trigger: "axis", axisPointer: { type: "shadow" },
+          formatter(params) {
+            const i = params[0].dataIndex;
+            const avgHrs = events[i] > 0 ? ((rows[i].npt_hrs||0)/events[i]).toFixed(1) : "—";
+            return `<b>${rig} · ${months[i]}</b><br/>
+              NPT: <b>${_fmtD(days[i])}</b><br/>
+              Events: <b>${events[i]}</b><br/>
+              Avg/event: <b>${avgHrs} h</b>`;
+          },
+        },
+        legend: { bottom: 4, textStyle: { fontSize: 11 }, itemWidth: 12, itemHeight: 12 },
+        grid: { top: 56, left: 52, right: 52, bottom: 44 },
+        xAxis: { type: "category", data: months, axisLabel: { fontSize: 10, rotate: 30 } },
+        yAxis: [
+          { type: "value", name: "NPT days", nameTextStyle: { fontSize: 10 }, axisLabel: { formatter: v => v+"d", fontSize: 10 }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+          { type: "value", name: "Events",   nameTextStyle: { fontSize: 10 }, axisLabel: { fontSize: 10 }, splitLine: { show: false } },
+        ],
+        series: [
+          {
+            name: "NPT Days", type: "bar", yAxisIndex: 0,
+            data: days.map(v => ({ value: v, itemStyle: { color: "#ef4444", borderRadius: [3,3,0,0] } })),
+            label: { show: days.length <= 6, position: "top", fontSize: 10, formatter: p => _fmtD(+p.value) },
+          },
+          {
+            name: "Events", type: "line", yAxisIndex: 1,
+            data: events, smooth: true, symbol: "circle", symbolSize: 6,
+            itemStyle: { color: "#f59e0b" }, lineStyle: { width: 2 },
+          },
+        ],
+      }, true);
+    }
+
+    // Back button: layer 2 → layer 1, layer 1 → layer 0
+    backBtn.onclick = () => {
+      if (_currentRig) {
+        _showRigBreakdown(_currentReason);  // layer 2 → layer 1
+      } else {
+        _showOverview();                     // layer 1 → layer 0
+      }
+    };
+
+    _showOverview();
+  }
+
+  /* ── Sidebar collapse/expand ── */
+  const sidebar    = document.getElementById("sidebar");
+  const toggleBtn  = document.getElementById("sidebar-toggle-btn");
+  let sidebarCollapsed = false;
+
+  toggleBtn.addEventListener("click", () => {
+    sidebarCollapsed = !sidebarCollapsed;
+    sidebar.classList.toggle("collapsed", sidebarCollapsed);
+    toggleBtn.innerHTML  = sidebarCollapsed ? "&#x2630;" : "&#x2715;";
+    toggleBtn.title      = sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar";
+    // realign charts after transition
+    setTimeout(() => Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} }), 240);
+  });
+
+  /* ── Load dashboard data ── */
+
+  /* ── Insight 4: HSE Overview renderers ── */
+
+  let _hseLoaded = false;
+
+  async function loadHse() {
+    if (_hseLoaded) return;
+    const spinner = document.getElementById("hse-spinner");
+    if (spinner) spinner.style.display = "flex";
+
+    const year = document.getElementById("year-select").value;
+    const params = new URLSearchParams();
+    if (year) params.set("year", year);
+    selectedRigs.forEach(r => params.append("rig", r));
+
+    try {
+      const res  = await fetch("/api/dashboard/hse/?" + params.toString());
+      const hse  = await res.json();
+      const s    = hse.summary || {};
+
+      const crate = s.card_close_rate;
+      const arate = s.closure_rate_pct;
+
+      setKpi("kpi-hse-open-cards",  s.open_cards       != null ? s.open_cards       : null);
+      setKpi("kpi-hse-card-close",  crate              != null ? crate              : null, "%");
+      setKpi("kpi-hse-overdue",     s.overdue_actions  != null ? s.overdue_actions  : null);
+      setKpi("kpi-hse-closure-rate",arate              != null ? arate              : null, "%");
+      setKpi("kpi-hse-tfs",         s.tfs_count        != null ? s.tfs_count        : null);
+      setKpi("kpi-hse-max-age",     s.max_card_age_days!= null ? s.max_card_age_days: null, " d");
+
+      // Colour KPIs by threshold
+      const el = id => document.getElementById(id);
+      if (crate != null) el("kpi-hse-card-close").className  = "kpi-value " + (crate >= 90 ? "good" : crate >= 70 ? "warn" : "bad");
+      if (arate != null) el("kpi-hse-closure-rate").className= "kpi-value " + (arate >= 80 ? "good" : arate >= 60 ? "warn" : "bad");
+      if (s.overdue_actions != null) el("kpi-hse-overdue").className = "kpi-value " + (s.overdue_actions === 0 ? "good" : s.overdue_actions <= 5 ? "warn" : "bad");
+
+      renderHseSubmission(hse.submission_monthly || [], hse.submission_by_type_monthly || []);
+      renderHseType(hse.by_type           || []);
+      renderHseLocation(hse.by_work_location || []);
+      renderHseDept(hse.by_dept           || []);
+      renderHseCardAgeing(hse.card_ageing  || {});
+      renderHseClosureByRig(hse.closure_by_rig || []);
+      renderHseIncHaz(hse.submission_monthly || [], hse.inc_monthly || []);
+      renderTfsRig(hse.tfs_by_rig || []);
+      renderTfsLocation(hse.tfs_by_location || []);
+
+      _hseLoaded = true;
+    } catch (e) {
+      console.error("HSE load error:", e);
+    } finally {
+      if (spinner) spinner.style.display = "none";
+    }
+  }
+
+  // Preferred colors for known hazard types — falls back to PALETTE for any new type added in DB
+  const HSE_TYPE_COLOR_PREF = {
+    "Unsafe Condition":    "#f97316",
+    "Unsafe Act":          "#dc2626",
+    "Positive Recognition":"#3dbdb0",
+    "chart-info-utilisation": `<b>Rig Utilisation %</b><br/>Operating hours as a % of total logged rig time per month, stacked by rig. Formula: <b>Operating ÷ (Operating + Standby + Repair + Zero-rate + Rig Move) × 100</b>. Click a rig series to drill into monthly hours. Source: <i>eos_Drilling_Dtl</i> daily logs.<br/><b>Green ≥80% · Amber 60–79% · Red &lt;60%</b>`,
+    "chart-info-hours": `<b>Hours Breakdown</b><br/>How the rig's logged time is split across categories (Operating, Standby, Repair, Zero-rate, Rig Move). Helps identify where time is being lost. Click a bar to drill into that month's detail. Source: <i>eos_Drilling_Dtl</i>.`,
+    "chart-info-inc-year": `<b>Incidents by Year</b><br/>Total safety incidents per year, stacked by severity (High / Medium / Low). A rising trend or shift toward High severity requires management attention. Source: <i>eos_Incident_Details</i>.`,
+    "chart-info-inc-rig": `<b>Incidents by Rig × Year</b><br/>Incident count for each rig, broken down by year. Useful for comparing safety performance across the fleet and identifying rigs with persistent issues. Source: <i>eos_Incident_Details</i>.`,
+    "chart-info-rop-yoy": `<b>Rate of Penetration — Year on Year</b><br/>Weighted average ROP (m/hr) across years: <b>Total metres drilled ÷ Total drill hours</b>. Only 'Drill Actual' operations with forward depth progress (Depth_To > Depth_From) are counted. Backreaming excluded. Source: <i>eos_Drilling_Dtl_Ops</i>, Drilling_Ops_Id = 2.`,
+    "chart-info-rop-section": `<b>ROP by Hole Section</b><br/>ROP and metres drilled broken down by hole section (Surface, Intermediate, Production, etc.). Different sections have different formation hardness and target depths — comparing section ROP reveals where performance gains are possible.`,
+    "chart-info-ops-breakdown": `<b>Operations Time Breakdown</b><br/>All operation types from the daily log, showing total hours and their % of total rig time. Drill Actual % shows how much time the bit is actually cutting new rock. Everything else is non-drilling time (trips, cement, waiting, NPT, etc.).`,
+    "chart-info-metres-rig": `<b>Metres Drilled by Rig</b><br/>Total depth progress per rig for the selected year. Click a rig bar to see the breakdown by drill location/well. Metres = sum of (Depth_To − Depth_From) for Drill Actual ops only.`,
+    "chart-info-flat-time": `<b>Flat Time Operations</b><br/>Operations where depth progress was zero — hours spent without making new hole. Includes trips, cement jobs, wellbore conditioning, waiting on orders, etc. High flat time relative to drill time indicates inefficiency. Click a bar to see which rigs contributed most.`,
+    "chart-info-npt-yoy": `<b>NPT Year on Year</b><br/>Total Non-Productive Time (bars, left axis) and event count (line, right axis) per year. NPT = operations logged as downtime (Drilling_Ops_Id = 24) in the daily log. Rising bars with fewer events = longer individual breakdowns; many events with shorter bars = frequent minor stoppages.`,
+    "chart-info-npt-monthly": `<b>Monthly NPT Trend</b><br/>Month-by-month NPT hours and event count for the selected year. Useful for identifying seasonal patterns or specific months with concentrated downtime.`,
+    "chart-info-npt-rig": `<b>NPT by Rig</b><br/>NPT hours per rig for the selected year, all rigs shown. Click a bar to drill into that rig's monthly NPT trend. The rig with the highest bar is the largest contributor to fleet downtime.`,
+    "chart-info-npt-causes": `<b>Top NPT Causes</b><br/>NPT hours grouped by downtime reason from the <i>Downtime_Reason</i> field on daily log records. Top 15 causes shown. Click a bar to see which rigs and months drove that specific cause — two drill-down levels available.`,
+    "chart-info-inc-year": `<b>Incidents by Year</b><br/>Total safety incidents per year, stacked by severity (High / Medium / Low). A rising trend or shift toward High severity requires management attention. Source: <i>eos_Incident_Details</i>.`,
+    "chart-info-inc-rig": `<b>Incidents by Rig × Year</b><br/>Incident count for each rig, broken down by year. Useful for comparing safety performance across the fleet and identifying rigs with persistent issues. Source: <i>eos_Incident_Details</i>.`,
+    "chart-info-npt-causes": `<b>Top NPT Causes</b><br/>NPT hours grouped by downtime reason from the <i>Downtime_Reason</i> field on daily log records. Top 15 causes shown. Click a bar to see which rigs and months drove that specific cause — two drill-down levels available.`,
+  };
+  function hseTypeColor(name, idx) {
+    return HSE_TYPE_COLOR_PREF[name] || PALETTE[idx % PALETTE.length];
+  }
+
+  function renderHseSubmission(rows, byTypeMonthly) {
+    const c = echarts.getInstanceByDom(document.getElementById("chart-hse-submission"))
+           || echarts.init(document.getElementById("chart-hse-submission"));
+    if (!rows.length) { c.clear(); return; }
+
+    const months = [...new Set(rows.map(r => r.month))].sort();
+    const tfs    = rows.map(r => +r.tfs);
+
+    // Build type order dynamically from data (sorted by total cards desc)
+    const typeMonthMap = {};
+    const typeTotals   = {};
+    (byTypeMonthly || []).forEach(r => {
+      if (!typeMonthMap[r.type_name]) { typeMonthMap[r.type_name] = {}; typeTotals[r.type_name] = 0; }
+      typeMonthMap[r.type_name][r.month] = +r.cards;
+      typeTotals[r.type_name] += +r.cards;
+    });
+    const TYPE_ORDER = Object.keys(typeTotals).sort((a, b) => typeTotals[b] - typeTotals[a]);
+
+    const typeSeries = TYPE_ORDER.map((name, idx) => ({
+      name,
+      type: "bar",
+      stack: "type",
+      data: months.map(m => typeMonthMap[name]?.[m] || 0),
+      itemStyle: { color: hseTypeColor(name, idx) },
+      barMaxWidth: 40,
+    }));
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter(params) {
+          const m = params[0].axisValue;
+          const row = rows.find(r => r.month === m) || {};
+          let s = `<b>${m}</b><br/>`;
+          params.forEach(p => {
+            if (p.value > 0 || p.seriesType === "line") {
+              const dot = `<span style="display:inline-block;width:9px;height:9px;border-radius:${p.seriesType==='line'?'50%':'2px'};background:${p.color};margin-right:5px;"></span>`;
+              s += `${dot}${p.seriesName}: <b>${p.value}</b><br/>`;
+            }
+          });
+          s += `Total: <b>${+row.cards}</b>`;
+          return s;
+        },
+      },
+      legend: { data: [...TYPE_ORDER, "Timeout for Safety"], bottom: 4, textStyle: { fontSize: 11 } },
+      grid: { top: 14, bottom: 60, left: 52, right: 16 },
+      xAxis: { type: "category", data: months, axisLabel: { fontSize: 10, rotate: 35, interval: "auto" } },
+      yAxis: { type: "value", name: "Cards", nameTextStyle: { fontSize: 10 } },
+      series: [
+        ...typeSeries,
+        { name: "Timeout for Safety", type: "line", data: tfs,
+          itemStyle: { color: "#f59e0b" }, lineStyle: { width: 2, type: "dashed" },
+          symbol: "circle", symbolSize: 5 },
+      ],
+    }, true);
+  }
+
+  function renderHseType(byType) {
+    const c = echarts.getInstanceByDom(document.getElementById("chart-hse-type"))
+           || echarts.init(document.getElementById("chart-hse-type"));
+    if (!byType.length) { c.clear(); return; }
+    const pieData = byType.map((t, i) => ({
+      name:  t.type_name,
+      value: t.cards,
+      itemStyle: { color: hseTypeColor(t.type_name, i) },
+    }));
+    const total = byType.reduce((s, t) => s + t.cards, 0);
+    c.setOption({
+      tooltip: {
+        trigger: "item",
+        formatter: p => `${p.name}<br/>${p.value.toLocaleString()} cards (${p.percent.toFixed(1)}%)`,
+      },
+      legend: { bottom: 4, textStyle: { fontSize: 11 }, itemGap: 8 },
+      series: [{
+        type: "pie", radius: ["42%", "66%"], center: ["50%", "42%"],
+        data: pieData,
+        label: {
+          show: true, position: "outside",
+          formatter: p => p.percent.toFixed(0) + "%",
+          fontSize: 11,
+        },
+        emphasis: { itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.2)" } },
+      }],
+    }, true);
+  }
+
+  function renderHseLocation(byLoc) {
+    const c = echarts.getInstanceByDom(document.getElementById("chart-hse-location"))
+           || echarts.init(document.getElementById("chart-hse-location"));
+    if (!byLoc.length) { c.clear(); return; }
+    // Shorten long location names
+    const shorten = s => s.length > 28 ? s.slice(0, 26) + "…" : s;
+    const locs   = byLoc.map(r => shorten(r.location)).reverse();
+    const cards  = byLoc.map(r => r.cards).reverse();
+    c.setOption({
+      tooltip: {
+        trigger: "axis",
+        formatter: params => `${byLoc[byLoc.length - 1 - params[0].dataIndex].location}<br/>${params[0].value.toLocaleString()} cards`,
+      },
+      grid: { top: 8, bottom: 8, left: 8, right: 60, containLabel: true },
+      xAxis: { type: "value", axisLabel: { fontSize: 10 } },
+      yAxis: { type: "category", data: locs, axisLabel: { fontSize: 9, width: 120, overflow: "truncate" } },
+      series: [{
+        type: "bar", data: cards,
+        itemStyle: { color: "#1a3f7a" },
+        barMaxWidth: 22,
+        label: { show: true, position: "right", fontSize: 9, formatter: p => p.value.toLocaleString() },
+      }],
+    }, true);
+  }
+
+  function renderHseDept(byDept) {
+    const c = echarts.getInstanceByDom(document.getElementById("chart-hse-dept"))
+           || echarts.init(document.getElementById("chart-hse-dept"));
+    if (!byDept.length) { c.clear(); return; }
+    const shorten = s => s.length > 22 ? s.slice(0, 20) + "…" : s;
+    const depts  = byDept.map(r => shorten(r.dept)).reverse();
+    const total  = byDept.map(r => r.cards).reverse();
+    const open   = byDept.map(r => +r.open_cnt).reverse();
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      legend: { data: ["Closed", "Open"], bottom: 4, textStyle: { fontSize: 11 } },
+      grid: { top: 8, bottom: 36, left: 8, right: 60, containLabel: true },
+      xAxis: { type: "value", axisLabel: { fontSize: 10 } },
+      yAxis: { type: "category", data: depts, axisLabel: { fontSize: 9, width: 100, overflow: "truncate" } },
+      series: [
+        { name: "Closed", type: "bar", stack: "s", data: total.map((v, i) => v - open[i]), itemStyle: { color: "#1a3f7a" }, barMaxWidth: 22 },
+        { name: "Open",   type: "bar", stack: "s", data: open, itemStyle: { color: "#3dbdb0" }, barMaxWidth: 22 },
+      ],
+    }, true);
+  }
+
+  function renderHseCardAgeing(ag) {
+    const c = echarts.getInstanceByDom(document.getElementById("chart-hse-ageing"))
+           || echarts.init(document.getElementById("chart-hse-ageing"));
+    if (!ag || ag.total_open === 0) { c.clear(); return; }
+    const pieData = [
+      { name: "< 30 days",  value: ag.lt_30,  itemStyle: { color: "#3dbdb0" } },
+      { name: "30–60 days", value: ag.d30_60, itemStyle: { color: "#f59e0b" } },
+      { name: "60–90 days", value: ag.d60_90, itemStyle: { color: "#f97316" } },
+      { name: "> 90 days",  value: ag.gt_90,  itemStyle: { color: "#dc2626" } },
+    ].filter(d => d.value > 0);
+    c.setOption({
+      tooltip: { trigger: "item", formatter: p => `${p.name}<br/>${p.value} cards (${p.percent.toFixed(1)}%)` },
+      legend: { orient: "vertical", right: 8, top: "center", textStyle: { fontSize: 11 } },
+      graphic: [{ type: "text", left: "28%", top: "center",
+        style: { text: ag.total_open + "\nopen", textAlign: "center", fontSize: 13, fontWeight: 700, fill: "#1a3f7a", lineHeight: 18 } }],
+      series: [{
+        type: "pie", radius: ["46%", "68%"], center: ["33%", "50%"],
+        data: pieData, label: { show: false },
+        emphasis: { itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.2)" } },
+      }],
+    }, true);
+  }
+
+  function renderHseClosureByRig(rows) {
+    const c = echarts.getInstanceByDom(document.getElementById("chart-hse-closure"))
+           || echarts.init(document.getElementById("chart-hse-closure"));
+    if (!rows.length) { c.clear(); return; }
+    const rigs       = rows.map(r => r.Rig_Name);
+    const pctClosed  = rows.map(r => r.total > 0 ? +(+r.closed  / r.total * 100).toFixed(1) : 0);
+    const pctOverdue = rows.map(r => r.total > 0 ? +(+r.overdue / r.total * 100).toFixed(1) : 0);
+    const pctOther   = pctClosed.map((v, i) => Math.max(0, +(100 - v - pctOverdue[i]).toFixed(1)));
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter(params) {
+          const rig = params[0].axisValue;
+          const row = rows.find(r => r.Rig_Name === rig) || {};
+          return `<b>${rig}</b><br/>Total: ${row.total} &nbsp; Closed: ${row.closed}<br/>Overdue: ${row.overdue}`;
+        },
+      },
+      legend: { data: ["Closed", "Open", "Overdue"], bottom: 4, textStyle: { fontSize: 11 } },
+      grid: { top: 8, bottom: 40, left: 90, right: 16 },
+      xAxis: { type: "value", max: 100, axisLabel: { formatter: v => v + "%", fontSize: 10 } },
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 10 } },
+      series: [
+        { name: "Closed",  type: "bar", stack: "s", data: pctClosed,  itemStyle: { color: "#16a34a" }, barMaxWidth: 22 },
+        { name: "Open",    type: "bar", stack: "s", data: pctOther,   itemStyle: { color: "#cbd5e1" }, barMaxWidth: 22 },
+        { name: "Overdue", type: "bar", stack: "s", data: pctOverdue, itemStyle: { color: "#dc2626" }, barMaxWidth: 22 },
+      ],
+    }, true);
+  }
+
+  function renderHseIncHaz(subRows, incRows) {
+    const c = echarts.getInstanceByDom(document.getElementById("chart-hse-inc-haz"))
+           || echarts.init(document.getElementById("chart-hse-inc-haz"));
+    if (!subRows.length && !incRows.length) { c.clear(); return; }
+    const allM  = [...new Set([...subRows.map(r => r.month), ...incRows.map(r => r.month)])].sort();
+    const hazLU = Object.fromEntries(subRows.map(r => [r.month, +r.cards]));
+    const incLU = Object.fromEntries(incRows.map(r => [r.month, +r.incidents]));
+    const hazD  = allM.map(m => hazLU[m] ?? 0);
+    const incD  = allM.map(m => incLU[m] ?? 0);
+    c.setOption({
+      tooltip: { trigger: "axis" },
+      legend: { data: ["Hazard Cards", "Incidents"], bottom: 4, textStyle: { fontSize: 11 } },
+      grid: { top: 14, bottom: 52, left: 54, right: 54 },
+      xAxis: { type: "category", data: allM, axisLabel: { fontSize: 10, rotate: 35, interval: "auto" } },
+      yAxis: [
+        { type: "value", name: "Cards",     nameTextStyle: { fontSize: 10 }, nameGap: 8 },
+        { type: "value", name: "Incidents", nameTextStyle: { fontSize: 10 }, nameGap: 8, splitLine: { show: false } },
+      ],
+      series: [
+        { name: "Hazard Cards", type: "bar",  yAxisIndex: 0, data: hazD, itemStyle: { color: "#3dbdb0" }, barMaxWidth: 32 },
+        { name: "Incidents",    type: "line", yAxisIndex: 1, data: incD,
+          itemStyle: { color: "#dc2626" }, lineStyle: { width: 2.5 }, symbol: "circle", symbolSize: 6 },
+      ],
+    }, true);
+  }
+
+  function renderTfsRig(rows) {
+    const c = echarts.getInstanceByDom(document.getElementById("chart-tfs-rig"))
+           || echarts.init(document.getElementById("chart-tfs-rig"));
+    if (!rows || !rows.length) {
+      c.setOption({ title: { text: "No TFS data for selected filters", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    const sorted = [...rows].sort((a, b) => +a.tfs_count - +b.tfs_count);
+    const rigs   = sorted.map(r => r.rig);
+    const counts = sorted.map(r => +r.tfs_count);
+    const rates  = sorted.map(r => +(r.tfs_rate_pct || 0));
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter(params) {
+          const i   = params[0].dataIndex;
+          const row = sorted[i];
+          return `<b>${row.rig}</b><br/>TFS Count: <b>${row.tfs_count}</b><br/>TFS Rate: <b>${row.tfs_rate_pct}%</b> of total cards<br/>Avg close time (TFS): <b>${row.avg_close_days_tfs != null ? row.avg_close_days_tfs + ' days' : 'N/A'}</b>`;
+        },
+      },
+      legend: { data: ["TFS Count", "TFS Rate %"], bottom: 4, textStyle: { fontSize: 11 } },
+      grid: { top: 14, bottom: 44, left: 90, right: 54 },
+      xAxis: [
+        { type: "value", name: "Count", nameTextStyle: { fontSize: 10 }, nameGap: 6 },
+        { type: "value", name: "Rate %", nameTextStyle: { fontSize: 10 }, nameGap: 6, splitLine: { show: false } },
+      ],
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 10 } },
+      series: [
+        { name: "TFS Count", type: "bar", xAxisIndex: 0, data: counts,
+          itemStyle: { color: "#f59e0b" }, barMaxWidth: 28, label: { show: true, position: "right", fontSize: 10 } },
+        { name: "TFS Rate %", type: "line", xAxisIndex: 1, data: rates,
+          itemStyle: { color: "#dc2626" }, lineStyle: { width: 2 }, symbol: "circle", symbolSize: 5 },
+      ],
+    }, true);
+  }
+
+  function renderTfsLocation(rows) {
+    const c = echarts.getInstanceByDom(document.getElementById("chart-tfs-location"))
+           || echarts.init(document.getElementById("chart-tfs-location"));
+    // Data comes pre-sorted by tfs_count DESC from the API; reverse for horizontal bar (lowest at top)
+    const tfsLocs = [...(rows || [])].reverse();
+    if (!tfsLocs.length) {
+      c.setOption({ title: { text: "No TFS data for selected filters", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    const shorten = s => s.length > 28 ? s.slice(0, 26) + "…" : s;
+    const locs   = tfsLocs.map(r => shorten(r.location));
+    const counts = tfsLocs.map(r => +r.tfs_count);
+    const rates  = tfsLocs.map(r => +(r.tfs_rate_pct || 0));
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter(params) {
+          const i = params[0].dataIndex;
+          const r = tfsLocs[i];
+          return `<b>${r.location}</b><br/>TFS: <b>${r.tfs_count}</b> of ${r.total_cards} cards (${r.tfs_rate_pct}%)`;
+        },
+      },
+      grid: { top: 14, bottom: 30, left: 12, right: 60, containLabel: true },
+      xAxis: { type: "value", axisLabel: { fontSize: 10 } },
+      yAxis: { type: "category", data: locs, axisLabel: { fontSize: 10 } },
+      series: [{
+        name: "TFS Count", type: "bar", data: counts,
+        itemStyle: { color: "#f59e0b" }, barMaxWidth: 28,
+        label: { show: true, position: "right", fontSize: 10, formatter: p => `${p.value} (${rates[p.dataIndex]}%)` },
+      }],
+    }, true);
+  }
+
+  async function loadDashboard() {
+    _hseLoaded = false;  // force HSE reload on filter change
+    // If HSE tab is active, reload it now so filter change takes effect
+    if (document.getElementById("insight-hse")?.classList.contains("active")) {
+      loadHse();
+    }
+    document.getElementById("loading-overlay").classList.remove("hidden");
+
+    const year = document.getElementById("year-select").value;
+    const params = new URLSearchParams();
+    if (year) params.set("year", year);
+    selectedRigs.forEach(r => params.append("rig", r));
+
+    try {
+      const res  = await fetch("/api/dashboard/?" + params.toString());
+      const data = await res.json();
+
+      const kpi = data.kpi || {};
+      const util = kpi.avg_utilisation_pct;
+      setKpi("kpi-utilisation", util !== null && util !== undefined ? util : null, "%", utilClass);
+      setKpi("kpi-active-rigs", kpi.active_rigs);
+      setKpi("kpi-total-rigs",  kpi.total_rigs);
+      setKpi("kpi-employees",   kpi.total_employees);
+      setKpi("kpi-crew",        kpi.active_rig_crew);
+      setKpi("kpi-incidents",   kpi.total_incidents);
+      // kpi-npt set later after npts is defined (uses operational NPT, not incident NPT)
+
+      monthlyDetail = data.monthly_detail || [];
+
+      renderUtilisation(data.utilisation              || {});
+      renderHours(data.hours_breakdown || {}, monthlyDetail);
+      _lastIncData = data.incidents || {};
+      renderIncidentsYear(_lastIncData, _lastIncData.monthly_detail   || []);
+      renderIncidentsRig(_lastIncData,  _lastIncData.rig_year_detail  || []);
+      renderHeadcount(data.headcount       || {});
+
+      // ── Insight 2: Drilling Performance ──
+      const dp = data.drilling_performance || {};
+      const dps = dp.summary || {};
+      const ropVal = dps.rop_mhr;
+      setKpi("kpi-rop",       ropVal != null ? ropVal.toFixed(2) : null, " m/hr");
+      setKpi("kpi-metres",    dps.total_metres    ? Math.round(dps.total_metres).toLocaleString()    : null, " m");
+      setKpi("kpi-drill-hrs", dps.total_drill_hrs ? Math.round(dps.total_drill_hrs).toLocaleString() : null, " h");
+      setKpi("kpi-drill-ops", dps.drill_operations || null);
+      setKpi("kpi-flat-hrs", dps.drill_operations != null && dp.flat_time_total_hrs != null
+        ? Math.round(dp.flat_time_total_hrs) : null, " h");
+      renderRopYoy(dp.yoy            || []);
+      renderRopSection(dp.by_section || []);
+      renderOpsBreakdown(dp.ops_breakdown || []);
+      renderRopByRig(dp.rop_by_rig   || []);
+      renderMetresByRig(dp.rop_by_rig || [], dp.locations_by_rig || []);
+      renderFlatTime(dp.flat_time || [], dp.flat_time_total_hrs || 0, dp.flat_time_rig_detail || []);
+
+      // ── Insight 3: NPT Analysis ──
+      const npt  = data.npt || {};
+      const npts = npt.summary || {};
+      const incNpt = npt.incident_npt || {};
+      // Top-banner NPT uses operational NPT hours (drilling log), converted to days
+      setKpi("kpi-npt", npts.total_npt_hrs != null ? (npts.total_npt_hrs / 24).toFixed(1) : null, " d");
+      setKpi("kpi-npt-hrs",      npts.total_npt_hrs     != null ? (npts.total_npt_hrs/24).toFixed(1)       : null, " d");
+      setKpi("kpi-npt-pct",      npts.npt_pct           != null ? npts.npt_pct.toFixed(1)                  : null, "%");
+      setKpi("kpi-npt-events",   npts.npt_events        != null ? npts.npt_events                          : null);
+      setKpi("kpi-npt-avg",      npts.avg_event_hrs     != null ? npts.avg_event_hrs.toFixed(1)            : null, " h");
+      setKpi("kpi-npt-incident", incNpt.incident_npt_hrs != null ? (incNpt.incident_npt_hrs/24).toFixed(1) : null, " d");
+      renderNptYoy(npt.yoy             || []);
+      renderNptMonthly(npt.monthly     || []);
+      renderNptByRig(npt.npt_by_rig    || [], npt.monthly_rig_detail || []);
+      renderNptReasons(npt.top_reasons || [], npt.reason_rig_detail || [], npt.reason_rig_monthly || []);
+
+      document.getElementById("last-updated").textContent =
+        "Updated " + new Date().toLocaleTimeString();
+    } catch (err) {
+      console.error("Dashboard error:", err);
+    } finally {
+      document.getElementById("loading-overlay").classList.add("hidden");
+    }
+  }
+
+  /* ── Populate filters from meta API ── */
+  async function loadMeta() {
+    try {
+      const res  = await fetch("/api/dashboard/meta/");
+      const data = await res.json();
+
+      // Years
+      const sel = document.getElementById("year-select");
+      // Remove old dynamic options (keep "All years")
+      while (sel.options.length > 1) sel.remove(1);
+      for (const yr of data.years || []) {
+        const opt = document.createElement("option");
+        opt.value = yr;
+        opt.textContent = yr;
+        if (yr === new Date().getFullYear()) opt.selected = true; // default current year
+        sel.appendChild(opt);
+      }
+
+      // Rigs
+      allRigs = data.rigs || [];
+      renderRigList(allRigs);
+    } catch (err) {
+      console.error("Meta load failed:", err);
+    }
+  }
+
+  /* ── Rig multi-select panel ── */
+  function renderRigList(rigs) {
+    const container = document.getElementById("rig-list");
+    const search = document.getElementById("rig-search").value.toLowerCase();
+    const filtered = rigs.filter(r =>
+      r.Rig_Name.toLowerCase().includes(search) ||
+      (r.Rig_Short_Name || "").toLowerCase().includes(search)
+    );
+
+    if (!filtered.length) {
+      container.innerHTML = '<div class="rig-empty">No rigs found</div>';
+      return;
+    }
+
+    container.innerHTML = "";
+    for (const rig of filtered) {
+      const item = document.createElement("label");
+      item.className = "rig-item";
+
+      const cb = document.createElement("input");
+      cb.type    = "checkbox";
+      cb.value   = rig.Rig_Name;
+      cb.checked = selectedRigs.includes(rig.Rig_Name);
+      cb.addEventListener("change", () => {
+        if (cb.checked) {
+          if (!selectedRigs.includes(rig.Rig_Name)) selectedRigs.push(rig.Rig_Name);
+        } else {
+          selectedRigs = selectedRigs.filter(r => r !== rig.Rig_Name);
+        }
+        updateRigTrigger();
+      });
+
+      const name = document.createElement("span");
+      name.className   = "rig-item-name";
+      name.textContent = rig.Rig_Name;
+
+      const short = document.createElement("span");
+      short.className   = "rig-item-short";
+      short.textContent = rig.Rig_Short_Name || "";
+
+      const badge = document.createElement("span");
+      badge.className   = "rig-item-badge " + (rig.Rig_Active === "Y" ? "rig-active-badge" : "rig-inactive-badge");
+      badge.textContent = rig.Rig_Active === "Y" ? "Active" : "Inactive";
+
+      item.appendChild(cb);
+      item.appendChild(name);
+      if (rig.Rig_Short_Name) item.appendChild(short);
+      item.appendChild(badge);
+      container.appendChild(item);
+    }
+  }
+
+  function updateRigTrigger() {
+    const label = document.getElementById("rig-trigger-label");
+    const badge = document.getElementById("rig-badge");
+    if (selectedRigs.length === 0) {
+      label.textContent = "All rigs";
+      badge.classList.add("hidden");
+    } else if (selectedRigs.length === 1) {
+      label.textContent = selectedRigs[0];
+      badge.classList.add("hidden");
+    } else {
+      label.textContent = selectedRigs.length + " rigs";
+      badge.textContent = selectedRigs.length;
+      badge.classList.remove("hidden");
+    }
+  }
+
+  // Toggle panel
+  const rigTrigger = document.getElementById("rig-trigger");
+  const rigPanel   = document.getElementById("rig-panel");
+  rigTrigger.addEventListener("click", () => {
+    const open = rigPanel.classList.toggle("open");
+    rigTrigger.classList.toggle("open", open);
+    if (open) document.getElementById("rig-search").focus();
+  });
+
+  // Close on outside click
+  document.addEventListener("click", e => {
+    if (!document.getElementById("rig-dropdown").contains(e.target)) {
+      rigPanel.classList.remove("open");
+      rigTrigger.classList.remove("open");
+    }
+  });
+
+  // Search within rig list
+  document.getElementById("rig-search").addEventListener("input", () => {
+    renderRigList(allRigs);
+  });
+
+  // Select all / clear
+  document.getElementById("rig-select-all").addEventListener("click", () => {
+    const search = document.getElementById("rig-search").value.toLowerCase();
+    const visible = allRigs.filter(r =>
+      r.Rig_Name.toLowerCase().includes(search) ||
+      (r.Rig_Short_Name || "").toLowerCase().includes(search)
+    );
+    visible.forEach(r => {
+      if (!selectedRigs.includes(r.Rig_Name)) selectedRigs.push(r.Rig_Name);
+    });
+    updateRigTrigger();
+    renderRigList(allRigs);
+  });
+
+  document.getElementById("rig-clear").addEventListener("click", () => {
+    selectedRigs = [];
+    updateRigTrigger();
+    renderRigList(allRigs);
+  });
+
+  // Apply closes panel and refreshes
+  document.getElementById("rig-apply").addEventListener("click", () => {
+    rigPanel.classList.remove("open");
+    rigTrigger.classList.remove("open");
+    loadDashboard();
+  });
+
+  // Hours chart — back button
+  document.getElementById("hours-back-btn").addEventListener("click", () => {
+    if (hoursOverviewData) renderHours(hoursOverviewData, monthlyDetail);
+  });
+
+  // Incident back buttons — re-render with last loaded dashboard data
+  let _lastIncData = null;
+  document.getElementById("inc-year-back-btn").addEventListener("click", () => {
+    if (_lastIncData) renderIncidentsYear(_lastIncData, _lastIncData.monthly_detail || []);
+  });
+  document.getElementById("inc-rig-back-btn").addEventListener("click", () => {
+    if (_lastIncData) renderIncidentsRig(_lastIncData, _lastIncData.rig_year_detail || []);
+  });
+
+  document.getElementById("metres-rig-back-btn").addEventListener("click", () => {
+    const c = initChart("chart-metres-by-rig");
+    if (_metresRigOverviewData) {
+      const sorted = [..._metresRigOverviewData].sort((a, b) => (a.metres||0) - (b.metres||0));
+      _renderMetresOverview(c, sorted);
+      c.off("click");
+      c.on("click", params => {
+        const rig = sorted[params.dataIndex]?.rig;
+        if (rig) _renderMetresLocationDrilldown(c, rig, _metresLocDetail);
+      });
+    }
+    document.getElementById("metres-rig-back-btn").style.display = "none";
+    document.getElementById("metres-rig-sub").textContent = "total depth progress · selected year · click a rig to see locations";
+  });
+
+  document.getElementById("flat-back-btn").addEventListener("click", () => {
+    const c = initChart("chart-flat-time");
+    if (_flatOverviewData) {
+      const rows = [..._flatOverviewData].slice(0, 15).sort((a, b) => (a.hours||0) - (b.hours||0));
+      _renderFlatOverview(c, rows, _flatTotalHrs);
+      c.off("click");
+      c.on("click", params => {
+        const opName = rows[params.dataIndex]?.operation;
+        if (opName) _renderFlatDrilldown(c, opName, _flatRigDetailData);
+      });
+      document.getElementById("flat-back-btn").style.display = "none";
+      document.getElementById("flat-title-sub").textContent  = "zero-depth-progress ops · hours by type · click a bar to see per-rig split";
+    }
+  });
+
+  // Year change
+  document.getElementById("year-select").addEventListener("change", loadDashboard);
+
+  // Refresh
+  document.getElementById("refresh-btn").addEventListener("click", loadDashboard);
+
+
+  const KPI_TIPS = {
+    // ── KPI tiles ──────────────────────────────────────────────────────────
+    "kpi-utilisation":      `<b>Avg Utilisation %</b> — Operating hours as % of total logged rig time. Green ≥80, Amber 60–79, Red &lt;60.`,
+    "kpi-active-rigs":      `<b>Active Rigs</b> — Rigs currently flagged as active in the fleet.`,
+    "kpi-total-rigs":       `<b>Total Rigs</b> — All rigs including inactive and retired units.`,
+    "kpi-employees":        `<b>Active Employees</b> — Total headcount with active employment status.`,
+    "kpi-crew":             `<b>Crew Posted Today</b> — Field-service crew currently assigned to a rig.`,
+    "kpi-incidents":        `<b>Incidents</b> — Total safety incidents for the selected filters.`,
+    "kpi-npt":              `<b>NPT Days</b> — Non-Productive Time from the drilling log (hours ÷ 24). Separate from incident NPT.`,
+    "kpi-rop":              `<b>Rate of Penetration (m/hr)</b> — Metres drilled ÷ drill hours. Forward progress only.`,
+    "kpi-metres":           `<b>Metres Drilled</b> — Total depth progress for Drill Actual operations.`,
+    "kpi-drill-hrs":        `<b>Drilling Hours</b> — Hours spent in Drill Actual operations only.`,
+    "kpi-drill-ops":        `<b>Drill Operations</b> — Count of Drill Actual records in the daily log.`,
+    "kpi-flat-hrs":         `<b>Flat Time Hours</b> — Hours with zero depth progress (trips, cement, waiting, etc.).`,
+    "kpi-npt-hrs":          `<b>Total NPT Days</b> — Downtime hours converted to days (÷ 24).`,
+    "kpi-npt-pct":          `<b>NPT % of Rig Time</b> — NPT hours as % of all logged operation hours.`,
+    "kpi-npt-events":       `<b>NPT Events</b> — Number of discrete downtime entries recorded.`,
+    "kpi-npt-avg":          `<b>Avg Event Duration</b> — Average duration per NPT event in hours.`,
+    "kpi-npt-incident":     `<b>Incident NPT Days</b> — NPT attributed to safety incidents, in days.`,
+    "kpi-hse-open-cards":   `<b>Open Hazard Cards</b> — Cards not yet closed. Target: trend toward zero.`,
+    "kpi-hse-card-close":   `<b>Card Close Rate</b> — Closed cards ÷ total cards × 100. Target ≥90%.`,
+    "kpi-hse-overdue":      `<b>Overdue Actions</b> — Corrective actions past their target date. Target: 0.`,
+    "kpi-hse-closure-rate": `<b>Action Closure Rate</b> — Closed actions ÷ total actions × 100.`,
+    "kpi-hse-tfs":          `<b>Timeout for Safety</b> — Cards where work was formally stopped to fix the hazard on the spot.`,
+    "kpi-hse-max-age":      `<b>Oldest Open Card</b> — Age in days of the longest-outstanding open hazard card.`,
+    // ── Charts ─────────────────────────────────────────────────────────────
+    "chart-info-utilisation":          `<b>Rig Utilisation %</b> — Monthly utilisation stacked by rig. Click a series to drill into hours.`,
+    "chart-info-hours":                `<b>Hours Breakdown</b> — Logged rig time split by category. Click a bar for monthly detail.`,
+    "chart-info-inc-year":             `<b>Incidents by Year</b> — Annual incident count stacked by severity (High / Medium / Low).`,
+    "chart-info-inc-rig":              `<b>Incidents by Rig</b> — Incident count per rig broken down by year.`,
+    "chart-info-rop-yoy":              `<b>ROP Year on Year</b> — Weighted average metres/hour across years, Drill Actual ops only.`,
+    "chart-info-rop-section":          `<b>ROP by Hole Section</b> — Rate and metres drilled per hole section.`,
+    "chart-info-ops-breakdown":        `<b>Operations Breakdown</b> — All operation types by hours and % of total rig time.`,
+    "chart-info-metres-rig":           `<b>Metres by Rig</b> — Total depth drilled per rig. Click to see by location.`,
+    "chart-info-flat-time":            `<b>Flat Time</b> — Hours with zero depth progress. Click to see by rig.`,
+    "chart-info-npt-yoy":              `<b>NPT Year on Year</b> — Total downtime hours and event count per year.`,
+    "chart-info-npt-monthly":          `<b>Monthly NPT Trend</b> — Month-by-month downtime hours and events.`,
+    "chart-info-npt-rig":              `<b>NPT by Rig</b> — Downtime hours per rig. Click to drill into monthly trend.`,
+    "chart-info-npt-causes":           `<b>Top NPT Causes</b> — Downtime hours by reason. Click to drill into rig and month.`,
+    "chart-info-chart-hse-submission": `<b>Monthly Submission Trend</b> — Cards per month stacked by hazard type. Dashed line = TFS count.`,
+    "chart-info-chart-hse-type":       `<b>Hazard Type Split</b> — Cards by type: Unsafe Condition, Unsafe Act, Positive Recognition.`,
+    "chart-info-chart-hse-location":   `<b>Top Work Locations</b> — Areas with the most hazard card submissions.`,
+    "chart-info-chart-hse-dept":       `<b>Responsible Department</b> — Cards per department, split by open vs closed.`,
+    "chart-info-chart-hse-ageing":     `<b>Open Card Ageing</b> — How long current open cards have been outstanding.`,
+    "chart-info-chart-hse-closure":    `<b>Action Closure by Rig</b> — Corrective action status per rig: closed, open, overdue.`,
+    "chart-info-chart-hse-inc-haz":    `<b>Incidents vs Hazard Cards</b> — Hazard cards (leading) vs incidents (lagging) per month.`,
+    "chart-info-chart-tfs-rig":        `<b>TFS by Rig</b> — Work-stoppage count and rate % per rig.`,
+    "chart-info-chart-tfs-location":   `<b>TFS by Work Location</b> — Areas ranked by Timeout for Safety count.`,
+  };
+
+  /* ── KPI info tooltip ── */
+  const _kpiTip = document.getElementById("kpi-tooltip");
+  document.querySelectorAll(".kpi-info[data-kpi]").forEach(el => {
+    el.addEventListener("mouseenter", e => {
+      const html = KPI_TIPS[el.dataset.kpi] || el.dataset.kpi;
+      _kpiTip.innerHTML = html;
+      _kpiTip.style.display = "block";
+      _moveTip(e);
+    });
+    el.addEventListener("mousemove", _moveTip);
+    el.addEventListener("mouseleave", () => { _kpiTip.style.display = "none"; });
+  });
+  document.querySelectorAll(".chart-info[data-kpi]").forEach(el => {
+    el.addEventListener("mouseenter", e => {
+      const html = KPI_TIPS[el.dataset.kpi] || el.dataset.kpi;
+      _kpiTip.innerHTML = html;
+      _kpiTip.style.display = "block";
+      _moveTip(e);
+    });
+    el.addEventListener("mousemove", _moveTip);
+    el.addEventListener("mouseleave", () => { _kpiTip.style.display = "none"; });
+  });
+  function _moveTip(e) {
+    const pad = 14, tw = _kpiTip.offsetWidth, th = _kpiTip.offsetHeight;
+    let x = e.clientX + pad, y = e.clientY - th - pad;
+    if (x + tw > window.innerWidth  - 8) x = e.clientX - tw - pad;
+    if (y < 8) y = e.clientY + pad;
+    _kpiTip.style.left = x + "px";
+    _kpiTip.style.top  = y + "px";
+  }
+
+  /* ── Init ── */
+  (async () => {
+    await loadMeta();
+    await loadDashboard();
+    // Restore last-visited section after data loads
+    try {
+      const saved = localStorage.getItem("lastDashInsight");
+      if (saved && document.getElementById("insight-" + saved)) switchInsight(saved);
+    } catch(e) {}
+  })();
+</script>
+</body>
+</html>
