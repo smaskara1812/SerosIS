@@ -442,7 +442,13 @@
     /* ── Dashboard layout: sidebar + main ── */
     .dashboard-layout {
       display: flex;
-      min-height: calc(100vh - 114px);
+      min-height: calc(100vh - 54px);
+    }
+    .main-wrap {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
     }
 
     .sidebar {
@@ -452,8 +458,8 @@
       border-right: 1px solid #e9edf2;
       padding: 0 0 16px;
       position: sticky;
-      top: 114px;
-      height: calc(100vh - 114px);
+      top: 54px;
+      height: calc(100vh - 54px);
       overflow-y: auto;
       overflow-x: hidden;
       transition: width 0.2s ease;
@@ -599,50 +605,6 @@
   </div>
 </nav>
 
-<!-- ── Filter bar ── -->
-<div class="filter-bar">
-  <span class="filter-label">Filters</span>
-  <div class="filter-sep"></div>
-
-  <!-- Year -->
-  <span class="filter-label" style="color:#64748b;text-transform:none;font-weight:500;">Year</span>
-  <select id="year-select">
-    <option value="">All years</option>
-  </select>
-
-  <div class="filter-sep"></div>
-
-  <!-- Rig multi-select -->
-  <span class="filter-label" style="color:#64748b;text-transform:none;font-weight:500;">Rigs</span>
-  <div class="rig-dropdown" id="rig-dropdown">
-    <div class="rig-trigger" id="rig-trigger">
-      <span class="rig-trigger-label" id="rig-trigger-label">All rigs</span>
-      <span class="rig-trigger-badge hidden" id="rig-badge">0</span>
-      <span class="rig-trigger-arrow"></span>
-    </div>
-    <div class="rig-panel" id="rig-panel">
-      <div class="rig-search-wrap">
-        <input class="rig-search" id="rig-search" type="text" placeholder="Search rigs…" autocomplete="off" />
-      </div>
-      <div class="rig-actions">
-        <button class="rig-action-btn" id="rig-select-all">Select all</button>
-        <button class="rig-action-btn" id="rig-clear">Clear</button>
-      </div>
-      <div class="rig-list" id="rig-list">
-        <div class="rig-empty">Loading rigs…</div>
-      </div>
-      <div class="rig-footer">
-        <button class="rig-apply-btn" id="rig-apply">Apply</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="filter-right">
-    <button id="refresh-btn">↻ Refresh</button>
-    <span class="last-updated" id="last-updated"></span>
-  </div>
-</div>
-
 <!-- ── Dashboard layout ── -->
 <div class="dashboard-layout">
 
@@ -692,8 +654,54 @@
     </div>
   </aside>
 
-  <!-- Main content -->
-  <main class="main-content">
+  <div class="main-wrap">
+
+    <!-- ── Filter bar ── -->
+    <div class="filter-bar">
+      <span class="filter-label">Filters</span>
+      <div class="filter-sep"></div>
+
+      <!-- Year -->
+      <span class="filter-label" style="color:#64748b;text-transform:none;font-weight:500;">Year</span>
+      <select id="year-select">
+        <option value="">All years</option>
+      </select>
+
+      <div class="filter-sep"></div>
+
+      <!-- Rig multi-select -->
+      <span class="filter-label" style="color:#64748b;text-transform:none;font-weight:500;">Rigs</span>
+      <div class="rig-dropdown" id="rig-dropdown">
+        <div class="rig-trigger" id="rig-trigger">
+          <span class="rig-trigger-label" id="rig-trigger-label">All rigs</span>
+          <span class="rig-trigger-badge hidden" id="rig-badge">0</span>
+          <span class="rig-trigger-arrow"></span>
+        </div>
+        <div class="rig-panel" id="rig-panel">
+          <div class="rig-search-wrap">
+            <input class="rig-search" id="rig-search" type="text" placeholder="Search rigs…" autocomplete="off" />
+          </div>
+          <div class="rig-actions">
+            <button class="rig-action-btn" id="rig-select-all">Select all</button>
+            <button class="rig-action-btn" id="rig-clear">Clear</button>
+          </div>
+          <div class="rig-list" id="rig-list">
+            <div class="rig-empty">Loading rigs…</div>
+          </div>
+          <div class="rig-footer">
+            <button class="rig-apply-btn" id="rig-apply">Apply</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-right">
+        <button id="refresh-btn">↻ Refresh</button>
+        <span class="last-updated" id="last-updated"></span>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <main class="main-content">
 
     <!-- ══ Insight 1: Rig Utilisation ══ -->
     <div id="insight-utilisation" class="insight-section active">
@@ -1109,7 +1117,8 @@
 
     </div><!-- /#insight-roster -->
 
-  </main>
+    </main>
+  </div><!-- /.main-wrap -->
 </div><!-- /.dashboard-layout -->
 
 <div id="kpi-tooltip"></div>

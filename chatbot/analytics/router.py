@@ -208,6 +208,9 @@ def route(user_message: str, context: dict | None = None) -> dict | None:
         "expiring certificate", "expiring certification",
         "crew on board", "currently on board", "overdue rotation",
         "final settlement", "who is leaving", "which rig is losing crew",
+        "crew roster", "workforce composition", "designation breakdown",
+        "designations on", "top designations", "offshore and onshore",
+        "offshore employees", "onshore employees", "workforce by rig type",
     ]):
         return get_workforce_dashboard(rig=rig, year=year)
 
@@ -263,7 +266,7 @@ def route(user_message: str, context: dict | None = None) -> dict | None:
     # ── Oldest / overdue open hazard cards (specific records) ─────────────────
     if any(p in msg for p in [
         "oldest open card", "oldest hazard card", "oldest card",
-        "which card is oldest", "which is the oldest",
+        "oldest open hazard card", "which card is oldest", "which is the oldest",
         "overdue hazard card", "overdue open card", "overdue card",
         "long overdue card", "cards overdue", "outstanding card",
         "unresolved card", "aged card", "card ageing list",
