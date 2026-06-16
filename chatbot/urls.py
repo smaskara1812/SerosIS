@@ -7,12 +7,23 @@ urlpatterns = [
     path("health/", views.health_page, name="health"),
     path("manuals/", views.manuals_page, name="manuals"),
     path("dashboard/", views.dashboard_page, name="dashboard"),
+    path("listings/", views.listings_page, name="listings"),
+    path("listings/incidents/", views.listings_incidents_page, name="listings_incidents"),
+    path("listings/hazard-cards/", views.listings_hazard_cards_page, name="listings_hazard_cards"),
+    path("listings/employees/", views.listings_employees_page, name="listings_employees"),
 
     # ── Dashboard API ───────────────────────────────────────────────────────
     path("api/dashboard/", views.dashboard_api, name="dashboard_api"),
     path("api/dashboard/meta/", views.dashboard_meta, name="dashboard_meta"),
     path("api/dashboard/hse/", views.dashboard_hse_api, name="dashboard_hse_api"),
     path("api/dashboard/workforce/", views.dashboard_workforce_api, name="dashboard_workforce_api"),
+
+    # ── Listings API ────────────────────────────────────────────────────────
+    path("api/listings/meta/", views.listings_meta_api, name="listings_meta_api"),
+    path("api/listings/incidents/", views.listings_incidents_api, name="listings_incidents_api"),
+    path("api/listings/hazard-cards/", views.listings_hazard_cards_api, name="listings_hazard_cards_api"),
+    path("api/listings/employees/meta/", views.listings_employees_meta_api, name="listings_employees_meta_api"),
+    path("api/listings/employees/", views.listings_employees_api, name="listings_employees_api"),
 
     # ── Health API ──────────────────────────────────────────────────────────
     path("api/health/", views.health_api, name="health_api"),

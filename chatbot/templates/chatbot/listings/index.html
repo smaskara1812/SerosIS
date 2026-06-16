@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seros Listings</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+    }
+    .nav {
+      background: #1a3f7a;
+      color: #fff;
+      padding: 0 28px;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    }
+    .nav-brand { font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .nav-brand span { opacity: 0.45; font-weight: 400; font-size: 0.8rem; }
+    .nav-links { display: flex; gap: 20px; align-items: center; }
+    .nav-links a { color: rgba(255,255,255,0.55); text-decoration: none; font-size: 0.85rem; transition: color 0.15s; }
+    .nav-links a:hover, .nav-links a.active { color: #fff; }
+
+    .page-body { max-width: 1000px; margin: 0 auto; padding: 40px 28px; }
+    .page-title { font-size: 1.4rem; font-weight: 700; color: #1a3f7a; margin-bottom: 6px; }
+    .page-subtitle { font-size: 0.9rem; color: #64748b; margin-bottom: 28px; }
+
+    .listing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+    .listing-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      padding: 22px;
+      text-decoration: none;
+      display: block;
+      transition: box-shadow 0.15s, transform 0.15s;
+      border: 1px solid #eef1f5;
+    }
+    .listing-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.1); transform: translateY(-2px); }
+    .listing-card-icon {
+      width: 38px; height: 38px;
+      border-radius: 9px;
+      background: #e8f5f4;
+      color: #1a3f7a;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 14px;
+    }
+    .listing-card-title { font-size: 1.02rem; font-weight: 700; color: #1a3f7a; margin-bottom: 6px; }
+    .listing-card-desc { font-size: 0.83rem; color: #64748b; line-height: 1.5; }
+    .listing-card.disabled { opacity: 0.5; cursor: default; pointer-events: none; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">Seros AI <span>/ Listings</span></div>
+  <div class="nav-links">
+    <a href="/">Chat</a>
+    <a href="/dashboard/">Dashboard</a>
+    <a href="/listings/" class="active">Listings</a>
+    <a href="/health/">Health</a>
+    <a href="/manuals/">Manuals</a>
+  </div>
+</nav>
+
+<div class="page-body">
+  <div class="page-title">Listings</div>
+  <div class="page-subtitle">Searchable, paginated record listings — each one its own dedicated page.</div>
+
+  <div class="listing-grid">
+    <a class="listing-card" href="/listings/incidents/">
+      <div class="listing-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+      </div>
+      <div class="listing-card-title">Incidents</div>
+      <div class="listing-card-desc">Safety incidents with causes, corrective and preventive actions. Search, filter, and sort across the full record.</div>
+    </a>
+
+    <a class="listing-card" href="/listings/hazard-cards/">
+      <div class="listing-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
+      </div>
+      <div class="listing-card-title">Hazard Cards</div>
+      <div class="listing-card-desc">Hazard ID cards with action taken, responsible party, and close-out status. Search, filter, and sort across the full record.</div>
+    </a>
+
+    <a class="listing-card" href="/listings/employees/">
+      <div class="listing-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><path d="M3 20c0-3.5 2.5-6 6-6s6 2.5 6 6"></path><circle cx="17" cy="9" r="2.4"></circle><path d="M15.5 14.2c2.3.4 3.7 2.3 4 4.8"></path></svg>
+      </div>
+      <div class="listing-card-title">Employees</div>
+      <div class="listing-card-desc">Field-service crew master — rank, rig, category, contact details, and full personnel record. Search, filter, and sort across the full record.</div>
+    </a>
+
+    <span class="listing-card disabled">
+      <div class="listing-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 16 14"></polyline></svg>
+      </div>
+      <div class="listing-card-title">Crew Rotations <span style="font-size:0.7rem;font-weight:400;">(coming soon)</span></div>
+      <div class="listing-card-desc">Overdue and upcoming crew rotations, named and searchable.</div>
+    </span>
+
+    <span class="listing-card disabled">
+      <div class="listing-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+      </div>
+      <div class="listing-card-title">Certificates <span style="font-size:0.7rem;font-weight:400;">(coming soon)</span></div>
+      <div class="listing-card-desc">Crew certificate records with expiry status, searchable by employee and certificate type.</div>
+    </span>
+  </div>
+</div>
+
+</body>
+</html>

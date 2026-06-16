@@ -758,6 +758,138 @@ def dashboard_workforce_api(request):
     return JsonResponse(_build_workforce(year, rig_filter))
 
 
+# ── Listings ─────────────────────────────────────────────────────────────────
+
+def listings_page(request):
+    return render(request, "chatbot/listings/index.html")
+
+
+def listings_incidents_page(request):
+    return render(request, "chatbot/listings/incidents.html")
+
+
+def listings_hazard_cards_page(request):
+    return render(request, "chatbot/listings/hazard_cards.html")
+
+
+@require_GET
+def listings_meta_api(request):
+    """Filter dropdown options shared by the Listings pages."""
+    from .analytics.tools import _query
+    years = _query("""
+        SELECT DISTINCT YEAR(Incident_Date) AS yr FROM eos_Incident_Details
+        WHERE Incident_Date IS NOT NULL
+        UNION
+        SELECT DISTINCT YEAR(Event_Dt) AS yr FROM eos_Hazard_ID_Card
+        WHERE Event_Dt IS NOT NULL
+        ORDER BY yr DESC
+    """)
+    rigs = _query("""
+        SELECT Rig_Id, Rig_Name, Rig_Short_Name FROM eos_Mst_Rig
+        WHERE Rig_Type_Id IN (1,2) ORDER BY Rig_Name
+    """)
+    incident_types = _query("SELECT Incident_Type_Id AS id, Incident_Type AS name FROM Mstx_Incident_Type ORDER BY Incident_Type")
+    hazard_types = _query("SELECT Haz_Type_Id AS id, Haz_Type_Name AS name FROM eos_Mst_Hazard_Type ORDER BY Haz_Type_Name")
+    work_locations = _query("SELECT Work_Location_Id AS id, Work_Location AS name FROM Mstx_Work_Location ORDER BY Work_Location")
+    return JsonResponse({
+        "years": [r["yr"] for r in years if r["yr"]],
+        "rigs": rigs,
+        "incident_types": incident_types,
+        "hazard_types": hazard_types,
+        "work_locations": work_locations,
+    })
+
+
+@require_GET
+def listings_incidents_api(request):
+    from .analytics.listings import get_incident_listing
+    g = request.GET
+    page      = g.get("page")
+    page_size = g.get("page_size")
+    year      = g.get("year")
+    data = get_incident_listing(
+        page=int(page) if page and page.isdigit() else None,
+        page_size=int(page_size) if page_size and page_size.isdigit() else None,
+        rig=g.get("rig") or None,
+        year=int(year) if year and year.isdigit() else None,
+        severity=g.get("severity") or None,
+        person_injured=g.get("person_injured") or None,
+        incident_type=g.get("incident_type") or None,
+        search=g.get("search") or None,
+        sort=g.get("sort") or None,
+        sort_dir=g.get("sort_dir") or None,
+    )
+    return JsonResponse(data)
+
+
+@require_GET
+def listings_hazard_cards_api(request):
+    from .analytics.listings import get_hazard_card_listing
+    g = request.GET
+    page      = g.get("page")
+    page_size = g.get("page_size")
+    year      = g.get("year")
+    data = get_hazard_card_listing(
+        page=int(page) if page and page.isdigit() else None,
+        page_size=int(page_size) if page_size and page_size.isdigit() else None,
+        rig=g.get("rig") or None,
+        year=int(year) if year and year.isdigit() else None,
+        hazard_type=g.get("hazard_type") or None,
+        status=g.get("status") or None,
+        tfs=g.get("tfs") or None,
+        work_location=g.get("work_location") or None,
+        search=g.get("search") or None,
+        sort=g.get("sort") or None,
+        sort_dir=g.get("sort_dir") or None,
+    )
+    return JsonResponse(data)
+
+
+def listings_employees_page(request):
+    return render(request, "chatbot/listings/employees.html")
+
+
+@require_GET
+def listings_employees_meta_api(request):
+    """Filter dropdown options for the Employee listing."""
+    from .analytics.tools import _query
+    rigs = _query("""
+        SELECT Rig_Id, Rig_Name FROM eos_Mst_Rig
+        WHERE Rig_Type_Id IN (1,2) ORDER BY Rig_Name
+    """)
+    ranks = _query("SELECT rank_id AS id, rank_name AS name FROM Mst_Rank ORDER BY rank_name")
+    categories = _query("SELECT fs_category_id AS id, fs_category_name AS name FROM Mst_Fs_Category ORDER BY fs_category_name")
+    emp_types = _query("SELECT emp_type_id AS id, emp_type_name AS name FROM Mst_Emp_Type ORDER BY emp_type_name")
+    return JsonResponse({
+        "rigs": rigs,
+        "ranks": ranks,
+        "categories": categories,
+        "emp_types": emp_types,
+    })
+
+
+@require_GET
+def listings_employees_api(request):
+    from .analytics.listings import get_employee_listing
+    g = request.GET
+    page      = g.get("page")
+    page_size = g.get("page_size")
+    data = get_employee_listing(
+        page=int(page) if page and page.isdigit() else None,
+        page_size=int(page_size) if page_size and page_size.isdigit() else None,
+        rig=g.get("rig") or None,
+        rank=g.get("rank") or None,
+        category=g.get("category") or None,
+        emp_type=g.get("emp_type") or None,
+        status=g.get("status") or None,
+        gender=g.get("gender") or None,
+        search=g.get("search") or None,
+        sort=g.get("sort") or None,
+        sort_dir=g.get("sort_dir") or None,
+    )
+    return JsonResponse(data)
+
+
 # ── Chat API ───────────────────────────────────────────────────────────────────
 
 @csrf_exempt
