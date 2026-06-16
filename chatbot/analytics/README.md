@@ -54,13 +54,15 @@ Lists rigs with id, name, short name, and active flag.
 ---
 
 ### 2. `get_headcount(rig, dept)`
-Employee and crew headcount.
+Employee and crew headcount. Source: `eos_Service_Details` (`Serv_Subtype_Id = 7` 'On Board', `Serv_Subtype_To IS NULL`) joined to `eos_Mst_Rig` (`Rig_Type_Id IN (1,2)`).
+
+**"On board" means physically on the rig right now** — matches the Workforce dashboard's "Crew Currently On Board" definition exactly. This used to count any open service record (On Board + Off Board + On Leave + Standby Wages, etc.) and didn't filter out Office/Repair Yard/Well Service entries, which inflated the figure (462 vs. the correct 248) and didn't match what "crew posted today" should mean.
 
 | Filter | Type | Description |
 |--------|------|-------------|
-| `rig` | `str \| None` | Active field-service crew currently posted on that rig |
+| `rig` | `str \| None` | Crew currently on board that rig |
 | `dept` | `str \| None` | Active employees in that department |
-| *(none)* | — | Total active employees + FS crew broken down by rig |
+| *(none)* | — | Total active employees + crew on board, broken down by rig |
 
 **Returns:** counts, crew breakdown by rig (when no filter)
 
@@ -402,6 +404,84 @@ Downtime reasons come from the `eos_Drilling_Dtl.Downtime_Reason` field (joined 
 
 ---
 
+### 11a. `get_workforce_dashboard(rig, year)`
+Comprehensive Workforce overview — powers the Workforce section of the analytics dashboard.
+Sources: `eos_Service_Details`, `eos_Mst_Rig`, `Mst_Rank`, `eos_Fs_Certificates`, `Mst_Cert`.
+
+**Table/column reference — what each metric is actually built from:**
+
+| Metric | Table(s) | Key columns | Notes |
+|--------|----------|-------------|-------|
+| Departures (attrition) | `eos_Service_Details` | `Serv_Subtype_Id = 13` ('Final Settlement'), `Rig_Id`, `Rank_Id`, `Serv_Subtype_From` | The **only** subtype that means an employee left Seros for good. Routine rotation (`Serv_Subtype_Id` 7 'On Board' / 10 'Off Board') is excluded — those are not attrition. |
+| Average tenure | `eos_Service_Details` | `MIN(Serv_Subtype_From)` where `Serv_Subtype_Id = 7` (career start) vs. the `Serv_Subtype_From` of the matching `Serv_Subtype_Id = 13` row (career end) | Closed careers only — crew still employed have no tenure value yet. |
+| Rotation compliance | `eos_Service_Details` | `Serv_Subtype_Id = 7`, `Serv_Subtype_To` (actual sign-off), `Appx_End_Dt` (planned sign-off) | Compliance = signed off on/before `Appx_End_Dt`. Only rows with both dates populated count (96% coverage from 2013 onward; 2012 has only 68% coverage). |
+| Current rotation status (live) | `eos_Service_Details` | `Serv_Subtype_Id = 7`, `Serv_Subtype_To IS NULL`, `Appx_End_Dt` | Includes every open On Board record as-is, including a handful from 2013/2020/2022 that were likely never closed out. Those show as extreme "days overdue" outliers — surfaced intentionally rather than filtered, so the data-quality gap stays visible to management. |
+| Certificate expiry | `eos_Fs_Certificates`, `Mst_Cert` | `Fs_Cert_Active = 'Y'`, `Fs_Cert_Valid_Till`, `Cert_Id` → `cert_name` | `Fs_Cert_Active='Y'` means "this is the current cert record on file," **not** "not expired" — 354 of the active rows are already past their `Fs_Cert_Valid_Till` date with no renewal logged. Fleet-wide only; this table has no rig linkage. |
+
+| Filter | Type | Description |
+|--------|------|-------------|
+| `rig` | `str \| None` | Filter by rig name (only `Rig_Type_Id` 1/2 — Offshore/Onshore — ever returned; rigs of type 3/4/5 — Repair Yard, Office, Well Service — are excluded everywhere) |
+| `year` | `int \| None` | Filter by year (current rotation status and cert expiry are always live snapshots, not year-filtered) |
+
+**Returns:**
+- `summary` — `total_departures`, `avg_tenure_days`, `rotation_compliance_pct`, `crew_on_board`, `overdue_rotations`, `avg_days_overdue`, `certs_expired`, `certs_due_30`
+- `departures_by_rig` — final settlements per rig
+- `departures_by_rank` — top 10 ranks by final settlement count, fleet-wide
+- `tenure_by_rig` — avg tenure in days per rig, with `sample_size`
+- `rotation_compliance_by_rig` — `completed`, `on_time`, `compliance_pct`, `avg_overrun_days` per rig
+- `current_rotation_by_rig` — `on_board`, `overdue`, `avg_days_on_board`, `avg_days_overdue`, `max_days_overdue` per rig
+- `crew_roster_by_rig` — live crew roster per rig: `on_board`, `overdue`, `due_7d` (rotations planned within 7 days — almost always 0, see caveat below), `top_designations` (top 5 ranks with counts)
+- `cert_expiry_buckets` — `expired`, `due_30`, `due_90`, `healthy` counts
+- `cert_expiring_by_type` — top 10 certificate types by expired/due-soon count
+
+**Example triggers:**
+- "workforce overview"
+- "crew attrition by rig"
+- "average tenure for DR01"
+- "rotation compliance this year"
+- "certificate expiry status"
+- "who is leaving"
+
+---
+
+### 11b. `list_overdue_crew_rotations(rig, limit)`
+Named crew currently on board whose planned rotation date has passed. Sourced from `eos_Service_Details` joined to `eos_Mst_Fs_Employee` (name) and `Mst_Rank`. Same 180-day staleness filter as the dashboard's live snapshot — always current, no year filter.
+
+| Filter | Type | Description | Default |
+|--------|------|-------------|---------|
+| `rig` | `str \| None` | Filter by rig name | — |
+| `limit` | `int` | Records to return (max 50) | `10` |
+
+**Returns:** `most_overdue` (the single most-overdue record), `crew` list — each with employee name, rig, rank, joined date, planned end date, days overdue, days on board
+
+**Caveat:** "Overdue" here may include logging delays (crew who already rotated off but whose `Off Board` record hasn't been entered yet), not necessarily a real live staffing crisis — surface as a list to investigate, not a confirmed incident count.
+
+**Example triggers:**
+- "who is overdue for rotation"
+- "show overdue crew on DR01"
+- "which crew member hasn't rotated off"
+
+---
+
+### 11c. `list_expiring_crew_certificates(status, limit)`
+Named individual crew certificates that are expired or expiring soon. Sourced from `eos_Fs_Certificates` joined to `eos_Mst_Fs_Employee` (name) and `Mst_Cert` (cert name). Fleet-wide — no rig filter available (source table has no `Rig_Id`).
+
+| Filter | Type | Options | Default |
+|--------|------|---------|---------|
+| `status` | `str \| None` | `'expired'` / `'due_30'` / `'due_90'` / `None` (expired + due within 90 days) | `None` |
+| `limit` | `int` | Records to return (max 50) | `10` |
+
+**Returns:** list of certificates with employee name, cert name, issued date, expiry date, days since expiry
+
+**Sort order:** `expired` sorts most-recently-expired first (most actionable); `due_30`/`due_90` sort soonest-expiring first.
+
+**Example triggers:**
+- "which certificates are expired"
+- "list expiring certificates"
+- "who needs certificate renewal"
+
+---
+
 ## Router (`router.py`)
 
 ### Rig name matching
@@ -437,14 +517,19 @@ re-route to the same tool with the same filters without the user repeating the r
 2. Headcount
 3. **NPT analysis** (must appear before incident blocks — both match "npt")
 4. Incident listing → Incident summary
-5. **HSE dashboard overview** (broad HSE KPIs, card rates, ageing, action closure)
-6. Hazard card listing → Hazard card summary (individual records / trend)
-7. Material cost
-8. Rig utilisation (+ follow-up context)
-9. Drilling performance / ROP (+ follow-up context)
-10. Rig locations (+ follow-up context)
-11. Drilling hours
-12. Fallback → RAG pipeline (service manuals)
+5. Overdue/oldest open hazard cards (specific records)
+6. Corrective actions from incident investigations (specific records)
+7. **HSE dashboard overview** (broad HSE KPIs, card rates, ageing, action closure)
+8. Overdue crew rotations (specific records)
+9. Expiring crew certificates (specific records)
+10. **Workforce dashboard overview** (broad workforce KPIs — attrition, tenure, rotation, certs)
+11. Hazard card listing → Hazard card summary (individual records / trend)
+12. Material cost
+13. Rig utilisation (+ follow-up context)
+14. Drilling performance / ROP (+ follow-up context)
+15. Rig locations (+ follow-up context)
+16. Drilling hours
+17. Fallback → RAG pipeline (service manuals)
 
 ### Fallback
 If no analytics intent is matched → question goes to the **RAG pipeline** (service manuals).

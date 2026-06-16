@@ -371,6 +371,50 @@
     }
     .chart-body { width: 100%; }
 
+    /* ── Crew roster table ── */
+    .roster-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .roster-table th {
+      text-align: left;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0 12px 10px;
+      border-bottom: 2px solid #f1f5f9;
+      white-space: nowrap;
+    }
+    .roster-table td {
+      padding: 11px 12px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: top;
+      color: #334155;
+    }
+    .roster-table tr:last-child td { border-bottom: none; }
+    .roster-table tr:hover td { background: #f8fafc; }
+    .roster-table .roster-rig { font-weight: 600; color: #1a3f7a; white-space: nowrap; }
+    .roster-table .roster-num { font-weight: 700; font-size: 0.95rem; }
+    .roster-chip {
+      display: inline-block;
+      background: #eef2f7;
+      color: #475569;
+      border-radius: 12px;
+      padding: 2px 9px;
+      font-size: 0.74rem;
+      margin: 2px 4px 2px 0;
+      white-space: nowrap;
+    }
+    .roster-badge {
+      display: inline-block;
+      border-radius: 10px;
+      padding: 2px 9px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .roster-badge.zero  { background: #f0fdf4; color: #16a34a; }
+    .roster-badge.warn  { background: #fffbeb; color: #d97706; }
+    .roster-badge.bad   { background: #fef2f2; color: #dc2626; }
+
     /* ── Loading overlay ── */
     #loading-overlay {
       position: fixed;
@@ -402,20 +446,20 @@
     }
 
     .sidebar {
-      width: 216px;
+      width: 224px;
       flex-shrink: 0;
       background: #fff;
-      border-right: 1px solid #e5e7eb;
-      padding: 0 0 32px;
+      border-right: 1px solid #e9edf2;
+      padding: 0 0 16px;
       position: sticky;
       top: 114px;
       height: calc(100vh - 114px);
       overflow-y: auto;
       overflow-x: hidden;
-      transition: width 0.22s ease;
+      transition: width 0.2s ease;
     }
     .sidebar.collapsed {
-      width: 44px;
+      width: 56px;
     }
 
     /* Toggle button */
@@ -423,48 +467,66 @@
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      padding: 10px 10px 6px;
-      border-bottom: 1px solid #f1f5f9;
+      padding: 12px 12px 8px;
+    }
+    .sidebar.collapsed .sidebar-toggle {
+      justify-content: center;
+      padding: 12px 0 8px;
     }
     .sidebar-toggle-btn {
-      width: 28px;
-      height: 28px;
-      background: #f8fafc;
+      width: 26px;
+      height: 26px;
+      background: transparent;
       border: 1px solid #e2e8f0;
-      border-radius: 6px;
+      border-radius: 7px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      transition: background 0.12s;
-      color: #64748b;
-      font-size: 13px;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+      color: #94a3b8;
     }
-    .sidebar-toggle-btn:hover { background: #e2e8f0; }
+    .sidebar-toggle-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #1a3f7a; }
+    #sidebar-toggle-icon { transition: transform 0.2s ease; }
+    .sidebar.collapsed #sidebar-toggle-icon { transform: rotate(180deg); }
 
     .sidebar-body {
       overflow: hidden;
-      transition: opacity 0.18s ease;
-    }
-    .sidebar.collapsed .sidebar-body {
-      opacity: 0;
-      pointer-events: none;
     }
 
     .sidebar-section-label {
-      padding: 14px 16px 4px;
-      font-size: 0.67rem;
+      padding: 16px 16px 6px;
+      font-size: 0.66rem;
       font-weight: 700;
-      color: #94a3b8;
+      color: #aab4c2;
       text-transform: uppercase;
       letter-spacing: 0.8px;
       white-space: nowrap;
+      transition: opacity 0.15s ease;
+    }
+    .sidebar.collapsed .sidebar-section-label {
+      opacity: 0;
+      height: 0;
+      padding: 6px 0 0;
+      overflow: hidden;
+    }
+    .sidebar.collapsed .sidebar-section-label::before {
+      content: "";
+      display: block;
+      margin: 6px auto 0;
+      width: 22px;
+      height: 1px;
+      background: #eef1f5;
     }
 
     .sidebar-item {
-      display: block;
-      padding: 8px 18px 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 8px 14px 8px 17px;
+      margin: 1px 8px;
+      border-radius: 8px;
       font-size: 0.855rem;
       color: #64748b;
       cursor: pointer;
@@ -484,10 +546,28 @@
     .sidebar-item.coming-soon {
       color: #cbd5e1;
       cursor: default;
-      font-style: italic;
-      font-size: 0.78rem;
-      padding-left: 24px;
     }
+    .sidebar-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    .sidebar-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: opacity 0.15s ease;
+    }
+    .sidebar.collapsed .sidebar-item {
+      justify-content: center;
+      padding: 9px 0;
+      margin: 1px 6px;
+      border-left: none;
+    }
+    .sidebar.collapsed .sidebar-label { display: none; }
+    .sidebar.collapsed .sidebar-item.active { background: #e8f5f4; border-radius: 8px; }
 
     .main-content { flex: 1; min-width: 0; padding: 22px 28px; transition: padding 0.22s ease; }
 
@@ -569,22 +649,46 @@
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-toggle">
-      <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="Collapse sidebar">&#x2715;</button>
+      <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="Collapse sidebar">
+        <svg id="sidebar-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
     </div>
     <div class="sidebar-body" id="sidebar-body">
       <div class="sidebar-section-label">Operations</div>
-      <a class="sidebar-item active" data-insight="utilisation">Rig Utilisation</a>
-      <a class="sidebar-item" data-insight="drilling">Drilling Performance</a>
-      <a class="sidebar-item" data-insight="npt">NPT Analysis</a>
+      <a class="sidebar-item active" data-insight="utilisation" title="Rig Utilisation">
+        <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4" height="8"></rect><rect x="10" y="7" width="4" height="13"></rect><rect x="17" y="3" width="4" height="17"></rect></svg></span>
+        <span class="sidebar-label">Rig Utilisation</span>
+      </a>
+      <a class="sidebar-item" data-insight="drilling" title="Drilling Performance">
+        <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"></polyline><polyline points="14 7 21 7 21 14"></polyline></svg></span>
+        <span class="sidebar-label">Drilling Performance</span>
+      </a>
+      <a class="sidebar-item" data-insight="npt" title="NPT Analysis">
+        <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 16 14"></polyline></svg></span>
+        <span class="sidebar-label">NPT Analysis</span>
+      </a>
 
       <div class="sidebar-section-label">HSE</div>
-      <a class="sidebar-item" data-insight="hse">HSE Overview</a>
+      <a class="sidebar-item" data-insight="hse" title="HSE Overview">
+        <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"></path><polyline points="9 12 11 14 15 10"></polyline></svg></span>
+        <span class="sidebar-label">HSE Overview</span>
+      </a>
 
       <div class="sidebar-section-label">Workforce</div>
-      <span class="sidebar-item coming-soon">Coming soon</span>
+      <a class="sidebar-item" data-insight="workforce" title="Workforce Overview">
+        <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><path d="M3 20c0-3.5 2.5-6 6-6s6 2.5 6 6"></path><circle cx="17" cy="9" r="2.4"></circle><path d="M15.5 14.2c2.3.4 3.7 2.3 4 4.8"></path></svg></span>
+        <span class="sidebar-label">Workforce Overview</span>
+      </a>
+      <a class="sidebar-item" data-insight="roster" title="Crew Roster">
+        <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="7" y1="13" x2="13" y2="13"></line><line x1="7" y1="17" x2="11" y2="17"></line></svg></span>
+        <span class="sidebar-label">Crew Roster</span>
+      </a>
 
       <div class="sidebar-section-label">Finance</div>
-      <span class="sidebar-item coming-soon">Coming soon</span>
+      <span class="sidebar-item coming-soon" title="Coming soon">
+        <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 15.5c.5.8 1.4 1.3 2.5 1.3 1.7 0 3-1 3-2.3 0-1.4-1.3-2-3-2.5-1.7-.5-3-1.1-3-2.5 0-1.3 1.3-2.3 3-2.3 1.1 0 2 .5 2.5 1.3"></path><line x1="12" y1="6" x2="12" y2="18"></line></svg></span>
+        <span class="sidebar-label">Coming soon</span>
+      </span>
     </div>
   </aside>
 
@@ -896,6 +1000,115 @@
 
     </div><!-- /#insight-hse -->
 
+    <div id="insight-workforce" class="insight-section">
+
+      <div id="workforce-spinner" style="display:none;justify-content:center;align-items:center;height:120px;gap:10px;color:#64748b;font-size:0.875rem;">
+        <div style="width:18px;height:18px;border:2px solid #3dbdb0;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
+        Loading Workforce data…
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-wf-departures">i</span>
+          <div class="kpi-value" id="kpi-wf-departures">—</div>
+          <div class="kpi-label">Departures (Final Settlement)</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-wf-tenure">i</span>
+          <div class="kpi-value" id="kpi-wf-tenure">—</div>
+          <div class="kpi-label">Average Crew Tenure</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-wf-rotation-compliance">i</span>
+          <div class="kpi-value" id="kpi-wf-rotation-compliance">—</div>
+          <div class="kpi-label">Rotation Compliance</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-wf-on-board">i</span>
+          <div class="kpi-value" id="kpi-wf-on-board">—</div>
+          <div class="kpi-label">Crew Currently On Board</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-wf-overdue">i</span>
+          <div class="kpi-value" id="kpi-wf-overdue">—</div>
+          <div class="kpi-label">Overdue Rotations</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-wf-certs-expired">i</span>
+          <div class="kpi-value" id="kpi-wf-certs-expired">—</div>
+          <div class="kpi-label">Certificates Expired</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-wf-avg-overdue">i</span>
+          <div class="kpi-value" id="kpi-wf-avg-overdue">—</div>
+          <div class="kpi-label">Avg Days Overdue</div>
+        </div>
+      </div>
+
+      <!-- Tenure + Rotation Compliance -->
+      <div class="chart-grid-2" style="margin-bottom:16px;">
+        <div class="chart-card no-mb">
+          <div class="chart-title">Average Tenure by Rig <span>closed careers only</span><span class="chart-info" data-kpi="chart-info-chart-wf-tenure">i</span></div>
+          <div class="chart-body" id="chart-wf-tenure" style="height:280px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">Rotation Compliance by Rig <span>on-time % + avg overrun days</span><span class="chart-info" data-kpi="chart-info-chart-wf-rotation-compliance">i</span></div>
+          <div class="chart-body" id="chart-wf-rotation-compliance" style="height:280px;"></div>
+        </div>
+      </div>
+
+      <!-- Current Rotation Status — full width -->
+      <div class="chart-card">
+        <div class="chart-title">Days Overdue for Rotation, by Rig <span>live snapshot · log scale · bubble size = crew overdue · may include stale unclosed records</span><span class="chart-info" data-kpi="chart-info-chart-wf-current-rotation">i</span></div>
+        <div class="chart-body" id="chart-wf-current-rotation" style="height:280px;"></div>
+      </div>
+
+      <!-- Certification Expiry -->
+      <div class="chart-grid-2" style="margin-bottom:16px;">
+        <div class="chart-card no-mb">
+          <div class="chart-title">Certificate Expiry Status <span>individual crew certs</span><span class="chart-info" data-kpi="chart-info-chart-wf-cert-expiry">i</span></div>
+          <div class="chart-body" id="chart-wf-cert-expiry" style="height:260px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">Expiring Certificate Types <span>expired or due within 90 days</span><span class="chart-info" data-kpi="chart-info-chart-wf-cert-types">i</span></div>
+          <div class="chart-body" id="chart-wf-cert-types" style="height:260px;"></div>
+        </div>
+      </div>
+
+      <!-- Attrition Row: Departures by Rig + Departures by Rank -->
+      <div class="chart-grid-2" style="margin-bottom:16px;">
+        <div class="chart-card no-mb">
+          <div class="chart-title">Departures by Rig <span>final settlements</span><span class="chart-info" data-kpi="chart-info-chart-wf-departures-rig">i</span></div>
+          <div class="chart-body" id="chart-wf-departures-rig" style="height:280px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">Top Leaving Ranks <span>fleet-wide</span><span class="chart-info" data-kpi="chart-info-chart-wf-departures-rank">i</span></div>
+          <div class="chart-body" id="chart-wf-departures-rank" style="height:280px;"></div>
+        </div>
+      </div>
+
+    </div><!-- /#insight-workforce -->
+
+    <div id="insight-roster" class="insight-section">
+
+      <div id="roster-spinner" style="display:none;justify-content:center;align-items:center;height:120px;gap:10px;color:#64748b;font-size:0.875rem;">
+        <div style="width:18px;height:18px;border:2px solid #3dbdb0;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
+        Loading Crew Roster…
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Workforce Composition <span>everyone with a currently-open service record, by rig type and status</span><span class="chart-info" data-kpi="chart-info-roster-composition">i</span></div>
+        <div class="chart-body" id="chart-roster-composition" style="height:260px;"></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Crew Roster by Rig <span>live snapshot · who's on board, their designations, and rotation status</span><span class="chart-info" data-kpi="chart-info-roster-table">i</span></div>
+        <div id="roster-table-wrap"></div>
+      </div>
+
+    </div><!-- /#insight-roster -->
+
   </main>
 </div><!-- /.dashboard-layout -->
 
@@ -923,7 +1136,17 @@
     return c;
   }
 
-  window.addEventListener("resize", () => Object.values(charts).forEach(c => c.resize()));
+  // Resizes every ECharts instance on the page, regardless of how it was
+  // initialised (charts registry OR the inline getInstanceByDom pattern used
+  // by HSE/Workforce). A single source of truth so sidebar toggle, window
+  // resize, and section switch all keep every chart filling its container.
+  function resizeAllCharts() {
+    document.querySelectorAll(".chart-body").forEach(dom => {
+      const inst = echarts.getInstanceByDom(dom);
+      if (inst) { try { inst.resize(); } catch (e) {} }
+    });
+  }
+  window.addEventListener("resize", resizeAllCharts);
 
   /* ── KPI helpers ── */
   function setKpi(id, value, suffix, classRule) {
@@ -1432,8 +1655,10 @@
     try { localStorage.setItem("lastDashInsight", name); } catch(e) {}
     // Lazy-load HSE data on first visit
     if (name === "hse") loadHse();
+    // Lazy-load Workforce data on first visit (Crew Roster shares the same payload)
+    if (name === "workforce" || name === "roster") loadWorkforce();
     // Resize charts so they fill the newly visible containers
-    setTimeout(() => Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} }), 60);
+    setTimeout(resizeAllCharts, 60);
   }
 
   document.querySelectorAll(".sidebar-item[data-insight]").forEach(item => {
@@ -2095,18 +2320,24 @@
     _showOverview();
   }
 
-  /* ── Sidebar collapse/expand ── */
+  /* ── Sidebar collapse/expand (persisted across reloads) ── */
   const sidebar    = document.getElementById("sidebar");
   const toggleBtn  = document.getElementById("sidebar-toggle-btn");
   let sidebarCollapsed = false;
+  try { sidebarCollapsed = localStorage.getItem("sidebarCollapsed") === "1"; } catch(e) {}
+
+  function applySidebarState() {
+    sidebar.classList.toggle("collapsed", sidebarCollapsed);
+    toggleBtn.title = sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar";
+  }
+  applySidebarState();
 
   toggleBtn.addEventListener("click", () => {
     sidebarCollapsed = !sidebarCollapsed;
-    sidebar.classList.toggle("collapsed", sidebarCollapsed);
-    toggleBtn.innerHTML  = sidebarCollapsed ? "&#x2630;" : "&#x2715;";
-    toggleBtn.title      = sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar";
-    // realign charts after transition
-    setTimeout(() => Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} }), 240);
+    applySidebarState();
+    try { localStorage.setItem("sidebarCollapsed", sidebarCollapsed ? "1" : "0"); } catch(e) {}
+    // realign charts after the width transition finishes
+    setTimeout(resizeAllCharts, 240);
   });
 
   /* ── Load dashboard data ── */
@@ -2469,11 +2700,324 @@
     }, true);
   }
 
+  let _workforceLoaded = false;
+
+  async function loadWorkforce() {
+    if (_workforceLoaded) return;
+    const spinner = document.getElementById("workforce-spinner");
+    if (spinner) spinner.style.display = "flex";
+
+    const year = document.getElementById("year-select").value;
+    const params = new URLSearchParams();
+    if (year) params.set("year", year);
+    selectedRigs.forEach(r => params.append("rig", r));
+
+    try {
+      const res = await fetch("/api/dashboard/workforce/?" + params.toString());
+      const wf  = await res.json();
+      const s   = wf.summary || {};
+
+      const compliance = s.rotation_compliance_pct;
+
+      setKpi("kpi-wf-departures",          s.total_departures        != null ? s.total_departures        : null);
+      setKpi("kpi-wf-tenure",              s.avg_tenure_days         != null ? Math.round(s.avg_tenure_days / 30.44) : null, " mo");
+      setKpi("kpi-wf-rotation-compliance", compliance                != null ? compliance                : null, "%");
+      setKpi("kpi-wf-on-board",            s.crew_on_board           != null ? s.crew_on_board           : null);
+      setKpi("kpi-wf-overdue",             s.overdue_rotations       != null ? s.overdue_rotations       : null);
+      setKpi("kpi-wf-certs-expired",       s.certs_expired           != null ? s.certs_expired           : null);
+      setKpi("kpi-wf-avg-overdue",         s.avg_days_overdue        != null ? s.avg_days_overdue        : null, " d");
+
+      const el = id => document.getElementById(id);
+      if (compliance != null) el("kpi-wf-rotation-compliance").className = "kpi-value " + (compliance >= 90 ? "good" : compliance >= 75 ? "warn" : "bad");
+      if (s.certs_expired != null) el("kpi-wf-certs-expired").className  = "kpi-value " + (s.certs_expired === 0 ? "good" : s.certs_expired <= 10 ? "warn" : "bad");
+      if (s.avg_days_overdue != null) el("kpi-wf-avg-overdue").className = "kpi-value " + (s.avg_days_overdue <= 7 ? "good" : s.avg_days_overdue <= 21 ? "warn" : "bad");
+
+      renderWfDeparturesByRig(wf.departures_by_rig || []);
+      renderWfDeparturesByRank(wf.departures_by_rank || []);
+      renderWfTenure(wf.tenure_by_rig || []);
+      renderWfRotationCompliance(wf.rotation_compliance_by_rig || []);
+      renderWfCurrentRotation(wf.current_rotation_by_rig || []);
+      renderWfCertExpiry(wf.cert_expiry_buckets || {});
+      renderWfCertTypes(wf.cert_expiring_by_type || []);
+      renderCrewRoster(wf.crew_roster_by_rig || []);
+      renderWorkforceComposition(wf.workforce_composition || []);
+
+      _workforceLoaded = true;
+    } catch (e) {
+      console.error("Workforce load error:", e);
+    } finally {
+      if (spinner) spinner.style.display = "none";
+    }
+  }
+
+  function renderWfDeparturesByRig(rows) {
+    const dom = document.getElementById("chart-wf-departures-rig");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!rows.length) { c.clear(); return; }
+    const sorted = [...rows].sort((a, b) => +a.departures - +b.departures);
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      grid: { top: 10, bottom: 24, left: 100, right: 30 },
+      xAxis: { type: "value", name: "Departures", nameTextStyle: { fontSize: 10 } },
+      yAxis: { type: "category", data: sorted.map(r => r.rig), axisLabel: { fontSize: 10 } },
+      series: [{
+        type: "bar", data: sorted.map(r => +r.departures),
+        itemStyle: { color: "#dc2626" }, barMaxWidth: 22,
+        label: { show: true, position: "right", fontSize: 10 },
+      }],
+    }, true);
+  }
+
+  function renderWfDeparturesByRank(rows) {
+    const dom = document.getElementById("chart-wf-departures-rank");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!rows.length) { c.clear(); return; }
+    const data = rows.map((r, i) => ({
+      name: r.rank_name, value: +r.departures,
+      itemStyle: { color: PALETTE[i % PALETTE.length] },
+    }));
+    c.setOption({
+      tooltip: {
+        trigger: "item",
+        formatter: p => `${p.name}<br/>${p.value} departures (${p.percent.toFixed(1)}%)`,
+      },
+      legend: { type: "scroll", bottom: 4, textStyle: { fontSize: 10 }, itemGap: 6 },
+      series: [{
+        type: "pie", radius: ["38%", "64%"], center: ["50%", "42%"],
+        data,
+        label: { show: true, position: "outside", formatter: p => p.percent.toFixed(0) + "%", fontSize: 11 },
+        emphasis: { itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.2)" } },
+      }],
+    }, true);
+  }
+
+  function renderWfTenure(rows) {
+    const dom = document.getElementById("chart-wf-tenure");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!rows.length) { c.clear(); return; }
+    const sorted = [...rows].sort((a, b) => +b.avg_tenure_days - +a.avg_tenure_days);
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter(params) {
+          const row = sorted[params[0].dataIndex];
+          return `<b>${row.rig}</b><br/>Avg tenure: <b>${(row.avg_tenure_days/30.44).toFixed(1)} months</b><br/>Sample size: ${row.sample_size}`;
+        },
+      },
+      grid: { top: 14, bottom: 50, left: 44, right: 20 },
+      xAxis: { type: "category", data: sorted.map(r => r.rig), axisLabel: { fontSize: 10, rotate: 35 } },
+      yAxis: { type: "value", name: "Days", nameTextStyle: { fontSize: 10 } },
+      series: [{
+        type: "bar", data: sorted.map(r => +r.avg_tenure_days),
+        itemStyle: { color: "#2b7cb8", borderRadius: [3, 3, 0, 0] }, barMaxWidth: 36,
+        label: { show: true, position: "top", fontSize: 10, formatter: p => Math.round(p.value) + "d" },
+      }],
+    }, true);
+  }
+
+  function renderWfRotationCompliance(rows) {
+    const dom = document.getElementById("chart-wf-rotation-compliance");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!rows.length) { c.clear(); return; }
+    const sorted = [...rows].sort((a, b) => +a.compliance_pct - +b.compliance_pct);
+    const rigs   = sorted.map(r => r.rig);
+    const pct    = sorted.map(r => +r.compliance_pct);
+    const overrun= sorted.map(r => +r.avg_overrun_days);
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter(params) {
+          const row = sorted[params[0].dataIndex];
+          return `<b>${row.rig}</b><br/>Compliance: <b>${row.compliance_pct}%</b><br/>Avg overrun: <b>${row.avg_overrun_days} days</b><br/>Completed rotations: ${row.completed}`;
+        },
+      },
+      legend: { data: ["Compliance %", "Avg Overrun (days)"], bottom: 4, textStyle: { fontSize: 11 } },
+      grid: { top: 14, bottom: 44, left: 100, right: 54 },
+      xAxis: [
+        { type: "value", name: "%", nameTextStyle: { fontSize: 10 }, max: 100 },
+        { type: "value", name: "Days", nameTextStyle: { fontSize: 10 }, splitLine: { show: false } },
+      ],
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 10 } },
+      series: [
+        { name: "Compliance %", type: "bar", xAxisIndex: 0, data: pct,
+          itemStyle: { color: "#16a34a" }, barMaxWidth: 22 },
+        { name: "Avg Overrun (days)", type: "line", xAxisIndex: 1, data: overrun,
+          itemStyle: { color: "#dc2626" }, lineStyle: { width: 2 }, symbol: "circle", symbolSize: 5 },
+      ],
+    }, true);
+  }
+
+  function renderWfCurrentRotation(rows) {
+    const dom = document.getElementById("chart-wf-current-rotation");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!rows.length) {
+      c.setOption({ title: { text: "No crew currently on board for selected filters", left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    // Only plot rigs that actually have overdue crew — the point is "how many days overdue", not headcount
+    const withOverdue = rows.filter(r => +r.overdue > 0 && r.avg_days_overdue != null);
+    if (!withOverdue.length) {
+      c.setOption({ title: { text: "No overdue rotations for selected filters", left: "center", top: "center", textStyle: { color: "#16a34a", fontSize: 13, fontWeight: "normal" } } }, true);
+      return;
+    }
+    const sorted  = [...withOverdue].sort((a, b) => +a.avg_days_overdue - +b.avg_days_overdue);
+    const rigs    = sorted.map(r => r.rig);
+    const maxOverdueCount = Math.max(...sorted.map(r => +r.overdue));
+    const severityColor = d => d >= 30 ? "#dc2626" : d >= 14 ? "#f59e0b" : "#2b7cb8";
+
+    c.setOption({
+      tooltip: {
+        formatter(p) {
+          const row = sorted[p.dataIndex];
+          return `<b>${row.rig}</b><br/>Avg days overdue: <b>${row.avg_days_overdue} d</b><br/>Max days overdue: <b>${row.max_days_overdue} d</b><br/>Crew overdue: <b>${row.overdue}</b> of ${row.on_board} on board`;
+        },
+      },
+      grid: { top: 14, bottom: 30, left: 100, right: 80, containLabel: false },
+      xAxis: { type: "log", name: "Avg Days Overdue (log scale)", nameTextStyle: { fontSize: 10 }, min: 1 },
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 10 } },
+      series: [{
+        type: "scatter",
+        data: sorted.map((r, i) => [+r.avg_days_overdue, i]),
+        symbolSize: v => 14 + (+sorted[v[1]].overdue / maxOverdueCount) * 26,
+        itemStyle: { color: p => severityColor(+sorted[p.dataIndex].avg_days_overdue), opacity: 0.85 },
+        label: {
+          show: true, position: "right", fontSize: 10,
+          formatter: p => `${sorted[p.dataIndex].avg_days_overdue}d (${sorted[p.dataIndex].overdue} crew)`,
+        },
+      }],
+    }, true);
+  }
+
+  function renderWfCertExpiry(buckets) {
+    const dom = document.getElementById("chart-wf-cert-expiry");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    const data = [
+      { name: "Expired",        value: buckets.expired || 0, itemStyle: { color: "#dc2626" } },
+      { name: "Due in 30 days", value: buckets.due_30   || 0, itemStyle: { color: "#f59e0b" } },
+      { name: "Due in 90 days", value: buckets.due_90   || 0, itemStyle: { color: "#2b7cb8" } },
+      { name: "Healthy",        value: buckets.healthy  || 0, itemStyle: { color: "#16a34a" } },
+    ];
+    if (!data.some(d => d.value > 0)) { c.clear(); return; }
+    c.setOption({
+      tooltip: {
+        trigger: "item",
+        formatter: p => `${p.name}<br/>${p.value.toLocaleString()} certs (${p.percent.toFixed(1)}%)`,
+      },
+      legend: { orient: "vertical", right: 4, top: "center", textStyle: { fontSize: 11 }, itemGap: 10 },
+      series: [{
+        type: "pie", radius: ["42%", "70%"], center: ["33%", "50%"],
+        data,
+        label: { show: true, position: "outside", formatter: p => p.percent.toFixed(0) + "%", fontSize: 11 },
+        emphasis: { itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.2)" } },
+      }],
+    }, true);
+  }
+
+  function renderWfCertTypes(rows) {
+    const dom = document.getElementById("chart-wf-cert-types");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!rows.length) { c.clear(); return; }
+    const sorted = [...rows].sort((a, b) => +a.cnt - +b.cnt);
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      grid: { top: 10, bottom: 24, left: 160, right: 30 },
+      xAxis: { type: "value", name: "Count", nameTextStyle: { fontSize: 10 } },
+      yAxis: { type: "category", data: sorted.map(r => r.cert_name), axisLabel: { fontSize: 10 } },
+      series: [{
+        type: "bar", data: sorted.map(r => +r.cnt),
+        itemStyle: { color: "#8b5cf6" }, barMaxWidth: 22,
+        label: { show: true, position: "right", fontSize: 10 },
+      }],
+    }, true);
+  }
+
+  function renderWorkforceComposition(rows) {
+    const dom = document.getElementById("chart-roster-composition");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!rows.length) { c.clear(); return; }
+    const byCategory = {};
+    rows.forEach(r => {
+      if (!byCategory[r.category]) byCategory[r.category] = { onBoard: 0, other: 0 };
+      if (r.status === "On Board") byCategory[r.category].onBoard += r.cnt;
+      else byCategory[r.category].other += r.cnt;
+    });
+    const cats = Object.keys(byCategory).sort(
+      (a, b) => (byCategory[b].onBoard + byCategory[b].other) - (byCategory[a].onBoard + byCategory[a].other)
+    ).reverse();
+    const onBoard = cats.map(k => byCategory[k].onBoard);
+    const other   = cats.map(k => byCategory[k].other);
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter(params) {
+          const i = params[0].dataIndex;
+          const total = onBoard[i] + other[i];
+          return `<b>${cats[i]}</b><br/>On Board: <b>${onBoard[i]}</b><br/>Other status (off board, leave, standby, etc.): <b>${other[i]}</b><br/>Total: <b>${total}</b>`;
+        },
+      },
+      legend: { data: ["On Board", "Other Status"], bottom: 4, textStyle: { fontSize: 11 } },
+      grid: { top: 14, bottom: 44, left: 150, right: 30 },
+      xAxis: { type: "value", name: "Employees", nameTextStyle: { fontSize: 10 } },
+      yAxis: { type: "category", data: cats, axisLabel: { fontSize: 10 } },
+      series: [
+        { name: "On Board",     type: "bar", stack: "s", data: onBoard, itemStyle: { color: "#1a3f7a" }, barMaxWidth: 26 },
+        { name: "Other Status", type: "bar", stack: "s", data: other,   itemStyle: { color: "#94a3b8" }, barMaxWidth: 26 },
+      ],
+    }, true);
+  }
+
+  function _escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+  }
+
+  function renderCrewRoster(rows) {
+    const wrap = document.getElementById("roster-table-wrap");
+    if (!wrap) return;
+    if (!rows.length) {
+      wrap.innerHTML = `<p style="color:#94a3b8;font-size:0.85rem;padding:20px 0;">No crew currently on board for selected filters.</p>`;
+      return;
+    }
+    const sorted = [...rows].sort((a, b) => +b.overdue - +a.overdue);
+    const rowsHtml = sorted.map(r => {
+      const chips = (r.top_designations || [])
+        .map(d => `<span class="roster-chip">${_escapeHtml(d.rank_name)} &times;${d.cnt}</span>`)
+        .join("");
+      const dueBadgeClass = r.due_7d > 0 ? "warn" : "zero";
+      const overdueBadgeClass = r.overdue === 0 ? "zero" : r.overdue >= r.on_board * 0.5 ? "bad" : "warn";
+      return `
+        <tr>
+          <td class="roster-rig">${_escapeHtml(r.rig)}</td>
+          <td><span class="roster-num">${r.on_board}</span></td>
+          <td>${chips || "&mdash;"}</td>
+          <td><span class="roster-badge ${dueBadgeClass}">${r.due_7d}</span></td>
+          <td><span class="roster-badge ${overdueBadgeClass}">${r.overdue}</span></td>
+        </tr>`;
+    }).join("");
+    wrap.innerHTML = `
+      <table class="roster-table">
+        <thead>
+          <tr>
+            <th>Rig</th>
+            <th>Crew On Board</th>
+            <th>Top Designations</th>
+            <th>Due in 7 Days</th>
+            <th>Overdue</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  }
+
   async function loadDashboard() {
     _hseLoaded = false;  // force HSE reload on filter change
     // If HSE tab is active, reload it now so filter change takes effect
     if (document.getElementById("insight-hse")?.classList.contains("active")) {
       loadHse();
+    }
+    _workforceLoaded = false;  // force Workforce/Roster reload on filter change
+    if (document.getElementById("insight-workforce")?.classList.contains("active")
+        || document.getElementById("insight-roster")?.classList.contains("active")) {
+      loadWorkforce();
     }
     document.getElementById("loading-overlay").classList.remove("hidden");
 
@@ -2746,7 +3290,7 @@
     "kpi-utilisation":      `<b>Avg Utilisation %</b> — Operating hours as % of total logged rig time. Green ≥80, Amber 60–79, Red &lt;60.`,
     "kpi-active-rigs":      `<b>Active Rigs</b> — Rigs currently flagged as active in the fleet.`,
     "kpi-total-rigs":       `<b>Total Rigs</b> — All rigs including inactive and retired units.`,
-    "kpi-employees":        `<b>Active Employees</b> — Total headcount with active employment status.`,
+    "kpi-employees":        `<b>Active Employees</b> — Total headcount with active employment status in SEROS.`,
     "kpi-crew":             `<b>Crew Posted Today</b> — Field-service crew currently assigned to a rig.`,
     "kpi-incidents":        `<b>Incidents</b> — Total safety incidents for the selected filters.`,
     "kpi-npt":              `<b>NPT Days</b> — Non-Productive Time from the drilling log (hours ÷ 24). Separate from incident NPT.`,
@@ -2766,6 +3310,13 @@
     "kpi-hse-closure-rate": `<b>Action Closure Rate</b> — Closed actions ÷ total actions × 100.`,
     "kpi-hse-tfs":          `<b>Timeout for Safety</b> — Cards where work was formally stopped to fix the hazard on the spot.`,
     "kpi-hse-max-age":      `<b>Oldest Open Card</b> — Age in days of the longest-outstanding open hazard card.`,
+    "kpi-wf-departures":          `<b>Departures</b> — Employees with a Final Settlement, the only status that means they left Seros (not a routine rotation).`,
+    "kpi-wf-tenure":               `<b>Average Crew Tenure</b> — Months from first On Board date to Final Settlement, for closed careers only.`,
+    "kpi-wf-rotation-compliance": `<b>Rotation Compliance</b> — % of completed rotations where crew signed off on or before the planned date.`,
+    "kpi-wf-on-board":            `<b>Crew Currently On Board</b> — Live count of open On Board records with no sign-off date yet.`,
+    "kpi-wf-overdue":             `<b>Overdue Rotations</b> — Crew past their planned end date who haven't signed off. May include logging delays.`,
+    "kpi-wf-certs-expired":       `<b>Certificates Expired</b> — Active crew certificates past their validity date with no renewal on file.`,
+    "kpi-wf-avg-overdue":         `<b>Avg Days Overdue</b> — Average lateness, in days, among crew past their planned rotation date.`,
     // ── Charts ─────────────────────────────────────────────────────────────
     "chart-info-utilisation":          `<b>Rig Utilisation %</b> — Monthly utilisation stacked by rig. Click a series to drill into hours.`,
     "chart-info-hours":                `<b>Hours Breakdown</b> — Logged rig time split by category. Click a bar for monthly detail.`,
@@ -2789,6 +3340,15 @@
     "chart-info-chart-hse-inc-haz":    `<b>Incidents vs Hazard Cards</b> — Hazard cards (leading) vs incidents (lagging) per month.`,
     "chart-info-chart-tfs-rig":        `<b>TFS by Rig</b> — Work-stoppage count and rate % per rig.`,
     "chart-info-chart-tfs-location":   `<b>TFS by Work Location</b> — Areas ranked by Timeout for Safety count.`,
+    "chart-info-chart-wf-departures-rig":      `<b>Departures by Rig</b> — Final settlements per rig for the selected year.`,
+    "chart-info-chart-wf-departures-rank":     `<b>Top Leaving Ranks</b> — Final settlements grouped by rank, fleet-wide.`,
+    "chart-info-chart-wf-tenure":               `<b>Average Tenure by Rig</b> — Avg days from joining to final settlement, for crew who have already left.`,
+    "chart-info-chart-wf-rotation-compliance": `<b>Rotation Compliance by Rig</b> — On-time sign-off % (bar) and average overrun in days (line). People who have completed rotation before, on or after due date`,
+    "chart-info-chart-wf-current-rotation":    `<b>Days Overdue for Rotation</b> — Each bubble is a rig: position = avg days overdue, size = number of crew overdue. Poeple who have not yet rotated after due date`,
+    "chart-info-chart-wf-cert-expiry":          `<b>Certificate Expiry Status</b> — Active crew certs split into expired, due soon, and healthy.`,
+    "chart-info-chart-wf-cert-types":           `<b>Expiring Certificate Types</b> — Which certifications have the most expired or soon-to-expire records.`,
+    "chart-info-roster-table":                  `<b>Crew Roster</b> — Live crew count, top designations, and rotation status per rig.`,
+    "chart-info-roster-composition":            `<b>Workforce Composition</b> — Everyone with an open service record right now, split by rig type and whether they're on board or in another status (off board, leave, standby).`,
   };
 
   /* ── KPI info tooltip ── */

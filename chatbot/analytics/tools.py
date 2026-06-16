@@ -19,7 +19,7 @@ def _query(sql: str, params: tuple = ()) -> list[dict]:
 
 def _rig_id(rig_name: str) -> int | None:
     """Resolve a rig name or short name (case-insensitive) to its Rig_Id."""
-    rows = _query("SELECT Rig_Id, Rig_Name, Rig_Short_Name FROM eos_Mst_Rig")
+    rows = _query("SELECT Rig_Id, Rig_Name, Rig_Short_Name FROM eos_Mst_Rig WHERE Rig_Type_Id IN (1,2)")
     term = rig_name.strip().lower()
     for r in rows:
         if (
@@ -45,7 +45,7 @@ def _dept_id(dept_name: str) -> int | None:
 
 def count_rigs() -> dict:
     """Return active/inactive rig counts only — no full listing."""
-    rows = _query("SELECT Rig_Active FROM eos_Mst_Rig")
+    rows = _query("SELECT Rig_Active FROM eos_Mst_Rig WHERE Rig_Type_Id IN (1,2)")
     active   = sum(1 for r in rows if r["Rig_Active"] == "Y")
     inactive = len(rows) - active
     return {
@@ -64,7 +64,8 @@ def list_rigs(status: str = "all") -> dict:
     status: 'all' | 'active' | 'inactive'
     """
     rows = _query(
-        "SELECT Rig_Id, Rig_Name, Rig_Short_Name, Rig_Active FROM eos_Mst_Rig ORDER BY Rig_Active DESC, Rig_Name"
+        "SELECT Rig_Id, Rig_Name, Rig_Short_Name, Rig_Active FROM eos_Mst_Rig "
+        "WHERE Rig_Type_Id IN (1,2) ORDER BY Rig_Active DESC, Rig_Name"
     )
     if status == "active":
         rows = [r for r in rows if r["Rig_Active"] == "Y"]
@@ -92,9 +93,15 @@ def list_rigs(status: str = "all") -> dict:
 def get_headcount(rig: str | None = None, dept: str | None = None) -> dict:
     """
     Employee/crew headcount.
-    - rig: active floating staff currently posted on that rig.
+    - rig: crew physically on board that rig right now (Serv_Subtype_Id = 7 'On Board').
     - dept: active employees in that department.
-    - none: total active employees + FS crew by rig.
+    - none: total active employees + crew on board, fleet-wide.
+
+    "On board" specifically means Serv_Subtype_Id = 7 — matches the Workforce
+    dashboard's "Crew Currently On Board" definition. Earlier this counted any
+    open service record (On Board + Off Board + On Leave + Standby, etc.),
+    which inflated the figure and didn't match what "crew posted today" should
+    mean.
     """
     if rig:
         rig_id = _rig_id(rig)
@@ -103,8 +110,8 @@ def get_headcount(rig: str | None = None, dept: str | None = None) -> dict:
         rows = _query("""
             SELECT r.Rig_Name, COUNT(DISTINCT sd.Fs_Emp_Id) AS crew_count
             FROM eos_Service_Details sd
-            JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id
-            WHERE sd.Rig_Id = %s AND sd.Serv_Subtype_To IS NULL
+            JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+            WHERE sd.Rig_Id = %s AND sd.Serv_Subtype_To IS NULL AND sd.Serv_Subtype_Id = 7
         """, (rig_id,))
         return {
             "tool": "get_headcount",
@@ -131,12 +138,17 @@ def get_headcount(rig: str | None = None, dept: str | None = None) -> dict:
         }
 
     emp_rows  = _query("SELECT COUNT(*) AS cnt FROM Mst_Employee WHERE EMP_ACTIVE = 'Y'")
-    crew_rows = _query("SELECT COUNT(DISTINCT Fs_Emp_Id) AS cnt FROM eos_Service_Details WHERE Serv_Subtype_To IS NULL")
+    crew_rows = _query("""
+        SELECT COUNT(DISTINCT sd.Fs_Emp_Id) AS cnt
+        FROM eos_Service_Details sd
+        JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        WHERE sd.Serv_Subtype_To IS NULL AND sd.Serv_Subtype_Id = 7
+    """)
     by_rig    = _query("""
         SELECT r.Rig_Name, COUNT(DISTINCT sd.Fs_Emp_Id) AS crew
         FROM eos_Service_Details sd
-        JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id
-        WHERE sd.Serv_Subtype_To IS NULL
+        JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        WHERE sd.Serv_Subtype_To IS NULL AND sd.Serv_Subtype_Id = 7
         GROUP BY r.Rig_Name ORDER BY crew DESC
     """)
     return {
@@ -180,7 +192,7 @@ def get_incident_summary(rig: str | None = None, year: int | None = None) -> dic
     by_rig = _query(f"""
         SELECT r.Rig_Name, COUNT(*) AS incidents
         FROM eos_Incident_Details i
-        JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id
+        JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {where} GROUP BY r.Rig_Name ORDER BY incidents DESC
     """, tuple(params))
 
@@ -238,7 +250,7 @@ def list_incidents(
             COALESCE(i.NPT_Hrs_Loss, 0)  AS npt_hours,
             LEFT(i.Incident_Descr, 200)  AS description
         FROM eos_Incident_Details i
-        LEFT JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id
+        LEFT JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {where}
         ORDER BY i.Incident_Date DESC
         LIMIT %s
@@ -288,7 +300,7 @@ def get_hazard_card_trend(rig: str | None = None, year: int | None = None) -> di
         SELECT r.Rig_Name, COUNT(*) AS cards,
                SUM(CASE WHEN h.Haz_ID_Card_Status = 'C' THEN 1 ELSE 0 END) AS closed
         FROM eos_Hazard_ID_Card h
-        JOIN eos_Mst_Rig r ON h.Rig_Id = r.Rig_Id
+        JOIN eos_Mst_Rig r ON h.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {where} GROUP BY r.Rig_Name ORDER BY cards DESC LIMIT 10
     """, tuple(params))
 
@@ -355,7 +367,7 @@ def list_hazard_cards(
             LEFT(h.Hazard_Desc, 150)                          AS hazard_description,
             LEFT(h.Action_Taken, 150)                         AS action_taken
         FROM eos_Hazard_ID_Card h
-        LEFT JOIN eos_Mst_Rig r ON h.Rig_Id = r.Rig_Id
+        LEFT JOIN eos_Mst_Rig r ON h.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {where}
         ORDER BY h.Event_Dt DESC
         LIMIT %s
@@ -407,7 +419,7 @@ def list_overdue_hazard_cards(rig: str | None = None, limit: int = 10) -> dict:
             LEFT(h.Hazard_Desc, 200)                          AS hazard_description,
             LEFT(h.Action_Taken, 150)                         AS action_taken
         FROM eos_Hazard_ID_Card h
-        LEFT JOIN eos_Mst_Rig r            ON h.Rig_Id          = r.Rig_Id
+        LEFT JOIN eos_Mst_Rig r            ON h.Rig_Id          = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         LEFT JOIN Mstx_Work_Location w     ON h.Work_Location_Id = w.Work_Location_Id
         LEFT JOIN eos_Mst_Hazard_Type t    ON h.Haz_Type_Id      = t.Haz_Type_Id
         WHERE {where}
@@ -478,7 +490,7 @@ def list_corrective_actions(
                  THEN DATEDIFF(CURDATE(), a.Target_Date) ELSE NULL END AS days_overdue
         FROM eos_Incident_Actions a
         JOIN eos_Incident_Details i ON a.Incident_Id = i.Incident_Id
-        LEFT JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id
+        LEFT JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {where}
         ORDER BY
             CASE WHEN a.Action_Status = 'OP' AND a.Target_Date < CURDATE() THEN 0
@@ -541,7 +553,7 @@ def get_material_cost(rig: str | None = None, year: int | None = None) -> dict:
         SELECT r.Rig_Name, COUNT(*) AS items, ROUND(SUM(m.Total_Amt), 2) AS total_cost
         FROM eos_OPC_Material_Cost m
         JOIN eos_Mst_Cost_Centre cc ON m.Cost_Centre_Id = cc.Cost_Centre_Id
-        JOIN eos_Mst_Rig r ON cc.Rig_Id = r.Rig_Id
+        JOIN eos_Mst_Rig r ON cc.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {where} GROUP BY r.Rig_Name ORDER BY total_cost DESC LIMIT 10
     """, tuple(params))
 
@@ -598,7 +610,7 @@ def get_drilling_hours(rig: str | None = None, year: int | None = None) -> dict:
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd  ON ops.Drilling_Dtl_Id  = dd.Drilling_Dtl_Id
         JOIN eos_Drilling_Hdr dh  ON dd.Drilling_Hdr_Id   = dh.Drilling_Hdr_Id
-        JOIN eos_Mst_Rig r        ON dh.Rig_Id            = r.Rig_Id
+        JOIN eos_Mst_Rig r        ON dh.Rig_Id            = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {where} GROUP BY r.Rig_Name ORDER BY total_hours DESC
     """, tuple(params))
 
@@ -736,7 +748,7 @@ def get_drilling_performance(rig: str | None = None, year: int | None = None) ->
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
         JOIN eos_Mst_Drilling_Operations mo ON ops.Drilling_Ops_Id = mo.Drilling_Ops_Id
-        JOIN eos_Mst_Rig r ON dd.Rig_Id = r.Rig_Id
+        JOIN eos_Mst_Rig r ON dd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {" AND ".join(flat_conds)}
         GROUP BY mo.Drilling_Ops_Id, mo.Drilling_Ops_Name, r.Rig_Id, r.Rig_Name
         ORDER BY mo.Drilling_Ops_Name, hours DESC
@@ -763,7 +775,7 @@ def get_drilling_performance(rig: str | None = None, year: int | None = None) ->
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
         JOIN eos_Drilling_Hdr h  ON dd.Drilling_Hdr_Id  = h.Drilling_Hdr_Id
-        JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id
+        JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {" AND ".join(loc_conds)}
         GROUP BY r.Rig_Id, r.Rig_Name, h.Drilling_Hdr_Id, h.Location,
                  h.Latitude, h.Longitude, h.First_Anchor_Down_Dt, h.Drilling_Completion_Dt
@@ -786,7 +798,7 @@ def get_drilling_performance(rig: str | None = None, year: int | None = None) ->
             COUNT(*)                                                                              AS operations
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
-        JOIN eos_Mst_Rig r ON dd.Rig_Id = r.Rig_Id
+        JOIN eos_Mst_Rig r ON dd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {" AND ".join(rop_rig_conds)}
         GROUP BY r.Rig_Id, r.Rig_Name
         HAVING drill_hrs > 0
@@ -891,7 +903,7 @@ def get_rig_utilisation(
                 0) * 100, 1
             )                                            AS utilisation_pct
         FROM eos_Drilling_Dtl dd
-        JOIN eos_Mst_Rig r ON dd.Rig_Id = r.Rig_Id
+        JOIN eos_Mst_Rig r ON dd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {where}
         GROUP BY r.Rig_Name, month
         ORDER BY r.Rig_Name, month DESC
@@ -1032,7 +1044,7 @@ def get_npt_analysis(rig: str | None = None, year: int | None = None) -> dict:
             ROUND(AVG(ops.Duration), 2)  AS avg_hrs
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
-        JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id
+        JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {" AND ".join(rig_conds)}
         GROUP BY r.Rig_Id, r.Rig_Name
         ORDER BY npt_hrs DESC
@@ -1063,7 +1075,7 @@ def get_npt_analysis(rig: str | None = None, year: int | None = None) -> dict:
             COUNT(*)                           AS events
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
-        JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id
+        JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {npt_where}
           AND dd.Downtime_Reason IS NOT NULL
           AND TRIM(dd.Downtime_Reason) != ''
@@ -1081,7 +1093,7 @@ def get_npt_analysis(rig: str | None = None, year: int | None = None) -> dict:
             COUNT(*)                                AS events
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
-        JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id
+        JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {npt_where}
           AND dd.Downtime_Reason IS NOT NULL
           AND TRIM(dd.Downtime_Reason) != ''
@@ -1131,7 +1143,7 @@ def get_npt_analysis(rig: str | None = None, year: int | None = None) -> dict:
             COUNT(*)                                      AS events
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
-        JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id
+        JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {" AND ".join(mrd_conds)}
         GROUP BY r.Rig_Id, r.Rig_Name, month
         ORDER BY r.Rig_Name, month
@@ -1207,7 +1219,7 @@ def get_rig_locations(rig: str | None = None, year: int | None = None) -> dict:
             ROUND(SUM(ops.Duration), 1)                                                       AS drill_hrs,
             ROUND(SUM(ops.Depth_To - ops.Depth_From) / NULLIF(SUM(ops.Duration), 0), 2)     AS rop_mhr
         FROM eos_Drilling_Hdr h
-        JOIN eos_Mst_Rig r          ON h.Rig_Id           = r.Rig_Id
+        JOIN eos_Mst_Rig r          ON h.Rig_Id           = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         LEFT JOIN eos_Drilling_Dtl dd  ON dd.Drilling_Hdr_Id = h.Drilling_Hdr_Id
         LEFT JOIN eos_Drilling_Dtl_Ops ops ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
                                           AND ops.Drilling_Ops_Id = 2
@@ -1367,7 +1379,7 @@ def get_hse_dashboard(rig: str | None = None, year: int | None = None) -> dict:
                       THEN DATEDIFF(h.Close_Out_Dt, h.Event_Dt) END
                ), 1) AS avg_close_days_tfs
         FROM eos_Hazard_ID_Card h
-        JOIN eos_Mst_Rig r ON h.Rig_Id = r.Rig_Id
+        JOIN eos_Mst_Rig r ON h.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {haz_where}
         GROUP BY r.Rig_Name
         HAVING tfs_count > 0
@@ -1431,7 +1443,7 @@ def get_hse_dashboard(rig: str | None = None, year: int | None = None) -> dict:
                DATE(h.Event_Dt) AS event_date,
                DATEDIFF(CURDATE(), h.Event_Dt) AS age_days
         FROM eos_Hazard_ID_Card h
-        LEFT JOIN eos_Mst_Rig r ON h.Rig_Id = r.Rig_Id
+        LEFT JOIN eos_Mst_Rig r ON h.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {age_where}
         ORDER BY age_days DESC LIMIT 10
     """, tuple(age_params))
@@ -1466,7 +1478,7 @@ def get_hse_dashboard(rig: str | None = None, year: int | None = None) -> dict:
                              AND a.Target_Date < CURDATE() THEN 1 ELSE 0 END) AS overdue
         FROM eos_Incident_Actions a
         JOIN eos_Incident_Details i ON a.Incident_Id = i.Incident_Id
-        JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id
+        JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {act_where}
         GROUP BY r.Rig_Name ORDER BY total DESC
     """, tuple(act_params))
@@ -1517,5 +1529,390 @@ def get_hse_dashboard(rig: str | None = None, year: int | None = None) -> dict:
         },
         "oldest_open_cards": oldest_open_cards,
         "closure_by_rig":    closure_by_rig,
+    }
+
+
+# ── Tool 5: Workforce dashboard ─────────────────────────────────────────────────
+
+def get_workforce_dashboard(rig: str | None = None, year: int | None = None) -> dict:
+    """
+    Workforce dashboard metrics:
+    - departures_by_rig / departures_by_rank: attrition via Final Settlement
+      (Serv_Subtype_Id = 13 — the only subtype that means an employee left
+      Seros for good; On Board/Off Board rows are routine rotation, not attrition)
+    - tenure_by_rig: avg career length (first On Board to Final Settlement)
+    - rotation_compliance_by_rig: actual sign-off date vs planned Appx_End_Dt
+    - current_rotation_by_rig: live snapshot of who's on board now + overdue count
+    - cert_expiry: individual crew certificate expiry buckets (fleet-wide —
+      eos_Fs_Certificates has no rig linkage)
+    - summary: key KPIs
+    """
+    rig_id_val = None
+    if rig:
+        rig_id_val = _rig_id(rig)
+        if rig_id_val is None:
+            return {"tool": "get_workforce_dashboard", "error": f"Rig '{rig}' not found."}
+
+    dep_conds  = ["sd.Serv_Subtype_Id = 13"]
+    dep_params: list = []
+    if rig_id_val:
+        dep_conds.append("sd.Rig_Id = %s"); dep_params.append(rig_id_val)
+    if year:
+        dep_conds.append("YEAR(sd.Serv_Subtype_From) = %s"); dep_params.append(year)
+    dep_where = " AND ".join(dep_conds)
+
+    # ── 1. Departures (attrition) by rig ───────────────────────────────────────
+    departures_by_rig = _query(f"""
+        SELECT r.Rig_Name AS rig, COUNT(*) AS departures
+        FROM eos_Service_Details sd
+        JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        WHERE {dep_where}
+        GROUP BY r.Rig_Name ORDER BY departures DESC
+    """, tuple(dep_params))
+
+    # ── 1b. Departures by rank (top 10) ─────────────────────────────────────────
+    departures_by_rank = _query(f"""
+        SELECT mr.rank_name AS rank_name, COUNT(*) AS departures
+        FROM eos_Service_Details sd
+        JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        JOIN Mst_Rank mr ON sd.Rank_Id = mr.rank_id
+        WHERE {dep_where}
+        GROUP BY mr.rank_name ORDER BY departures DESC LIMIT 10
+    """, tuple(dep_params))
+
+    # ── 2. Average tenure by rig (closed careers only) ─────────────────────────
+    tenure_conds  = ["fs.Serv_Subtype_Id = 13"]
+    tenure_params: list = []
+    if rig_id_val:
+        tenure_conds.append("fs.Rig_Id = %s"); tenure_params.append(rig_id_val)
+    if year:
+        tenure_conds.append("YEAR(fs.Serv_Subtype_From) = %s"); tenure_params.append(year)
+    tenure_where = " AND ".join(tenure_conds)
+
+    tenure_by_rig = _query(f"""
+        SELECT r.Rig_Name AS rig,
+               ROUND(AVG(DATEDIFF(fs.Serv_Subtype_From, j.first_join)), 0) AS avg_tenure_days,
+               COUNT(*) AS sample_size
+        FROM eos_Service_Details fs
+        JOIN (
+            SELECT Fs_Emp_Id, MIN(Serv_Subtype_From) AS first_join
+            FROM eos_Service_Details WHERE Serv_Subtype_Id = 7
+            GROUP BY Fs_Emp_Id
+        ) j ON j.Fs_Emp_Id = fs.Fs_Emp_Id
+        JOIN eos_Mst_Rig r ON fs.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        WHERE {tenure_where}
+        GROUP BY r.Rig_Name
+        ORDER BY avg_tenure_days DESC
+    """, tuple(tenure_params))
+
+    # ── 3. Rotation compliance by rig (completed On Board cycles) ──────────────
+    rot_conds  = [
+        "sd.Serv_Subtype_Id = 7",
+        "sd.Serv_Subtype_To IS NOT NULL",
+        "sd.Appx_End_Dt IS NOT NULL",
+    ]
+    rot_params: list = []
+    if rig_id_val:
+        rot_conds.append("sd.Rig_Id = %s"); rot_params.append(rig_id_val)
+    if year:
+        rot_conds.append("YEAR(sd.Serv_Subtype_From) = %s"); rot_params.append(year)
+    rot_where = " AND ".join(rot_conds)
+
+    rotation_compliance_by_rig = _query(f"""
+        SELECT r.Rig_Name AS rig,
+               COUNT(*) AS completed,
+               SUM(CASE WHEN sd.Serv_Subtype_To <= sd.Appx_End_Dt THEN 1 ELSE 0 END) AS on_time,
+               ROUND(SUM(CASE WHEN sd.Serv_Subtype_To <= sd.Appx_End_Dt THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS compliance_pct,
+               ROUND(AVG(DATEDIFF(sd.Serv_Subtype_To, sd.Appx_End_Dt)), 1) AS avg_overrun_days
+        FROM eos_Service_Details sd
+        JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        WHERE {rot_where}
+        GROUP BY r.Rig_Name
+        ORDER BY compliance_pct ASC
+    """, tuple(rot_params))
+
+    # ── 4. Current rotation status (live snapshot — no year filter) ────────────
+    # Includes every open On Board record, even very old ones that look like
+    # abandoned data entries — surfaced as-is so data-quality gaps are visible
+    # rather than silently hidden.
+    cur_conds  = ["sd.Serv_Subtype_Id = 7", "sd.Serv_Subtype_To IS NULL"]
+    cur_params: list = []
+    if rig_id_val:
+        cur_conds.append("sd.Rig_Id = %s"); cur_params.append(rig_id_val)
+    cur_where = " AND ".join(cur_conds)
+
+    current_rotation_by_rig = _query(f"""
+        SELECT r.Rig_Name AS rig,
+               COUNT(*) AS on_board,
+               SUM(CASE WHEN sd.Appx_End_Dt IS NOT NULL AND sd.Appx_End_Dt < CURDATE() THEN 1 ELSE 0 END) AS overdue,
+               ROUND(AVG(DATEDIFF(CURDATE(), sd.Serv_Subtype_From)), 0) AS avg_days_on_board,
+               ROUND(AVG(CASE WHEN sd.Appx_End_Dt IS NOT NULL AND sd.Appx_End_Dt < CURDATE()
+                              THEN DATEDIFF(CURDATE(), sd.Appx_End_Dt) END), 0) AS avg_days_overdue,
+               MAX(CASE WHEN sd.Appx_End_Dt IS NOT NULL AND sd.Appx_End_Dt < CURDATE()
+                        THEN DATEDIFF(CURDATE(), sd.Appx_End_Dt) END) AS max_days_overdue
+        FROM eos_Service_Details sd
+        JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        WHERE {cur_where}
+        GROUP BY r.Rig_Name
+        ORDER BY overdue DESC
+    """, tuple(cur_params))
+
+    # ── 4b. Crew roster — current crew per rig with designation breakdown ──────
+    # Note: Appx_End_Dt is set once when a hitch starts and is rarely updated
+    # going forward — in practice every populated value is already in the
+    # past (240 of 253 open records) or null. "Due within 7 days" will almost
+    # always be 0 as a result; it's kept for when/if that data practice improves.
+    roster_due_conds = list(cur_conds) + [
+        "sd.Appx_End_Dt IS NOT NULL",
+        "sd.Appx_End_Dt BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)",
+    ]
+    roster_due_where = " AND ".join(roster_due_conds)
+
+    due_7d_by_rig = _query(f"""
+        SELECT r.Rig_Name AS rig, COUNT(*) AS due_7d
+        FROM eos_Service_Details sd
+        JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        WHERE {roster_due_where}
+        GROUP BY r.Rig_Name
+    """, tuple(cur_params))
+    due_7d_map = {row["rig"]: int(row["due_7d"]) for row in due_7d_by_rig}
+
+    designations_by_rig = _query(f"""
+        SELECT r.Rig_Name AS rig, mr.rank_name AS rank_name, COUNT(*) AS cnt
+        FROM eos_Service_Details sd
+        JOIN eos_Mst_Rig r ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        LEFT JOIN Mst_Rank mr ON sd.Rank_Id = mr.rank_id
+        WHERE {cur_where}
+        GROUP BY r.Rig_Name, mr.rank_name
+        ORDER BY r.Rig_Name, cnt DESC
+    """, tuple(cur_params))
+
+    designations_map: dict = {}
+    for row in designations_by_rig:
+        designations_map.setdefault(row["rig"], []).append(
+            {"rank_name": row["rank_name"] or "Unspecified", "cnt": int(row["cnt"])}
+        )
+
+    crew_roster_by_rig = [
+        {
+            "rig": row["rig"],
+            "on_board": int(row["on_board"]),
+            "overdue": int(row["overdue"]),
+            "due_7d": due_7d_map.get(row["rig"], 0),
+            "top_designations": designations_map.get(row["rig"], [])[:5],
+        }
+        for row in current_rotation_by_rig
+    ]
+
+    # ── 4c. Workforce composition — where the headcount actually comes from.
+    # "On board" (crew_on_board above) is the narrow, precise figure; this
+    # breaks out the wider population of everyone with any currently-open
+    # service record, split by rig type plus non-rig assignments (office,
+    # repair yard, well service) and non-"On Board" statuses (off board
+    # between hitches, leave, standby, etc.) — the gap that explains why a
+    # raw headcount query can land far higher than "crew on board now."
+    composition_rows = _query("""
+        SELECT
+            COALESCE(rt.Rig_Type_Name, 'Unassigned / Non-Rig') AS category,
+            sd.Serv_Subtype_Id = 7                              AS is_on_board,
+            COUNT(DISTINCT sd.Fs_Emp_Id)                        AS cnt
+        FROM eos_Service_Details sd
+        LEFT JOIN eos_Mst_Rig r      ON sd.Rig_Id = r.Rig_Id
+        LEFT JOIN Mst_Rig_Type rt    ON r.Rig_Type_Id = rt.Rig_Type_Id
+        WHERE sd.Serv_Subtype_To IS NULL
+        GROUP BY category, is_on_board
+    """)
+    workforce_composition = []
+    for row in composition_rows:
+        workforce_composition.append({
+            "category": row["category"],
+            "status": "On Board" if row["is_on_board"] else "Other Status",
+            "cnt": int(row["cnt"]),
+        })
+
+    # ── 5. Crew cert expiry (fleet-wide — no rig linkage in source table) ──────
+    cert_buckets = _query("""
+        SELECT
+            SUM(CASE WHEN Fs_Cert_Valid_Till < CURDATE() THEN 1 ELSE 0 END) AS expired,
+            SUM(CASE WHEN Fs_Cert_Valid_Till >= CURDATE()
+                          AND Fs_Cert_Valid_Till < CURDATE() + INTERVAL 30 DAY THEN 1 ELSE 0 END) AS due_30,
+            SUM(CASE WHEN Fs_Cert_Valid_Till >= CURDATE() + INTERVAL 30 DAY
+                          AND Fs_Cert_Valid_Till < CURDATE() + INTERVAL 90 DAY THEN 1 ELSE 0 END) AS due_90,
+            SUM(CASE WHEN Fs_Cert_Valid_Till >= CURDATE() + INTERVAL 90 DAY THEN 1 ELSE 0 END) AS healthy
+        FROM eos_Fs_Certificates
+        WHERE Fs_Cert_Active = 'Y' AND Fs_Cert_Valid_Till IS NOT NULL
+    """)
+
+    cert_expiring_by_type = _query("""
+        SELECT mc.cert_name AS cert_name, COUNT(*) AS cnt
+        FROM eos_Fs_Certificates fc
+        JOIN Mst_Cert mc ON fc.Cert_Id = mc.cert_id
+        WHERE fc.Fs_Cert_Active = 'Y' AND fc.Fs_Cert_Valid_Till IS NOT NULL
+          AND fc.Fs_Cert_Valid_Till < CURDATE() + INTERVAL 90 DAY
+        GROUP BY mc.cert_name ORDER BY cnt DESC LIMIT 10
+    """)
+
+    # ── 6. Summary KPIs ──────────────────────────────────────────────────────
+    total_departures = sum(int(r["departures"]) for r in departures_by_rig)
+
+    tenure_days_list = [int(r["avg_tenure_days"]) for r in tenure_by_rig if r.get("avg_tenure_days") is not None]
+    avg_tenure_days  = round(sum(tenure_days_list) / len(tenure_days_list), 0) if tenure_days_list else None
+
+    total_completed = sum(int(r["completed"]) for r in rotation_compliance_by_rig)
+    total_on_time   = sum(int(r["on_time"])   for r in rotation_compliance_by_rig)
+    rotation_compliance_pct = round(total_on_time / total_completed * 100, 1) if total_completed else None
+
+    crew_on_board     = sum(int(r["on_board"]) for r in current_rotation_by_rig)
+    overdue_rotations = sum(int(r["overdue"])  for r in current_rotation_by_rig)
+
+    # Weighted average overdue days across rigs (weighted by each rig's overdue count)
+    _overdue_day_sum = sum(
+        int(r["overdue"]) * float(r["avg_days_overdue"])
+        for r in current_rotation_by_rig
+        if r.get("avg_days_overdue") is not None and int(r["overdue"])
+    )
+    avg_days_overdue = round(_overdue_day_sum / overdue_rotations, 0) if overdue_rotations else None
+
+    cb = cert_buckets[0] if cert_buckets else {}
+
+    return {
+        "tool": "get_workforce_dashboard",
+        "filters": {"rig": rig, "year": year},
+        "summary": {
+            "total_departures":        total_departures,
+            "avg_tenure_days":         avg_tenure_days,
+            "rotation_compliance_pct": rotation_compliance_pct,
+            "crew_on_board":           crew_on_board,
+            "overdue_rotations":       overdue_rotations,
+            "avg_days_overdue":        avg_days_overdue,
+            "certs_expired":           int(cb.get("expired") or 0),
+            "certs_due_30":            int(cb.get("due_30")  or 0),
+        },
+        "departures_by_rig":          departures_by_rig,
+        "departures_by_rank":         departures_by_rank,
+        "tenure_by_rig":              tenure_by_rig,
+        "rotation_compliance_by_rig": rotation_compliance_by_rig,
+        "current_rotation_by_rig":    current_rotation_by_rig,
+        "crew_roster_by_rig":         crew_roster_by_rig,
+        "workforce_composition":      workforce_composition,
+        "cert_expiry_buckets": {
+            "expired": int(cb.get("expired") or 0),
+            "due_30":  int(cb.get("due_30")  or 0),
+            "due_90":  int(cb.get("due_90")  or 0),
+            "healthy": int(cb.get("healthy") or 0),
+        },
+        "cert_expiring_by_type": cert_expiring_by_type,
+    }
+
+
+# ── Tool 5b: List overdue crew rotations ────────────────────────────────────────
+
+def list_overdue_crew_rotations(rig: str | None = None, limit: int = 10) -> dict:
+    """
+    List crew currently on board whose planned rotation date has passed.
+    Includes every open On Board record, even very old ones that look like
+    abandoned data entries — surfaced as-is rather than silently filtered.
+    Always current snapshot — no year filter.
+    """
+    limit = min(max(1, limit), 50)
+    conditions = [
+        "sd.Serv_Subtype_Id = 7",
+        "sd.Serv_Subtype_To IS NULL",
+        "sd.Appx_End_Dt IS NOT NULL",
+        "sd.Appx_End_Dt < CURDATE()",
+    ]
+    params: list = []
+
+    if rig:
+        rig_id = _rig_id(rig)
+        if rig_id is None:
+            return {"tool": "list_overdue_crew_rotations", "error": f"Rig '{rig}' not found."}
+        conditions.append("sd.Rig_Id = %s")
+        params.append(rig_id)
+
+    where = " AND ".join(conditions)
+    params.append(limit)
+
+    rows = _query(f"""
+        SELECT
+            CONCAT(e.Fs_Emp_Fname, ' ', COALESCE(e.Fs_Emp_Lname, '')) AS employee_name,
+            r.Rig_Name,
+            mr.rank_name                                       AS rank_name,
+            DATE(sd.Serv_Subtype_From)                         AS joined_date,
+            DATE(sd.Appx_End_Dt)                               AS planned_end_date,
+            DATEDIFF(CURDATE(), sd.Appx_End_Dt)                AS days_overdue,
+            DATEDIFF(CURDATE(), sd.Serv_Subtype_From)           AS days_on_board
+        FROM eos_Service_Details sd
+        JOIN eos_Mst_Rig r            ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        LEFT JOIN eos_Mst_Fs_Employee e ON sd.Fs_Emp_Id = e.Fs_Emp_Id
+        LEFT JOIN Mst_Rank mr          ON sd.Rank_Id = mr.rank_id
+        WHERE {where}
+        ORDER BY days_overdue DESC
+        LIMIT %s
+    """, tuple(params))
+
+    most_overdue = rows[0] if rows else None
+    return {
+        "tool": "list_overdue_crew_rotations",
+        "filters": {"rig": rig, "limit": limit},
+        "note": "Current snapshot — not year-filtered. Includes records that may be stale data entries never closed out, not necessarily real crew still on the rig. Sorted most overdue first.",
+        "count_returned": len(rows),
+        "most_overdue": most_overdue,
+        "crew": rows,
+    }
+
+
+# ── Tool 5c: List expiring crew certificates ────────────────────────────────────
+
+def list_expiring_crew_certificates(status: str | None = None, limit: int = 10) -> dict:
+    """
+    List individual crew certificates that are expired or expiring soon.
+    status: 'expired' | 'due_30' | 'due_90' | None (expired + due within 90 days)
+    Fleet-wide — eos_Fs_Certificates has no rig linkage, so no rig filter.
+    """
+    limit = min(max(1, limit), 50)
+    conditions = ["fc.Fs_Cert_Active = 'Y'", "fc.Fs_Cert_Valid_Till IS NOT NULL"]
+    params: list = []
+
+    if status == "expired":
+        conditions.append("fc.Fs_Cert_Valid_Till < CURDATE()")
+    elif status == "due_30":
+        conditions.append("fc.Fs_Cert_Valid_Till >= CURDATE()")
+        conditions.append("fc.Fs_Cert_Valid_Till < CURDATE() + INTERVAL 30 DAY")
+    elif status == "due_90":
+        conditions.append("fc.Fs_Cert_Valid_Till >= CURDATE()")
+        conditions.append("fc.Fs_Cert_Valid_Till < CURDATE() + INTERVAL 90 DAY")
+    else:
+        conditions.append("fc.Fs_Cert_Valid_Till < CURDATE() + INTERVAL 90 DAY")
+
+    where = " AND ".join(conditions)
+    params.append(limit)
+
+    # Expired: most-recently-expired first (most actionable). Due soon: soonest first.
+    # Expired (or the mixed expired+due_90 default): most-recently-expired /
+    # soonest-due first — most actionable. due_30/due_90 alone: soonest first.
+    order_by = "fc.Fs_Cert_Valid_Till ASC" if status in ("due_30", "due_90") else "fc.Fs_Cert_Valid_Till DESC"
+
+    rows = _query(f"""
+        SELECT
+            CONCAT(e.Fs_Emp_Fname, ' ', COALESCE(e.Fs_Emp_Lname, '')) AS employee_name,
+            mc.cert_name                                       AS cert_name,
+            DATE(fc.Fs_Cert_Dt)                                AS issued_date,
+            DATE(fc.Fs_Cert_Valid_Till)                        AS expiry_date,
+            DATEDIFF(CURDATE(), fc.Fs_Cert_Valid_Till)         AS days_since_expiry
+        FROM eos_Fs_Certificates fc
+        LEFT JOIN eos_Mst_Fs_Employee e ON fc.Fs_Emp_Id = e.Fs_Emp_Id
+        LEFT JOIN Mst_Cert mc           ON fc.Cert_Id = mc.cert_id
+        WHERE {where}
+        ORDER BY {order_by}
+        LIMIT %s
+    """, tuple(params))
+
+    return {
+        "tool": "list_expiring_crew_certificates",
+        "filters": {"status": status, "limit": limit},
+        "note": "Fleet-wide — individual crew certs only, no rig linkage available in source data.",
+        "count_returned": len(rows),
+        "certificates": rows,
     }
 

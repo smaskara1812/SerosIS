@@ -437,6 +437,7 @@ def dashboard_meta(request):
     rigs = _query("""
         SELECT Rig_Id, Rig_Name, Rig_Short_Name, Rig_Active
         FROM eos_Mst_Rig
+        WHERE Rig_Type_Id IN (1,2)
         ORDER BY Rig_Active DESC, Rig_Name
     """)
     return JsonResponse({
@@ -539,7 +540,7 @@ def dashboard_api(request):
                SUM(CASE WHEN i.Incident_Severity = 'M' THEN 1 ELSE 0 END) AS medium,
                SUM(CASE WHEN i.Incident_Severity = 'L' THEN 1 ELSE 0 END) AS low_sev
         FROM eos_Incident_Details i
-        JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id
+        JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE COALESCE(i.Marked_As_Deleted, '') != 'Y'
         GROUP BY r.Rig_Name, yr
         ORDER BY r.Rig_Name, yr
@@ -740,6 +741,21 @@ def dashboard_hse_api(request):
     year       = int(year_param) if year_param and year_param.isdigit() else None
     rig_filter = request.GET.getlist("rig")
     return JsonResponse(_build_hse(year, rig_filter))
+
+
+def _build_workforce(year, rig_filter):
+    from .analytics.tools import get_workforce_dashboard
+    rig = rig_filter[0] if rig_filter else None
+    data = get_workforce_dashboard(rig=rig, year=year)
+    return data
+
+
+@require_GET
+def dashboard_workforce_api(request):
+    year_param = request.GET.get("year")
+    year       = int(year_param) if year_param and year_param.isdigit() else None
+    rig_filter = request.GET.getlist("rig")
+    return JsonResponse(_build_workforce(year, rig_filter))
 
 
 # ── Chat API ───────────────────────────────────────────────────────────────────

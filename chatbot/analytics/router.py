@@ -22,6 +22,9 @@ from .tools import (
     get_hse_dashboard,
     list_overdue_hazard_cards,
     list_corrective_actions,
+    get_workforce_dashboard,
+    list_overdue_crew_rotations,
+    list_expiring_crew_certificates,
 )
 
 _CURRENT_YEAR = datetime.now().year
@@ -36,7 +39,8 @@ def _refresh_rig_cache() -> None:
     global _rig_cache
     from .tools import _query
     _rig_cache = _query(
-        "SELECT Rig_Id, Rig_Name, Rig_Short_Name FROM eos_Mst_Rig ORDER BY Rig_Active DESC, Rig_Name"
+        "SELECT Rig_Id, Rig_Name, Rig_Short_Name FROM eos_Mst_Rig "
+        "WHERE Rig_Type_Id IN (1,2) ORDER BY Rig_Active DESC, Rig_Name"
     )
 
 
@@ -59,7 +63,10 @@ def _extract_rig(text: str) -> str | None:
     for full_name, short_name in candidates:
         if full_name.lower() in lower:
             return full_name
-        if short_name and short_name.lower() in lower:
+        # Word-boundary match for short names — plain substring containment
+        # let short abbreviations like "EW" match inside ordinary words
+        # (e.g. "crEW"), silently returning the wrong rig.
+        if short_name and re.search(r'\b' + re.escape(short_name.lower()) + r'\b', lower):
             return short_name
     return None
 
@@ -163,6 +170,46 @@ def route(user_message: str, context: dict | None = None) -> dict | None:
     ]):
         status = _extract_rig_status(msg)
         return list_rigs(status=status)
+
+    # ── Overdue crew rotations (specific records — must come before Headcount,
+    # since "show overdue crew on X" contains "crew on" which Headcount also matches)
+    if any(p in msg for p in [
+        "who is overdue", "which crew is overdue", "overdue crew",
+        "list overdue rotation", "list overdue crew", "show overdue crew",
+        "crew overdue list", "who hasn't rotated off", "who has not rotated off",
+        "overdue rotation list", "which crew member is overdue",
+    ]):
+        return list_overdue_crew_rotations(rig=rig, limit=limit)
+
+    # ── Expiring crew certificates (specific records) ───────────────────────────
+    if any(p in msg for p in [
+        "which certificate", "which cert", "whose certificate",
+        "list expiring certificate", "list expired certificate",
+        "show expiring certificate", "show expired certificate",
+        "certificate list", "expired cert list", "who needs certification",
+        "who needs renewal", "certificate renewal",
+    ]):
+        cert_status = None
+        if "expired" in msg:
+            cert_status = "expired"
+        elif "30 day" in msg or "30-day" in msg:
+            cert_status = "due_30"
+        elif "90 day" in msg or "90-day" in msg:
+            cert_status = "due_90"
+        return list_expiring_crew_certificates(status=cert_status, limit=limit)
+
+    # ── Workforce dashboard ─────────────────────────────────────────────────────
+    if any(p in msg for p in [
+        "workforce dashboard", "workforce overview", "workforce summary",
+        "crew attrition", "crew departure", "crew turnover", "staff attrition",
+        "crew tenure", "average tenure", "how long do crew stay",
+        "rotation compliance", "rotation on schedule", "crew rotation",
+        "cert expiry", "certificate expiry", "certification expiry",
+        "expiring certificate", "expiring certification",
+        "crew on board", "currently on board", "overdue rotation",
+        "final settlement", "who is leaving", "which rig is losing crew",
+    ]):
+        return get_workforce_dashboard(rig=rig, year=year)
 
     # ── Headcount ──────────────────────────────────────────────────────────────
     if any(p in msg for p in [
