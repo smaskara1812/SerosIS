@@ -531,8 +531,8 @@ def dashboard_api(request):
             ROUND(COALESCE(SUM(i.NPT_Hrs_Loss), 0), 1)                        AS npt_hours
         FROM eos_Incident_Details i
         WHERE COALESCE(i.Marked_As_Deleted, '') != 'Y' {year_cond}
-        GROUP BY yr, month
-        ORDER BY month
+        GROUP BY YEAR(i.Incident_Date), DATE_FORMAT(i.Incident_Date, '%%Y-%%m')
+        ORDER BY DATE_FORMAT(i.Incident_Date, '%%Y-%%m')
     """)
     inc_rig_year_detail = _query("""
         SELECT r.Rig_Name, YEAR(i.Incident_Date) AS yr, COUNT(*) AS total,
@@ -542,8 +542,8 @@ def dashboard_api(request):
         FROM eos_Incident_Details i
         JOIN eos_Mst_Rig r ON i.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE COALESCE(i.Marked_As_Deleted, '') != 'Y'
-        GROUP BY r.Rig_Name, yr
-        ORDER BY r.Rig_Name, yr
+        GROUP BY r.Rig_Name, YEAR(i.Incident_Date)
+        ORDER BY r.Rig_Name, YEAR(i.Incident_Date)
     """)
     crew_by_rig = headcount.get("crew_by_rig", [])
 
