@@ -136,6 +136,13 @@ def _tx_date(args: list[str]) -> str:
     return f"DATE({', '.join(args)})"
 
 
+def _tx_trim(args: list[str]) -> str:
+    # TRIM(x) added in SQL Server 2017; older builds need LTRIM(RTRIM(x)).
+    if len(args) == 1:
+        return f"LTRIM(RTRIM({args[0]}))"
+    return f"TRIM({', '.join(args)})"
+
+
 def _tx_concat_ws(args: list[str]) -> str:
     """
     CONCAT_WS was only added to SQL Server in 2017. On older builds we have to
@@ -293,6 +300,7 @@ def translate_mssql(sql: str, params: tuple) -> tuple[str, tuple]:
     sql = _replace_func(sql, "DATEDIFF",    _tx_datediff)
     sql = _replace_func(sql, "DATE",        _tx_date)
     sql = _replace_func(sql, "CONCAT_WS",   _tx_concat_ws)
+    sql = _replace_func(sql, "TRIM",        _tx_trim)
 
     # 3. Now-style functions.
     sql = _translate_curdate_now(sql)
