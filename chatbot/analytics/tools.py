@@ -910,8 +910,8 @@ def get_rig_utilisation(
         FROM eos_Drilling_Dtl dd
         JOIN eos_Mst_Rig r ON dd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {where}
-        GROUP BY r.Rig_Name, month
-        ORDER BY r.Rig_Name, month DESC
+        GROUP BY r.Rig_Name, DATE_FORMAT(dd.Drilling_Dtl_Dt, '%%Y-%%m')
+        ORDER BY r.Rig_Name, DATE_FORMAT(dd.Drilling_Dtl_Dt, '%%Y-%%m') DESC
         LIMIT 2000
     """, tuple(params))
 
@@ -1102,8 +1102,8 @@ def get_npt_analysis(rig: str | None = None, year: int | None = None) -> dict:
         WHERE {npt_where}
           AND dd.Downtime_Reason IS NOT NULL
           AND TRIM(dd.Downtime_Reason) != ''
-        GROUP BY TRIM(dd.Downtime_Reason), r.Rig_Id, r.Rig_Name, month
-        ORDER BY reason, r.Rig_Name, month
+        GROUP BY TRIM(dd.Downtime_Reason), r.Rig_Id, r.Rig_Name, DATE_FORMAT(ops.Time_From, '%%Y-%%m')
+        ORDER BY reason, r.Rig_Name, DATE_FORMAT(ops.Time_From, '%%Y-%%m')
     """, tuple(params))
 
     # ── NPT from incidents (Source C) ──────────────────────────────────────────
@@ -1150,8 +1150,8 @@ def get_npt_analysis(rig: str | None = None, year: int | None = None) -> dict:
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
         JOIN eos_Mst_Rig r       ON dd.Rig_Id           = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {" AND ".join(mrd_conds)}
-        GROUP BY r.Rig_Id, r.Rig_Name, month
-        ORDER BY r.Rig_Name, month
+        GROUP BY r.Rig_Id, r.Rig_Name, DATE_FORMAT(ops.Time_From, '%%Y-%%m')
+        ORDER BY r.Rig_Name, DATE_FORMAT(ops.Time_From, '%%Y-%%m')
     """, tuple(mrd_params))
 
     return {
