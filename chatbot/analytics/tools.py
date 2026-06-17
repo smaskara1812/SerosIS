@@ -7,10 +7,15 @@ and returns a plain dict/list. No LLM touches SQL — ever.
 
 from django.db import connections
 
+from chatbot.db.sql import maybe_translate
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _query(sql: str, params: tuple = ()) -> list[dict]:
     """Execute a read-only query on the operational DB and return rows as dicts."""
+    # On MSSQL, translate MySQL-style SQL (CURDATE, DATEDIFF arg order,
+    # INTERVAL, LIMIT, eos_* table names, etc.) — see chatbot/db/sql.py.
+    sql, params = maybe_translate(sql, tuple(params))
     with connections["default"].cursor() as cur:
         cur.execute(sql, params)
         cols = [c[0] for c in cur.description]
