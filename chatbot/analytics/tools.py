@@ -204,7 +204,7 @@ def get_incident_summary(rig: str | None = None, year: int | None = None) -> dic
     by_year = _query(f"""
         SELECT YEAR(i.Incident_Date) AS year, COUNT(*) AS incidents
         FROM eos_Incident_Details i
-        WHERE {where} GROUP BY year ORDER BY year DESC LIMIT 6
+        WHERE {where} GROUP BY YEAR(i.Incident_Date) ORDER BY YEAR(i.Incident_Date) DESC LIMIT 6
     """, tuple(params))
 
     return {
@@ -313,7 +313,7 @@ def get_hazard_card_trend(rig: str | None = None, year: int | None = None) -> di
         SELECT YEAR(h.Event_Dt) AS year, COUNT(*) AS cards
         FROM eos_Hazard_ID_Card h
         WHERE {where} AND h.Event_Dt > '2010-01-01'
-        GROUP BY year ORDER BY year DESC LIMIT 6
+        GROUP BY YEAR(h.Event_Dt) ORDER BY YEAR(h.Event_Dt) DESC LIMIT 6
     """, tuple(params))
 
     return {
@@ -566,7 +566,7 @@ def get_material_cost(rig: str | None = None, year: int | None = None) -> dict:
         SELECT YEAR(m.Expense_Month) AS year, ROUND(SUM(m.Total_Amt), 2) AS total_cost
         FROM eos_OPC_Material_Cost m
         JOIN eos_Mst_Cost_Centre cc ON m.Cost_Centre_Id = cc.Cost_Centre_Id
-        WHERE {where} GROUP BY year ORDER BY year DESC LIMIT 6
+        WHERE {where} GROUP BY YEAR(m.Expense_Month) ORDER BY YEAR(m.Expense_Month) DESC LIMIT 6
     """, tuple(params))
 
     return {
@@ -625,7 +625,7 @@ def get_drilling_hours(rig: str | None = None, year: int | None = None) -> dict:
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd  ON ops.Drilling_Dtl_Id  = dd.Drilling_Dtl_Id
         JOIN eos_Drilling_Hdr dh  ON dd.Drilling_Hdr_Id   = dh.Drilling_Hdr_Id
-        WHERE {where} GROUP BY year ORDER BY year DESC LIMIT 6
+        WHERE {where} GROUP BY YEAR(ops.Time_From) ORDER BY YEAR(ops.Time_From) DESC LIMIT 6
     """, tuple(params))
 
     return {
@@ -1030,8 +1030,8 @@ def get_npt_analysis(rig: str | None = None, year: int | None = None) -> dict:
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
         WHERE {npt_where}
-        GROUP BY month
-        ORDER BY month
+        GROUP BY DATE_FORMAT(ops.Time_From, '%%Y-%%m')
+        ORDER BY DATE_FORMAT(ops.Time_From, '%%Y-%%m')
     """, tuple(params))
 
     # ── NPT by rig (always all rigs, year-filtered only) ──────────────────────
@@ -1311,7 +1311,7 @@ def get_hse_dashboard(rig: str | None = None, year: int | None = None) -> dict:
                SUM(CASE WHEN h.Timeout_For_Safety = 'Y' THEN 1 ELSE 0 END) AS tfs
         FROM eos_Hazard_ID_Card h
         WHERE {haz_where} AND h.Event_Dt >= DATE_SUB(CURDATE(), INTERVAL 6 YEAR)
-        GROUP BY month ORDER BY month
+        GROUP BY DATE_FORMAT(h.Event_Dt, '%%Y-%%m') ORDER BY DATE_FORMAT(h.Event_Dt, '%%Y-%%m')
     """, tuple(haz_params))
 
     # ── 1b. Monthly breakdown by hazard type (for stacked bar) ────────────────
@@ -1322,8 +1322,8 @@ def get_hse_dashboard(rig: str | None = None, year: int | None = None) -> dict:
         FROM eos_Hazard_ID_Card h
         JOIN eos_Mst_Hazard_Type t ON h.Haz_Type_Id = t.Haz_Type_Id
         WHERE {haz_where} AND h.Event_Dt >= DATE_SUB(CURDATE(), INTERVAL 6 YEAR)
-        GROUP BY month, t.Haz_Type_Id, t.Haz_Type_Name
-        ORDER BY month
+        GROUP BY DATE_FORMAT(h.Event_Dt, '%%Y-%%m'), t.Haz_Type_Id, t.Haz_Type_Name
+        ORDER BY DATE_FORMAT(h.Event_Dt, '%%Y-%%m')
     """, tuple(haz_params))
 
     # ── 2. By hazard type ──────────────────────────────────────────────────────
@@ -1409,7 +1409,7 @@ def get_hse_dashboard(rig: str | None = None, year: int | None = None) -> dict:
                COUNT(*) AS incidents
         FROM eos_Incident_Details i
         WHERE {inc_where}
-        GROUP BY month ORDER BY month
+        GROUP BY DATE_FORMAT(i.Incident_Date, '%%Y-%%m') ORDER BY DATE_FORMAT(i.Incident_Date, '%%Y-%%m')
     """, tuple(inc_params))
 
     # ── 6. Summary KPIs ────────────────────────────────────────────────────────
