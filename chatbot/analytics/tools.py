@@ -806,7 +806,7 @@ def get_drilling_performance(rig: str | None = None, year: int | None = None) ->
         JOIN eos_Mst_Rig r ON dd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {" AND ".join(rop_rig_conds)}
         GROUP BY r.Rig_Id, r.Rig_Name
-        HAVING drill_hrs > 0
+        HAVING SUM(ops.Duration) > 0
         ORDER BY rop_mhr DESC
     """, tuple(rop_rig_params))
 
@@ -826,7 +826,7 @@ def get_drilling_performance(rig: str | None = None, year: int | None = None) ->
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
         WHERE {" AND ".join(yoy_conds)}
-        GROUP BY yr ORDER BY yr DESC LIMIT 6
+        GROUP BY YEAR(ops.Time_From) ORDER BY YEAR(ops.Time_From) DESC LIMIT 6
     """, tuple(yoy_params))
 
     return {
@@ -1130,7 +1130,7 @@ def get_npt_analysis(rig: str | None = None, year: int | None = None) -> dict:
         FROM eos_Drilling_Dtl_Ops ops
         JOIN eos_Drilling_Dtl dd ON ops.Drilling_Dtl_Id = dd.Drilling_Dtl_Id
         WHERE {" AND ".join(yoy_conds)}
-        GROUP BY yr ORDER BY yr DESC LIMIT 6
+        GROUP BY YEAR(ops.Time_From) ORDER BY YEAR(ops.Time_From) DESC LIMIT 6
     """, tuple(yoy_params))
 
     # ── Monthly NPT per rig (for drill-down: click rig → show its monthly trend) ─
@@ -1365,7 +1365,7 @@ def get_hse_dashboard(rig: str | None = None, year: int | None = None) -> dict:
         JOIN Mstx_Work_Location w ON h.Work_Location_Id = w.Work_Location_Id
         WHERE {haz_where}
         GROUP BY w.Work_Location_Id, w.Work_Location
-        HAVING tfs_count > 0
+        HAVING SUM(CASE WHEN h.Timeout_For_Safety = 'Y' THEN 1 ELSE 0 END) > 0
         ORDER BY tfs_count DESC
         LIMIT 10
     """, tuple(haz_params))
@@ -1387,7 +1387,7 @@ def get_hse_dashboard(rig: str | None = None, year: int | None = None) -> dict:
         JOIN eos_Mst_Rig r ON h.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
         WHERE {haz_where}
         GROUP BY r.Rig_Name
-        HAVING tfs_count > 0
+        HAVING SUM(CASE WHEN h.Timeout_For_Safety = 'Y' THEN 1 ELSE 0 END) > 0
         ORDER BY tfs_count DESC
     """, tuple(haz_params))
 
