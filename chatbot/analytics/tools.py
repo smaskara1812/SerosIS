@@ -1716,16 +1716,20 @@ def get_workforce_dashboard(rig: str | None = None, year: int | None = None) -> 
     # repair yard, well service) and non-"On Board" statuses (off board
     # between hitches, leave, standby, etc.) — the gap that explains why a
     # raw headcount query can land far higher than "crew on board now."
+    # MSSQL doesn't allow boolean expressions in the SELECT list (and won't
+    # let GROUP BY reference the alias), so write the flag as a CASE and group
+    # by the underlying expression.
     composition_rows = _query("""
         SELECT
             COALESCE(rt.Rig_Type_Name, 'Unassigned / Non-Rig') AS category,
-            sd.Serv_Subtype_Id = 7                              AS is_on_board,
+            CASE WHEN sd.Serv_Subtype_Id = 7 THEN 1 ELSE 0 END  AS is_on_board,
             COUNT(DISTINCT sd.Fs_Emp_Id)                        AS cnt
         FROM eos_Service_Details sd
         LEFT JOIN eos_Mst_Rig r      ON sd.Rig_Id = r.Rig_Id
         LEFT JOIN Mst_Rig_Type rt    ON r.Rig_Type_Id = rt.Rig_Type_Id
         WHERE sd.Serv_Subtype_To IS NULL
-        GROUP BY category, is_on_board
+        GROUP BY COALESCE(rt.Rig_Type_Name, 'Unassigned / Non-Rig'),
+                 CASE WHEN sd.Serv_Subtype_Id = 7 THEN 1 ELSE 0 END
     """)
     workforce_composition = []
     for row in composition_rows:

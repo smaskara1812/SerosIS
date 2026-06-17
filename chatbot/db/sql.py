@@ -136,6 +136,19 @@ def _tx_date(args: list[str]) -> str:
     return f"DATE({', '.join(args)})"
 
 
+def _tx_concat_ws(args: list[str]) -> str:
+    """
+    CONCAT_WS was only added to SQL Server in 2017. On older builds we have to
+    emulate it. The MySQL semantics we need: join with the separator, skip NULLs
+    and empty strings.
+    """
+    if len(args) < 2:
+        return f"CONCAT_WS({', '.join(args)})"
+    sep = args[0]
+    pieces = [f"ISNULL({sep} + NULLIF({v}, ''), '')" for v in args[1:]]
+    return f"LTRIM({' + '.join(pieces)})"
+
+
 def _tx_date_format(args: list[str]) -> str:
     if len(args) != 2:
         return f"DATE_FORMAT({', '.join(args)})"
@@ -279,6 +292,7 @@ def translate_mssql(sql: str, params: tuple) -> tuple[str, tuple]:
     sql = _replace_func(sql, "DATE_ADD",    _tx_date_add)
     sql = _replace_func(sql, "DATEDIFF",    _tx_datediff)
     sql = _replace_func(sql, "DATE",        _tx_date)
+    sql = _replace_func(sql, "CONCAT_WS",   _tx_concat_ws)
 
     # 3. Now-style functions.
     sql = _translate_curdate_now(sql)
