@@ -487,3 +487,133 @@ def get_staff_listing(
         "rows": rows,
         **_paginate(total, page, page_size),
     }
+
+
+# ── Crew Rotations Listing ───────────────────────────────────────────────────
+# Source: eos_Service_Details (Serv_Subtype_Id = 7 'On Board', Serv_Subtype_To
+# IS NULL — currently on board). Each row is a named crew member currently
+# posted on a rig, with their planned rotation date and status.
+
+ROTATION_SORT_COLUMNS = {
+    "days_overdue":  "DATEDIFF(CURDATE(), sd.Appx_End_Dt)",
+    "days_on_board": "DATEDIFF(CURDATE(), sd.Serv_Subtype_From)",
+    "joined_date":   "sd.Serv_Subtype_From",
+    "planned_end":   "sd.Appx_End_Dt",
+    "name":          "e.Fs_Emp_Lname",
+    "rig":           "r.Rig_Name",
+}
+
+
+def get_crew_rotation_listing(
+    page: int | None = None,
+    page_size: int | None = None,
+    rig: str | None = None,
+    rank: str | None = None,    # Rank_Id (str digits)
+    status: str | None = None,  # 'overdue' | 'due_7d' | 'due_30d' | 'on_schedule' | 'no_planned'
+    search: str | None = None,
+    sort: str | None = None,
+    sort_dir: str | None = None,
+) -> dict:
+    page      = _clean_page(page)
+    page_size = _clean_page_size(page_size)
+
+    conditions = ["sd.Serv_Subtype_Id = 7", "sd.Serv_Subtype_To IS NULL"]
+    params: list = []
+
+    if rig:
+        rig_id = _rig_id(rig)
+        if rig_id is None:
+            return {"error": f"Rig '{rig}' not found."}
+        conditions.append("sd.Rig_Id = %s")
+        params.append(rig_id)
+    if rank:
+        conditions.append("sd.Rank_Id = %s")
+        params.append(rank)
+    if status == "overdue":
+        conditions.append("sd.Appx_End_Dt IS NOT NULL AND sd.Appx_End_Dt < CURDATE()")
+    elif status == "due_7d":
+        conditions.append("sd.Appx_End_Dt IS NOT NULL AND sd.Appx_End_Dt BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)")
+    elif status == "due_30d":
+        conditions.append("sd.Appx_End_Dt IS NOT NULL AND sd.Appx_End_Dt BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)")
+    elif status == "on_schedule":
+        conditions.append("sd.Appx_End_Dt IS NOT NULL AND sd.Appx_End_Dt >= CURDATE()")
+    elif status == "no_planned":
+        conditions.append("sd.Appx_End_Dt IS NULL")
+    if search:
+        conditions.append("""(
+            e.Fs_Emp_Fname    LIKE %s OR
+            e.Fs_Emp_Lname    LIKE %s OR
+            CAST(e.Fs_Emp_Staff_Id AS CHAR) LIKE %s OR
+            mr.rank_name      LIKE %s
+        )""")
+        like = f"%{search}%"
+        params.extend([like, like, like, like])
+
+    where = " AND ".join(conditions)
+
+    total_rows = _query(f"""
+        SELECT COUNT(*) AS cnt
+        FROM eos_Service_Details sd
+        JOIN eos_Mst_Rig r            ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        LEFT JOIN eos_Mst_Fs_Employee e ON sd.Fs_Emp_Id = e.Fs_Emp_Id
+        LEFT JOIN Mst_Rank mr          ON sd.Rank_Id = mr.rank_id
+        WHERE {where}
+    """, tuple(params))
+    total = total_rows[0]["cnt"] if total_rows else 0
+
+    sort_col = ROTATION_SORT_COLUMNS.get(sort, "DATEDIFF(CURDATE(), sd.Appx_End_Dt)")
+    sort_dir = "ASC" if sort_dir == "asc" else "DESC"
+    offset   = (page - 1) * page_size
+
+    rows = _query(f"""
+        SELECT
+            sd.Serv_Dtl_Id                                          AS id,
+            CONCAT_WS(' ', e.Fs_Emp_Fname, NULLIF(e.Fs_Emp_Mname, ''), e.Fs_Emp_Lname) AS name,
+            e.Fs_Emp_Staff_Id                                        AS staff_id,
+            mr.rank_name                                            AS rank_name,
+            COALESCE(r.Rig_Name, 'Unknown')                         AS rig,
+            DATE(sd.Serv_Subtype_From)                              AS joined_date,
+            DATE(sd.Appx_End_Dt)                                    AS planned_end_date,
+            DATEDIFF(CURDATE(), sd.Serv_Subtype_From)                AS days_on_board,
+            CASE WHEN sd.Appx_End_Dt IS NULL THEN NULL
+                 ELSE DATEDIFF(CURDATE(), sd.Appx_End_Dt) END        AS days_overdue,
+            CASE WHEN sd.Appx_End_Dt IS NULL THEN NULL
+                 ELSE DATEDIFF(sd.Appx_End_Dt, CURDATE()) END        AS days_to_rotation,
+            e.Fs_Emp_Mobile_No                                       AS mobile,
+            e.Fs_Emp_Email_Pers                                      AS email,
+            fc.fs_category_name                                     AS category,
+            et.emp_type_name                                        AS emp_type
+        FROM eos_Service_Details sd
+        JOIN eos_Mst_Rig r            ON sd.Rig_Id = r.Rig_Id AND r.Rig_Type_Id IN (1,2)
+        LEFT JOIN eos_Mst_Fs_Employee e ON sd.Fs_Emp_Id = e.Fs_Emp_Id
+        LEFT JOIN Mst_Rank mr          ON sd.Rank_Id = mr.rank_id
+        LEFT JOIN Mst_Fs_Category fc  ON sd.Fs_Category_Id = fc.fs_category_id
+        LEFT JOIN Mst_Emp_Type et     ON sd.Emp_Type_Id = et.emp_type_id
+        WHERE {where}
+        ORDER BY {sort_col} {sort_dir}
+        LIMIT %s OFFSET %s
+    """, tuple(params) + (page_size, offset))
+
+    # Derive status label per row for the UI
+    for r in rows:
+        d = r.get("days_to_rotation")
+        if r.get("planned_end_date") is None:
+            r["status_label"] = "No planned date"
+            r["status_class"] = "neutral"
+        elif d is None or d < 0:
+            r["status_label"] = "Overdue"
+            r["status_class"] = "bad"
+        elif d <= 7:
+            r["status_label"] = "Due ≤7 d"
+            r["status_class"] = "warn"
+        elif d <= 30:
+            r["status_label"] = "Due ≤30 d"
+            r["status_class"] = "info"
+        else:
+            r["status_label"] = "On schedule"
+            r["status_class"] = "good"
+
+    return {
+        "rows": rows,
+        **_paginate(total, page, page_size),
+    }

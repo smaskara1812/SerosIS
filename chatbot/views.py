@@ -890,6 +890,50 @@ def listings_employees_api(request):
     return JsonResponse(data)
 
 
+def listings_crew_rotations_page(request):
+    return render(request, "chatbot/listings/crew_rotations.html")
+
+
+@require_GET
+def listings_crew_rotations_meta_api(request):
+    """Filter dropdown options for the Crew Rotations listing."""
+    from .analytics.tools import _query
+    rigs = _query("""
+        SELECT Rig_Id, Rig_Name FROM eos_Mst_Rig
+        WHERE Rig_Type_Id IN (1,2) ORDER BY Rig_Name
+    """)
+    ranks = _query("""
+        SELECT DISTINCT mr.rank_id AS id, mr.rank_name AS name
+        FROM eos_Service_Details sd
+        JOIN Mst_Rank mr ON sd.Rank_Id = mr.rank_id
+        WHERE sd.Serv_Subtype_Id = 7 AND sd.Serv_Subtype_To IS NULL
+        ORDER BY mr.rank_name
+    """)
+    return JsonResponse({
+        "rigs": rigs,
+        "ranks": ranks,
+    })
+
+
+@require_GET
+def listings_crew_rotations_api(request):
+    from .analytics.listings import get_crew_rotation_listing
+    g = request.GET
+    page      = g.get("page")
+    page_size = g.get("page_size")
+    data = get_crew_rotation_listing(
+        page=int(page) if page and page.isdigit() else None,
+        page_size=int(page_size) if page_size and page_size.isdigit() else None,
+        rig=g.get("rig") or None,
+        rank=g.get("rank") or None,
+        status=g.get("status") or None,
+        search=g.get("search") or None,
+        sort=g.get("sort") or None,
+        sort_dir=g.get("sort_dir") or None,
+    )
+    return JsonResponse(data)
+
+
 def listings_staff_page(request):
     return render(request, "chatbot/listings/staff.html")
 

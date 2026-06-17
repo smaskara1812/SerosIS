@@ -95,7 +95,13 @@ def check_chat_db() -> dict:
     else:
         host_db = f"{CHAT_MSSQL_HOST}/{CHAT_MSSQL_DB}"
         driver = CHAT_MSSQL_ODBC_DRIVER.replace(" ", "+")
-        url = f"mssql+pyodbc://{CHAT_MSSQL_USER}:{CHAT_MSSQL_PASSWORD}@{CHAT_MSSQL_HOST}:{CHAT_MSSQL_PORT}/{CHAT_MSSQL_DB}?driver={driver}"
+        # Named instances (host contains '\\') get NO port — same rule as
+        # test_mssql_connections.py:_build_conn_str.
+        if "\\" in CHAT_MSSQL_HOST or not CHAT_MSSQL_PORT:
+            hostpart = CHAT_MSSQL_HOST
+        else:
+            hostpart = f"{CHAT_MSSQL_HOST}:{CHAT_MSSQL_PORT}"
+        url = f"mssql+pyodbc://{CHAT_MSSQL_USER}:{CHAT_MSSQL_PASSWORD}@{hostpart}/{CHAT_MSSQL_DB}?driver={driver}"
 
     try:
         eng = create_engine(url)

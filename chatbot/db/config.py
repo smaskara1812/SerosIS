@@ -21,8 +21,10 @@ MYSQL_USER     = os.getenv("MYSQL_USER", "root")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
 
 # ── Operational DB — MSSQL ────────────────────────────────────────────────────
-MSSQL_HOST        = os.getenv("MSSQL_HOST", "localhost")
-MSSQL_PORT        = int(os.getenv("MSSQL_PORT", "1433"))
+# Port is kept as a str (not int) so it can be left blank for named instances
+# like "172.24.33.59\\QAserver", where appending a port breaks the connection.
+MSSQL_HOST        = os.getenv("MSSQL_HOST", "localhost").strip()
+MSSQL_PORT        = os.getenv("MSSQL_PORT", "").strip()
 MSSQL_DB          = os.getenv("MSSQL_DB", "seros")
 MSSQL_USER        = os.getenv("MSSQL_USER", "")
 MSSQL_PASSWORD    = os.getenv("MSSQL_PASSWORD", "")
@@ -36,12 +38,31 @@ CHAT_MYSQL_USER     = os.getenv("CHAT_MYSQL_USER", "root")
 CHAT_MYSQL_PASSWORD = os.getenv("CHAT_MYSQL_PASSWORD", "")
 
 # ── Chat History DB — MSSQL ───────────────────────────────────────────────────
-CHAT_MSSQL_HOST        = os.getenv("CHAT_MSSQL_HOST", "localhost")
-CHAT_MSSQL_PORT        = int(os.getenv("CHAT_MSSQL_PORT", "1433"))
+CHAT_MSSQL_HOST        = os.getenv("CHAT_MSSQL_HOST", "localhost").strip()
+CHAT_MSSQL_PORT        = os.getenv("CHAT_MSSQL_PORT", "").strip()
 CHAT_MSSQL_DB          = os.getenv("CHAT_MSSQL_DB", "SerosIS")
 CHAT_MSSQL_USER        = os.getenv("CHAT_MSSQL_USER", "")
 CHAT_MSSQL_PASSWORD    = os.getenv("CHAT_MSSQL_PASSWORD", "")
 CHAT_MSSQL_ODBC_DRIVER = os.getenv("CHAT_MSSQL_ODBC_DRIVER", "ODBC Driver 17 for SQL Server")
+
+
+def _mssql_django_config(host: str, port: str, db: str, user: str, password: str, driver: str) -> dict:
+    """
+    Django DATABASES dict for SQL Server.
+    Named instances (host contains '\\') get NO port — passing both breaks the
+    connection string. Same rule as test_mssql_connections.py:_build_conn_str.
+    """
+    cfg = {
+        "ENGINE": "mssql",
+        "NAME": db,
+        "USER": user,
+        "PASSWORD": password,
+        "HOST": host,
+        "OPTIONS": {"driver": driver},
+    }
+    if "\\" not in host and port:
+        cfg["PORT"] = port
+    return cfg
 
 
 def get_sqlalchemy_url() -> str:
@@ -52,9 +73,14 @@ def get_sqlalchemy_url() -> str:
             f"@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
         )
     driver = MSSQL_ODBC_DRIVER.replace(" ", "+")
+    # Named instance: no port; default instance: include port if set.
+    if "\\" in MSSQL_HOST or not MSSQL_PORT:
+        hostpart = MSSQL_HOST
+    else:
+        hostpart = f"{MSSQL_HOST}:{MSSQL_PORT}"
     return (
         f"mssql+pyodbc://{MSSQL_USER}:{MSSQL_PASSWORD}"
-        f"@{MSSQL_HOST}:{MSSQL_PORT}/{MSSQL_DB}"
+        f"@{hostpart}/{MSSQL_DB}"
         f"?driver={driver}"
     )
 
@@ -71,15 +97,9 @@ def get_django_db_config() -> dict:
             "PORT": str(MYSQL_PORT),
             "OPTIONS": {"charset": "utf8mb4"},
         }
-    return {
-        "ENGINE": "mssql",
-        "NAME": MSSQL_DB,
-        "USER": MSSQL_USER,
-        "PASSWORD": MSSQL_PASSWORD,
-        "HOST": MSSQL_HOST,
-        "PORT": str(MSSQL_PORT),
-        "OPTIONS": {"driver": MSSQL_ODBC_DRIVER},
-    }
+    return _mssql_django_config(
+        MSSQL_HOST, MSSQL_PORT, MSSQL_DB, MSSQL_USER, MSSQL_PASSWORD, MSSQL_ODBC_DRIVER,
+    )
 
 
 def get_chat_db_config() -> dict:
@@ -94,12 +114,6 @@ def get_chat_db_config() -> dict:
             "PORT": str(CHAT_MYSQL_PORT),
             "OPTIONS": {"charset": "utf8mb4"},
         }
-    return {
-        "ENGINE": "mssql",
-        "NAME": CHAT_MSSQL_DB,
-        "USER": CHAT_MSSQL_USER,
-        "PASSWORD": CHAT_MSSQL_PASSWORD,
-        "HOST": CHAT_MSSQL_HOST,
-        "PORT": str(CHAT_MSSQL_PORT),
-        "OPTIONS": {"driver": CHAT_MSSQL_ODBC_DRIVER},
-    }
+    return _mssql_django_config(
+        CHAT_MSSQL_HOST, CHAT_MSSQL_PORT, CHAT_MSSQL_DB, CHAT_MSSQL_USER, CHAT_MSSQL_PASSWORD, CHAT_MSSQL_ODBC_DRIVER,
+    )

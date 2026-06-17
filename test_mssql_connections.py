@@ -5,13 +5,8 @@ Tests both databases:
   DB 1  Operational data  (MSSQL_* vars)
   DB 2  Chat history      (CHAT_MSSQL_* vars)
 
-Requires pyodbc and the ODBC driver named in MSSQL_ODBC_DRIVER.
-Check installed drivers with:
-    odbcinst -q -d            (Linux / macOS)
-    Get-OdbcDriver            (Windows PowerShell)
-
-Usage:
-    python test_mssql_connections.py
+Requires:
+    pip install pyodbc python-dotenv
 """
 
 import os
@@ -19,151 +14,172 @@ import sys
 import time
 from pathlib import Path
 
-# Load .env from project root
+# ─────────────────────────────────────────────
+# Load .env
+# ─────────────────────────────────────────────
 try:
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).parent / ".env")
 except ImportError:
-    print("[WARN] python-dotenv not installed — reading env vars from shell only\n")
+    print("[WARN] python-dotenv not installed — using system env only\n")
 
 
 def _get(key, default=""):
-    return os.getenv(key, default)
+    value = os.getenv(key, default)
+    return value.strip() if isinstance(value, str) else value
 
 
+# ─────────────────────────────────────────────
+# Build connection string (FIXED)
+# ─────────────────────────────────────────────
 def _build_conn_str(host, port, user, password, database, driver):
-    """Build a pyodbc connection string.
-
-    Supports both SQL Server auth (user/password) and Windows Integrated auth
-    (leave MSSQL_USER blank to use Trusted_Connection=yes).
     """
-    parts = [
-        f"DRIVER={{{driver}}}",
-        f"SERVER={host},{port}",
-        f"DATABASE={database}",
-    ]
+    Supports:
+    - Named instance: 172.24.33.59\\QAserver
+    - Default instance: 172.24.33.59,1433
+    - SQL auth + Windows auth
+    """
+
+    parts = [f"DRIVER={{{driver}}}"]
+
+    host = host.strip()
+
+    # IMPORTANT FIX:
+    # If named instance exists → NEVER append port
+    if "\\" in host:
+        parts.append(f"SERVER={host}")
+    else:
+        port = (port or "").strip()
+
+        if port:
+            parts.append(f"SERVER={host},{port}")
+        else:
+            parts.append(f"SERVER={host}")
+
+    if database:
+        parts.append(f"DATABASE={database}")
+
     if user:
-        parts += [f"UID={user}", f"PWD={password}"]
+        parts.append(f"UID={user}")
+        parts.append(f"PWD={password}")
     else:
         parts.append("Trusted_Connection=yes")
-    return ";".join(parts)
+
+    conn_str = ";".join(parts)
+
+    # DEBUG (VERY IMPORTANT)
+    print("\n[DEBUG] Connection string:")
+    print(conn_str)
+    print()
+
+    return conn_str
 
 
+# ─────────────────────────────────────────────
+# Test single connection
+# ─────────────────────────────────────────────
 def test_connection(label, host, port, user, password, database, driver):
-    print(f"\n{'─'*60}")
-    print(f"  {label}")
-    print(f"  Host     : {host}:{port}")
-    print(f"  User     : {user or '(Windows Integrated Auth)'}")
-    print(f"  Database : {database}")
-    print(f"  Driver   : {driver}")
-    print(f"{'─'*60}")
+
+    print(f"\n{'─'*70}")
+    print(f"{label}")
+    print(f"Host     : {host}")
+    print(f"Port     : {port}")
+    print(f"User     : {user or '(Windows Auth)'}")
+    print(f"Database : {database}")
+    print(f"Driver   : {driver}")
+    print(f"{'─'*70}")
 
     try:
         import pyodbc
     except ImportError:
-        print("  [FAIL] pyodbc is not installed — run: pip install pyodbc")
+        print("[FAIL] pyodbc not installed → pip install pyodbc")
         return False
 
-    # Check driver is available
-    available = [d for d in pyodbc.drivers() if driver.lower() in d.lower()]
-    if not available:
-        all_drivers = pyodbc.drivers()
-        print(f"  [FAIL] ODBC driver not found: '{driver}'")
-        if all_drivers:
-            print(f"         Available drivers: {', '.join(all_drivers)}")
-        else:
-            print("         No ODBC drivers installed.")
+    # Validate driver
+    drivers = pyodbc.drivers()
+    if not any(driver.lower() in d.lower() for d in drivers):
+        print(f"[FAIL] ODBC driver not found: {driver}")
+        print("Available drivers:", drivers)
         return False
 
     conn_str = _build_conn_str(host, port, user, password, database, driver)
 
     t0 = time.perf_counter()
+
     try:
         conn = pyodbc.connect(conn_str, timeout=10)
-    except pyodbc.OperationalError as exc:
-        elapsed = time.perf_counter() - t0
-        print(f"  [FAIL] Connection refused after {elapsed:.2f}s")
-        print(f"         {exc}")
-        return False
-    except pyodbc.InterfaceError as exc:
-        print(f"  [FAIL] Interface error (check driver / server name)")
-        print(f"         {exc}")
-        return False
-    except Exception as exc:
-        print(f"  [FAIL] {type(exc).__name__}: {exc}")
+    except Exception as e:
+        print(f"[FAIL] Connection error: {type(e).__name__}")
+        print(e)
         return False
 
     elapsed = time.perf_counter() - t0
 
-    with conn.cursor() as cur:
-        # Server version
+    try:
+        cur = conn.cursor()
+
         cur.execute("SELECT @@VERSION")
-        full_version = cur.fetchone()[0]
-        # Shorten to first line only
-        version = full_version.splitlines()[0].strip()
+        version = cur.fetchone()[0].splitlines()[0]
 
-        # List user tables
-        cur.execute(
-            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
-            "WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME"
-        )
-        tables = [row[0] for row in cur.fetchall()]
+        cur.execute("""
+            SELECT TABLE_NAME
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_TYPE='BASE TABLE'
+            ORDER BY TABLE_NAME
+        """)
+        tables = [r[0] for r in cur.fetchall()]
 
-    conn.close()
+        conn.close()
 
-    print(f"  [OK]   Connected in {elapsed*1000:.1f} ms")
-    print(f"  Server : {version}")
-    if tables:
-        print(f"  Tables ({len(tables)}): {', '.join(tables[:10])}", end="")
-        print(" …" if len(tables) > 10 else "")
-    else:
-        print("  Tables : (none — database is empty)")
+    except Exception as e:
+        print("[FAIL] Query error:", e)
+        return False
+
+    print(f"[OK] Connected in {elapsed*1000:.1f} ms")
+    print("Server :", version)
+    print(f"Tables : {len(tables)}")
 
     return True
 
 
+# ─────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────
 def main():
-    print("=" * 60)
-    print("  Seros — MSSQL Connection Test")
-    print("=" * 60)
+    print("=" * 70)
+    print("        MSSQL CONNECTION TEST (FIXED)")
+    print("=" * 70)
 
     results = {}
 
-    # ── DB 1: Operational data ──────────────────────────────────
-    results["DB 1 Operational"] = test_connection(
-        label    = "DB 1 — Operational Data  (read-only, Phase 2)",
-        host     = _get("MSSQL_HOST", "localhost"),
-        port     = _get("MSSQL_PORT", "1433"),
-        user     = _get("MSSQL_USER", ""),
-        password = _get("MSSQL_PASSWORD", ""),
-        database = _get("MSSQL_DB", ""),
-        driver   = _get("MSSQL_ODBC_DRIVER", "ODBC Driver 17 for SQL Server"),
+    results["DB1"] = test_connection(
+        "DB 1 — Operational",
+        _get("MSSQL_HOST", "localhost"),
+        _get("MSSQL_PORT", "1433"),
+        _get("MSSQL_USER", ""),
+        _get("MSSQL_PASSWORD", ""),
+        _get("MSSQL_DB", ""),
+        _get("MSSQL_ODBC_DRIVER", "ODBC Driver 17 for SQL Server"),
     )
 
-    # ── DB 2: Chat history ──────────────────────────────────────
-    results["DB 2 Chat History"] = test_connection(
-        label    = "DB 2 — Chat History  (cb_conversations, cb_messages)",
-        host     = _get("CHAT_MSSQL_HOST", "localhost"),
-        port     = _get("CHAT_MSSQL_PORT", "1433"),
-        user     = _get("CHAT_MSSQL_USER", ""),
-        password = _get("CHAT_MSSQL_PASSWORD", ""),
-        database = _get("CHAT_MSSQL_DB", ""),
-        driver   = _get("CHAT_MSSQL_ODBC_DRIVER", "ODBC Driver 17 for SQL Server"),
+    results["DB2"] = test_connection(
+        "DB 2 — Chat History",
+        _get("CHAT_MSSQL_HOST", "localhost"),
+        _get("CHAT_MSSQL_PORT", "1433"),
+        _get("CHAT_MSSQL_USER", ""),
+        _get("CHAT_MSSQL_PASSWORD", ""),
+        _get("CHAT_MSSQL_DB", ""),
+        _get("CHAT_MSSQL_ODBC_DRIVER", "ODBC Driver 17 for SQL Server"),
     )
 
-    # ── Summary ─────────────────────────────────────────────────
-    print(f"\n{'═'*60}")
-    print("  Summary")
-    print(f"{'═'*60}")
-    all_ok = True
-    for name, ok in results.items():
-        status = "OK  " if ok else "FAIL"
-        print(f"  [{status}]  {name}")
-        if not ok:
-            all_ok = False
+    print("\n" + "=" * 70)
+    print("SUMMARY")
+    print("=" * 70)
 
-    print()
-    sys.exit(0 if all_ok else 1)
+    for k, v in results.items():
+        print(f"{k}: {'OK' if v else 'FAIL'}")
+
+    sys.exit(0 if all(results.values()) else 1)
 
 
 if __name__ == "__main__":
