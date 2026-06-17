@@ -383,3 +383,107 @@ def get_employee_listing(
         "rows": rows,
         **_paginate(total, page, page_size),
     }
+
+
+# ── Company Staff Listing ────────────────────────────────────────────────────
+# Source: Mst_Employee — the company-wide HR master spanning every Seros
+# business unit/company (shore staff, corporate, finance, etc.), NOT the
+# same population as eos_Mst_Fs_Employee (rig crew). Kept as its own
+# separate listing rather than merged into Employees.
+
+STAFF_SORT_COLUMNS = {
+    "name": "e.Emp_Sname",
+    "company": "c.Company_Name",
+    "dept": "d.Dept_Name",
+}
+
+
+def get_staff_listing(
+    page: int | None = None,
+    page_size: int | None = None,
+    company: str | None = None,     # COMPANY_ID (str digits)
+    dept: str | None = None,        # Dept_Id (str digits)
+    status: str | None = None,      # 'active' | 'inactive'
+    gender: str | None = None,      # 'M' | 'F'
+    search: str | None = None,
+    sort: str | None = None,
+    sort_dir: str | None = None,
+) -> dict:
+    page      = _clean_page(page)
+    page_size = _clean_page_size(page_size)
+
+    conditions = ["1=1"]
+    params: list = []
+
+    if company:
+        conditions.append("e.COMPANY_ID = %s")
+        params.append(company)
+    if dept:
+        conditions.append("e.DEPT_ID = %s")
+        params.append(dept)
+    if status == "active":
+        conditions.append("e.EMP_ACTIVE = 'Y'")
+    elif status == "inactive":
+        conditions.append("COALESCE(e.EMP_ACTIVE, '') != 'Y'")
+    if gender in ("M", "F"):
+        conditions.append("e.GENDER = %s")
+        params.append(gender)
+    if search:
+        conditions.append("""(
+            e.Emp_Fname    LIKE %s OR
+            e.Emp_Sname    LIKE %s OR
+            e.EMP_EMAIL    LIKE %s OR
+            e.EMP_MOBILE_NO LIKE %s OR
+            CAST(e.EMP_SAP_CODE AS CHAR) LIKE %s
+        )""")
+        like = f"%{search}%"
+        params.extend([like, like, like, like, like])
+
+    where = " AND ".join(conditions)
+
+    total_rows = _query(f"""
+        SELECT COUNT(*) AS cnt
+        FROM Mst_Employee e
+        WHERE {where}
+    """, tuple(params))
+    total = total_rows[0]["cnt"] if total_rows else 0
+
+    sort_col = STAFF_SORT_COLUMNS.get(sort, "e.Emp_Sname")
+    sort_dir = "DESC" if sort_dir == "desc" else "ASC"
+    offset   = (page - 1) * page_size
+
+    rows = _query(f"""
+        SELECT
+            e.EMP_ID                              AS id,
+            CONCAT_WS(' ', e.Emp_Fname, NULLIF(e.Emp_Mname, ''), e.Emp_Sname) AS name,
+            c.Company_Name                        AS company,
+            d.Dept_Name                           AS dept,
+            wd.Working_Designation                AS designation,
+            eg.Emp_Designation                    AS grade,
+            e.EMP_ACTIVE                          AS active,
+            e.GENDER                              AS gender,
+            DATE(e.Emp_DOB)                       AS dob,
+            DATE(e.EMP_FROM)                      AS emp_from,
+            DATE(e.EMP_TO)                        AS emp_to,
+            e.EMP_MOBILE_NO                       AS mobile,
+            e.EMP_EMAIL                           AS email,
+            e.EMP_SAP_CODE                        AS sap_code,
+            cl.Company_Loc_NAME                   AS location
+        FROM Mst_Employee e
+        LEFT JOIN Mst_Company c             ON e.COMPANY_ID = c.COMPANY_ID
+        LEFT JOIN Mst_Department d          ON e.DEPT_ID = d.Dept_Id
+        LEFT JOIN Mst_Working_Designation wd ON e.Working_Designation_Id = wd.Working_Designation_Id
+        LEFT JOIN Mst_Emp_Grade eg          ON e.Emp_Grade_Id = eg.Emp_Grade_Id
+        LEFT JOIN Mst_Company_Location cl   ON e.COMPANY_LOC_ID = cl.Company_Loc_Id
+        WHERE {where}
+        ORDER BY {sort_col} {sort_dir}
+        LIMIT %s OFFSET %s
+    """, tuple(params) + (page_size, offset))
+
+    for r in rows:
+        r["active"] = r["active"] == "Y"
+
+    return {
+        "rows": rows,
+        **_paginate(total, page, page_size),
+    }

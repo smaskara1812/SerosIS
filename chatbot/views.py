@@ -890,6 +890,42 @@ def listings_employees_api(request):
     return JsonResponse(data)
 
 
+def listings_staff_page(request):
+    return render(request, "chatbot/listings/staff.html")
+
+
+@require_GET
+def listings_staff_meta_api(request):
+    """Filter dropdown options for the Company Staff listing."""
+    from .analytics.tools import _query
+    companies = _query("SELECT COMPANY_ID AS id, Company_Name AS name FROM Mst_Company ORDER BY Company_Name")
+    depts = _query("SELECT Dept_Id AS id, Dept_Name AS name FROM Mst_Department ORDER BY Dept_Name")
+    return JsonResponse({
+        "companies": companies,
+        "depts": depts,
+    })
+
+
+@require_GET
+def listings_staff_api(request):
+    from .analytics.listings import get_staff_listing
+    g = request.GET
+    page      = g.get("page")
+    page_size = g.get("page_size")
+    data = get_staff_listing(
+        page=int(page) if page and page.isdigit() else None,
+        page_size=int(page_size) if page_size and page_size.isdigit() else None,
+        company=g.get("company") or None,
+        dept=g.get("dept") or None,
+        status=g.get("status") or None,
+        gender=g.get("gender") or None,
+        search=g.get("search") or None,
+        sort=g.get("sort") or None,
+        sort_dir=g.get("sort_dir") or None,
+    )
+    return JsonResponse(data)
+
+
 # ── Chat API ───────────────────────────────────────────────────────────────────
 
 @csrf_exempt
