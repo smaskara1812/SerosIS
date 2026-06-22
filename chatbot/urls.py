@@ -8,6 +8,9 @@ urlpatterns = [
     path("manuals/", views.manuals_page, name="manuals"),
     path("dashboard/", views.dashboard_page, name="dashboard"),
 
+    path("rigs/", views.rigs_page, name="rigs"),
+    path("rigs/<int:rig_id>/", views.rig_detail_page, name="rig_detail"),
+
     path("listings/", views.listings_page, name="listings"),
     path("listings/incidents/", views.listings_incidents_page, name="listings_incidents"),
     path("listings/hazard-cards/", views.listings_hazard_cards_page, name="listings_hazard_cards"),
@@ -15,6 +18,16 @@ urlpatterns = [
     path("listings/staff/", views.listings_staff_page, name="listings_staff"),
     path("listings/crew-rotations/", views.listings_crew_rotations_page, name="listings_crew_rotations"),
     path("listings/invoices/", views.listings_invoices_page, name="listings_invoices"),
+
+    # ── Rigs 360 API ───────────────────────────────────────────────────────
+    path("api/rigs/", views.rigs_list_api, name="rigs_list_api"),
+    path("api/rigs/<int:rig_id>/overview/", views.rig_overview_api, name="rig_overview_api"),
+    path("api/rigs/<int:rig_id>/snapshot/", views.rig_snapshot_api, name="rig_snapshot_api"),
+    path("api/rigs/<int:rig_id>/crew-groups/", views.rig_crew_groups_api, name="rig_crew_groups_api"),
+    path("api/rigs/<int:rig_id>/people/", views.rig_people_api, name="rig_people_api"),
+    path("api/rigs/<int:rig_id>/safety/", views.rig_safety_api, name="rig_safety_api"),
+    path("api/rigs/<int:rig_id>/finance/", views.rig_finance_api, name="rig_finance_api"),
+    path("api/rigs/<int:rig_id>/operations/", views.rig_operations_api, name="rig_operations_api"),
 
     # ── Dashboard API ───────────────────────────────────────────────────────
     path("api/dashboard/", views.dashboard_api, name="dashboard_api"),

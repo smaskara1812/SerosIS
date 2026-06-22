@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rigs — Seros</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; min-height: 100vh; }
+    .nav {
+      background: #1a3f7a; color: #fff; padding: 0 28px; height: 54px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    }
+    .nav-brand { font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .nav-brand span { opacity: 0.45; font-weight: 400; font-size: 0.8rem; }
+    .nav-links { display: flex; gap: 20px; align-items: center; }
+    .nav-links a { color: rgba(255,255,255,0.55); text-decoration: none; font-size: 0.85rem; transition: color 0.15s; }
+    .nav-links a:hover, .nav-links a.active { color: #fff; }
+
+    .page-body { max-width: 1200px; margin: 0 auto; padding: 36px 28px 60px; }
+    .page-header { display: flex; align-items: flex-end; gap: 20px; margin-bottom: 28px; flex-wrap: wrap; }
+    .page-title { font-size: 1.4rem; font-weight: 700; color: #1a3f7a; }
+    .page-subtitle { font-size: 0.88rem; color: #64748b; margin-top: 4px; }
+
+    /* Type filter tabs */
+    .type-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .type-tab {
+      padding: 6px 16px; border-radius: 20px; font-size: 0.82rem; font-weight: 600;
+      border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; transition: all 0.15s;
+    }
+    .type-tab:hover { border-color: #1a3f7a; color: #1a3f7a; }
+    .type-tab.active { background: #1a3f7a; color: #fff; border-color: #1a3f7a; }
+
+    /* Status filter */
+    .status-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .status-pill {
+      display: flex; align-items: center; gap: 6px; padding: 5px 14px;
+      border-radius: 20px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+      border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; transition: all 0.15s;
+    }
+    .status-pill:hover, .status-pill.active { border-color: #1a3f7a; color: #1a3f7a; background: #eef3fb; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-active { background: #16a34a; }
+    .dot-inactive { background: #94a3b8; }
+    .search-input {
+      margin-left: auto; border: 1.5px solid #e2e8f0; border-radius: 8px;
+      padding: 6px 12px; font-size: 0.83rem; font-family: inherit; outline: none;
+      width: 200px; transition: border-color 0.15s;
+    }
+    .search-input:focus { border-color: #1a3f7a; }
+
+    /* Rig grid */
+    .rig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .rig-card {
+      background: #fff; border-radius: 12px; padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07); border: 1.5px solid #eef1f5;
+      text-decoration: none; display: block; cursor: pointer;
+      transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+    }
+    .rig-card:hover { box-shadow: 0 6px 20px rgba(26,63,122,0.12); transform: translateY(-2px); border-color: #1a3f7a; }
+    .rig-card.inactive { opacity: 0.6; }
+    .rig-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+    .rig-card-icon {
+      width: 42px; height: 42px; border-radius: 10px;
+      background: linear-gradient(135deg, #1a3f7a 0%, #2563eb 100%);
+      color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+    }
+    .rig-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .badge-active { background: #dcfce7; color: #16a34a; }
+    .badge-inactive { background: #f1f5f9; color: #64748b; }
+    .badge-type { background: #e0e7ff; color: #3730a3; }
+    .rig-name { font-size: 1.05rem; font-weight: 700; color: #1a3f7a; margin-bottom: 3px; }
+    .rig-short { font-size: 0.78rem; color: #94a3b8; font-weight: 600; letter-spacing: 0.5px; }
+    .rig-meta { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+    .rig-meta-row { display: flex; justify-content: space-between; font-size: 0.78rem; }
+    .rig-meta-label { color: #94a3b8; font-weight: 600; }
+    .rig-meta-val { color: #374151; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; grid-column: 1/-1; }
+    .empty-state svg { margin-bottom: 12px; opacity: 0.4; }
+
+    .count-badge {
+      background: #e8f5f4; color: #1a3f7a; border-radius: 12px;
+      padding: 2px 10px; font-size: 0.78rem; font-weight: 700;
+    }
+    .loading { text-align: center; padding: 60px; color: #94a3b8; grid-column: 1/-1; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">Seros AI <span>/ Rigs</span></div>
+  <div class="nav-links">
+    <a href="/">Chat</a>
+    <a href="/dashboard/">Dashboard</a>
+    <a href="/listings/">Listings</a>
+    <a href="/rigs/" class="active">Rigs</a>
+    <a href="/health/">Health</a>
+    <a href="/manuals/">Manuals</a>
+  </div>
+</nav>
+
+<div class="page-body">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Rig Fleet</div>
+      <div class="page-subtitle">Select a rig to view its complete 360° profile</div>
+    </div>
+    <div class="type-tabs" id="type-tabs"></div>
+  </div>
+
+  <div class="status-row">
+    <div class="status-pill active" data-status="all" onclick="setStatus(this)">
+      All <span class="count-badge" id="cnt-all">—</span>
+    </div>
+    <div class="status-pill" data-status="active" onclick="setStatus(this)">
+      <span class="status-dot dot-active"></span>Active <span class="count-badge" id="cnt-active">—</span>
+    </div>
+    <div class="status-pill" data-status="inactive" onclick="setStatus(this)">
+      <span class="status-dot dot-inactive"></span>Inactive <span class="count-badge" id="cnt-inactive">—</span>
+    </div>
+    <input class="search-input" id="search-input" type="text" placeholder="Search rig name…" oninput="renderGrid()" />
+  </div>
+
+  <div class="rig-grid" id="rig-grid">
+    <div class="loading">Loading rigs…</div>
+  </div>
+</div>
+
+<script>
+let allRigs = [];
+let activeType = 'all';
+let activeStatus = 'all';
+
+async function init() {
+  const res = await fetch('/api/rigs/');
+  const data = await res.json();
+  allRigs = data.rigs || [];
+  buildTypeTabs();
+  renderGrid();
+}
+
+function buildTypeTabs() {
+  const types = ['all', ...new Set(allRigs.map(r => r.Rig_Type_Name))];
+  const container = document.getElementById('type-tabs');
+  container.innerHTML = types.map(t => `
+    <div class="type-tab ${t === 'all' ? 'active' : ''}" onclick="setType(this,'${t}')">${t === 'all' ? 'All Types' : t}</div>
+  `).join('');
+}
+
+function setType(el, type) {
+  document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  activeType = type;
+  renderGrid();
+}
+
+function setStatus(el) {
+  document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  activeStatus = el.dataset.status;
+  renderGrid();
+}
+
+function renderGrid() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  let filtered = allRigs;
+
+  if (activeType !== 'all') filtered = filtered.filter(r => r.Rig_Type_Name === activeType);
+  if (activeStatus === 'active')   filtered = filtered.filter(r => r.Rig_Active === 'Y');
+  if (activeStatus === 'inactive') filtered = filtered.filter(r => r.Rig_Active !== 'Y');
+  if (search) filtered = filtered.filter(r => r.Rig_Name.toLowerCase().includes(search) || r.Rig_Short_Name.toLowerCase().includes(search));
+
+  // Update counts
+  const typed = activeType === 'all' ? allRigs : allRigs.filter(r => r.Rig_Type_Name === activeType);
+  document.getElementById('cnt-all').textContent      = typed.length;
+  document.getElementById('cnt-active').textContent   = typed.filter(r => r.Rig_Active === 'Y').length;
+  document.getElementById('cnt-inactive').textContent = typed.filter(r => r.Rig_Active !== 'Y').length;
+
+  const grid = document.getElementById('rig-grid');
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><div>No rigs match the filter</div></div>`;
+    return;
+  }
+  grid.innerHTML = filtered.map(r => rigCard(r)).join('');
+}
+
+function rigCard(r) {
+  const isActive = r.Rig_Active === 'Y';
+  const builtYr  = r.Rig_Built_Dt ? r.Rig_Built_Dt.slice(0,4) : '—';
+  return `
+    <a class="rig-card ${isActive ? '' : 'inactive'}" href="/rigs/${r.Rig_Id}/">
+      <div class="rig-card-top">
+        <div class="rig-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="rig-badges">
+          <span class="badge ${isActive ? 'badge-active' : 'badge-inactive'}">${isActive ? 'Active' : 'Inactive'}</span>
+          <span class="badge badge-type">${r.Rig_Type_Name}</span>
+        </div>
+      </div>
+      <div class="rig-name">${r.Rig_Name}</div>
+      <div class="rig-short">${r.Rig_Short_Name}</div>
+      <div class="rig-meta">
+        <div class="rig-meta-row">
+          <span class="rig-meta-label">Subtype</span>
+          <span class="rig-meta-val">${r.Rig_Subtype_Name || '—'}</span>
+        </div>
+        <div class="rig-meta-row">
+          <span class="rig-meta-label">Built</span>
+          <span class="rig-meta-val">${builtYr}</span>
+        </div>
+      </div>
+    </a>
+  `;
+}
+
+init();
+</script>
+</body>
+</html>

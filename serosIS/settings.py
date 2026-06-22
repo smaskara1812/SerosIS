@@ -1,6 +1,7 @@
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+import sys
 
 load_dotenv()
 
@@ -17,6 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret-key-change-in-production")
 DEBUG = os.getenv("DEBUG", "True") == "True"
+TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
@@ -55,3 +57,9 @@ DATABASE_ROUTERS = ["serosIS.db_router.ChatHistoryRouter"]
 
 STATIC_URL = "/static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+INTERNAL_IPS = ["127.0.0.1"]
+
+if DEBUG and not TESTING:
+    INSTALLED_APPS += ["debug_toolbar"]
+    MIDDLEWARE.insert(1, "debug_toolbar.middleware.DebugToolbarMiddleware")

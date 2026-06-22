@@ -1,4 +1,5 @@
 django==5.2.15
+django-debug-toolbar
 
 langchain==0.3.25
 langchain-community==0.3.24

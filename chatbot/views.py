@@ -783,6 +783,80 @@ def dashboard_finance_api(request):
     return JsonResponse(get_finance_dashboard(year=year))
 
 
+# ── Rigs 360 ─────────────────────────────────────────────────────────────────
+
+def rigs_page(request):
+    return render(request, "chatbot/rigs/index.html")
+
+
+def rig_detail_page(request, rig_id):
+    return render(request, "chatbot/rigs/detail.html", {"rig_id": rig_id})
+
+
+@require_GET
+def rigs_list_api(request):
+    from .analytics.rigs import get_rigs_list
+    rigs = get_rigs_list()
+    return JsonResponse({"rigs": rigs})
+
+
+@require_GET
+def rig_overview_api(request, rig_id):
+    from .analytics.rigs import get_rig_overview
+    data = get_rig_overview(rig_id)
+    return JsonResponse(data)
+
+
+@require_GET
+def rig_snapshot_api(request, rig_id):
+    from .analytics.rigs import get_rig_snapshot
+    year = request.GET.get("year")
+    year = int(year) if year and year.isdigit() else datetime.now().year
+    return JsonResponse(get_rig_snapshot(rig_id, year))
+
+
+@require_GET
+def rig_crew_groups_api(request, rig_id):
+    from .analytics.rigs import get_rig_crew_groups
+    return JsonResponse(get_rig_crew_groups(rig_id))
+
+
+@require_GET
+def rig_people_api(request, rig_id):
+    from .analytics.rigs import get_rig_people
+    year = request.GET.get("year")
+    year = int(year) if year and year.isdigit() else datetime.now().year
+    data = get_rig_people(rig_id, year)
+    return JsonResponse(data)
+
+
+@require_GET
+def rig_safety_api(request, rig_id):
+    from .analytics.rigs import get_rig_safety
+    year = request.GET.get("year")
+    year = int(year) if year and year.isdigit() else datetime.now().year
+    data = get_rig_safety(rig_id, year)
+    return JsonResponse(data)
+
+
+@require_GET
+def rig_finance_api(request, rig_id):
+    from .analytics.rigs import get_rig_finance
+    year = request.GET.get("year")
+    year = int(year) if year and year.isdigit() else datetime.now().year
+    data = get_rig_finance(rig_id, year)
+    return JsonResponse(data)
+
+
+@require_GET
+def rig_operations_api(request, rig_id):
+    from .analytics.rigs import get_rig_operations
+    year = request.GET.get("year")
+    year = int(year) if year and year.isdigit() else datetime.now().year
+    data = get_rig_operations(rig_id, year)
+    return JsonResponse(data)
+
+
 # ── Listings ─────────────────────────────────────────────────────────────────
 
 def listings_page(request):
