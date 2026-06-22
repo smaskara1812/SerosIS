@@ -648,7 +648,7 @@
       </a>
 
       <div class="sidebar-section-label">Finance</div>
-      <a class="sidebar-item" href="/dashboard/finance/" title="Finance Dashboard">
+      <a class="sidebar-item" data-insight="finance" title="Finance Overview">
         <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 15.5c.5.8 1.4 1.3 2.5 1.3 1.7 0 3-1 3-2.3 0-1.4-1.3-2-3-2.5-1.7-.5-3-1.1-3-2.5 0-1.3 1.3-2.3 3-2.3 1.1 0 2 .5 2.5 1.3"></path><line x1="12" y1="6" x2="12" y2="18"></line></svg></span>
         <span class="sidebar-label">Finance</span>
       </a>
@@ -1118,6 +1118,70 @@
 
     </div><!-- /#insight-roster -->
 
+    <div id="insight-finance" class="insight-section">
+
+      <div id="finance-spinner" style="display:none;justify-content:center;align-items:center;height:120px;gap:10px;color:#64748b;font-size:0.875rem;">
+        <div style="width:18px;height:18px;border:2px solid #3dbdb0;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
+        Loading Finance data…
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-fin-total-spend">i</span>
+          <div class="kpi-value" id="kpi-fin-total-spend">—</div>
+          <div class="kpi-label">Total Invoice Spend</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-fin-vendor-count">i</span>
+          <div class="kpi-value" id="kpi-fin-vendor-count">—</div>
+          <div class="kpi-label">Vendors</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-fin-top-vendor-pct">i</span>
+          <div class="kpi-value" id="kpi-fin-top-vendor-pct">—</div>
+          <div class="kpi-label">Top Vendor Share</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-fin-mr-count">i</span>
+          <div class="kpi-value" id="kpi-fin-mr-count">—</div>
+          <div class="kpi-label">MRs Fulfilled</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-info" data-kpi="kpi-fin-avg-days">i</span>
+          <div class="kpi-value" id="kpi-fin-avg-days">—</div>
+          <div class="kpi-label">Avg Fulfilment Days</div>
+        </div>
+      </div>
+
+      <div class="chart-grid-2" style="margin-bottom:16px;">
+        <div class="chart-card no-mb">
+          <div class="chart-title">Vendor Spend Concentration <span>top 15 vendors by invoice amount</span><span class="chart-info" data-kpi="chart-info-fin-vendor-donut">i</span></div>
+          <div class="chart-body" id="chart-fin-vendor-donut" style="height:320px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">Vendor Breakdown <span>spend · invoice count · % of total</span><span class="chart-info" data-kpi="chart-info-fin-vendor-table">i</span></div>
+          <div id="fin-vendor-table-wrap" style="max-height:320px;overflow-y:auto;padding:4px 0;font-size:0.82rem;"></div>
+        </div>
+      </div>
+
+      <div class="chart-grid-2" style="margin-bottom:16px;">
+        <div class="chart-card no-mb">
+          <div class="chart-title">MR Fulfilment by Rig <span>avg days from requisition to GRN receipt, by priority</span><span class="chart-info" data-kpi="chart-info-fin-mr-rig">i</span></div>
+          <div class="chart-body" id="chart-fin-mr-rig" style="height:300px;"></div>
+        </div>
+        <div class="chart-card no-mb">
+          <div class="chart-title">Fulfilment Distribution <span>how long MRs take to fulfil</span><span class="chart-info" data-kpi="chart-info-fin-mr-buckets">i</span></div>
+          <div class="chart-body" id="chart-fin-mr-buckets" style="height:300px;"></div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">MR Fulfilment Trend <span>avg days · last 24 months</span><span class="chart-info" data-kpi="chart-info-fin-mr-trend">i</span></div>
+        <div class="chart-body" id="chart-fin-mr-trend" style="height:240px;"></div>
+      </div>
+
+    </div><!-- /#insight-finance -->
+
     </main>
   </div><!-- /.main-wrap -->
 </div><!-- /.dashboard-layout -->
@@ -1133,6 +1197,16 @@
   const charts = {};
   let allRigs = [];          // full list from /api/dashboard/meta/
   let selectedRigs = [];     // currently selected (empty = all)
+
+  // ── Indian-number currency formatter ──────────────────────────────────────
+  function fmtINR(v) {
+    if (v == null || isNaN(+v)) return "—";
+    const n = Math.abs(+v);
+    if (n >= 1e7) return "₹" + (n / 1e7).toFixed(2) + " Cr";
+    if (n >= 1e5) return "₹" + (n / 1e5).toFixed(2) + " L";
+    if (n >= 1e3) return "₹" + (n / 1e3).toFixed(1) + "K";
+    return "₹" + n.toFixed(0);
+  }
   let monthlyDetail = [];    // per-rig per-month data for drill-down
   let hoursOverviewData = null; // saved overview data for back-navigation
 
@@ -1667,6 +1741,8 @@
     if (name === "hse") loadHse();
     // Lazy-load Workforce data on first visit (Crew Roster shares the same payload)
     if (name === "workforce" || name === "roster") loadWorkforce();
+    // Lazy-load Finance data on first visit
+    if (name === "finance") loadFinance();
     // Resize charts so they fill the newly visible containers
     setTimeout(resizeAllCharts, 60);
   }
@@ -2760,6 +2836,197 @@
     }
   }
 
+  let _financeLoaded = false;
+
+  async function loadFinance() {
+    if (_financeLoaded) return;
+    const spinner = document.getElementById("finance-spinner");
+    if (spinner) spinner.style.display = "flex";
+
+    const year = document.getElementById("year-select").value;
+    const params = new URLSearchParams();
+    if (year) params.set("year", year);
+
+    try {
+      const res  = await fetch("/api/dashboard/finance/?" + params.toString());
+      const data = await res.json();
+
+      const vs = data.vendor_spend || {};
+      const mr = data.mr_fulfilment || {};
+      const s  = mr.summary || {};
+
+      // ── KPIs ──────────────────────────────────────────────────────────────
+      const totalSpend = vs.grand_total;
+      setKpi("kpi-fin-total-spend", totalSpend != null ? fmtINR(totalSpend) : null);
+      setKpi("kpi-fin-vendor-count",  (vs.vendors || []).length || null);
+      const topVendorPct = (vs.vendors || []).length && totalSpend
+        ? +(((vs.vendors[0].total_spend || 0) / totalSpend) * 100).toFixed(1) : null;
+      setKpi("kpi-fin-top-vendor-pct", topVendorPct, "%");
+      setKpi("kpi-fin-mr-count",  s.total_fulfilled    != null ? s.total_fulfilled                      : null);
+      setKpi("kpi-fin-avg-days",  s.overall_avg_days   != null ? (+s.overall_avg_days).toFixed(1)       : null, " d");
+
+      if (topVendorPct != null) {
+        document.getElementById("kpi-fin-top-vendor-pct").className =
+          "kpi-value " + (topVendorPct < 30 ? "good" : topVendorPct < 50 ? "warn" : "bad");
+      }
+      if (s.overall_avg_days != null) {
+        const d = +s.overall_avg_days;
+        document.getElementById("kpi-fin-avg-days").className =
+          "kpi-value " + (d <= 14 ? "good" : d <= 30 ? "warn" : "bad");
+      }
+
+      // ── Charts ─────────────────────────────────────────────────────────────
+      renderFinVendorDonut(vs.vendors || [], totalSpend);
+      renderFinVendorTable(vs.vendors || [], totalSpend);
+      renderFinMrRig(mr.by_rig_priority || []);
+      renderFinMrBuckets(mr.buckets || []);
+      renderFinMrTrend(mr.monthly_trend || []);
+
+      _financeLoaded = true;
+    } catch (e) {
+      console.error("Finance load error:", e);
+    } finally {
+      if (spinner) spinner.style.display = "none";
+    }
+  }
+
+  function renderFinVendorDonut(vendors, grandTotal) {
+    const dom = document.getElementById("chart-fin-vendor-donut");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!vendors.length) { c.clear(); return; }
+    // Assign colors: named vendors get PALETTE colors, "Others" always gets a neutral gray
+    const paletteVendors = vendors.filter(v => v.vendor !== "Others");
+    const colorMap = {};
+    paletteVendors.forEach((v, i) => { colorMap[v.vendor] = PALETTE[i % PALETTE.length]; });
+    const data = vendors.map(v => ({
+      name: v.vendor,
+      value: +(v.total_spend || 0),
+      itemStyle: { color: v.vendor === "Others" ? "#64748b" : colorMap[v.vendor] },
+    }));
+    c.setOption({
+      tooltip: {
+        trigger: "item",
+        formatter: p => {
+          const pct = grandTotal ? ((p.value / grandTotal) * 100).toFixed(1) : "—";
+          return `${p.name}<br/>Spend: <b>${fmtINR(p.value)}</b> (${pct}%)`;
+        },
+      },
+      legend: { type: "scroll", bottom: 4, textStyle: { fontSize: 10 }, itemGap: 6 },
+      series: [{
+        type: "pie", radius: ["36%", "62%"], center: ["50%", "44%"],
+        data,
+        // Labels inside the slice only for slices ≥ 8% — avoids outside clipping entirely
+        label: {
+          show: true,
+          position: "inside",
+          formatter: p => p.percent >= 8 ? p.percent.toFixed(0) + "%" : "",
+          fontSize: 11,
+          color: "#fff",
+          fontWeight: "bold",
+        },
+        labelLine: { show: false },
+        emphasis: {
+          itemStyle: { shadowBlur: 8, shadowColor: "rgba(0,0,0,0.25)" },
+          label: { show: true, formatter: p => p.percent.toFixed(1) + "%", fontSize: 12 },
+        },
+      }],
+    }, true);
+  }
+
+  function renderFinVendorTable(vendors, grandTotal) {
+    const wrap = document.getElementById("fin-vendor-table-wrap");
+    if (!wrap) return;
+    if (!vendors.length) { wrap.innerHTML = `<p style="padding:12px;color:#94a3b8;">No invoice data.</p>`; return; }
+    const rows = vendors.map(v => {
+      const pct = grandTotal ? ((v.total_spend / grandTotal) * 100).toFixed(1) : "—";
+      return `<tr>
+        <td style="padding:5px 8px;border-bottom:1px solid #1e293b;">${v.vendor}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #1e293b;text-align:right;">${fmtINR(v.total_spend)}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #1e293b;text-align:right;">${v.invoice_count}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #1e293b;text-align:right;">${pct}%</td>
+      </tr>`;
+    }).join("");
+    wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="color:#94a3b8;font-size:0.78rem;">
+        <th style="padding:5px 8px;text-align:left;border-bottom:1px solid #334155;">Vendor</th>
+        <th style="padding:5px 8px;text-align:right;border-bottom:1px solid #334155;">Spend</th>
+        <th style="padding:5px 8px;text-align:right;border-bottom:1px solid #334155;">Invoices</th>
+        <th style="padding:5px 8px;text-align:right;border-bottom:1px solid #334155;">Share</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  function renderFinMrRig(rows) {
+    const dom = document.getElementById("chart-fin-mr-rig");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!rows.length) { c.clear(); return; }
+    const rigs = [...new Set(rows.map(r => r.rig))];
+    const priorities = ["Urgent", "Normal", "Routine"];
+    const colours = { Urgent: "#ef4444", Normal: "#f59e0b", Routine: "#22c55e" };
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: params => {
+          const rig = params[0].axisValue;
+          return `<b>${rig}</b>` + params.map(p => `<br/>${p.marker}${p.seriesName}: <b>${p.value != null ? (+p.value).toFixed(1) + " d" : "—"}</b>`).join("");
+        },
+      },
+      legend: { data: priorities, top: 4, textStyle: { fontSize: 10 } },
+      grid: { top: 36, bottom: 50, left: 44, right: 20 },
+      xAxis: { type: "category", data: rigs, axisLabel: { fontSize: 10, rotate: 35 } },
+      yAxis: { type: "value", name: "Avg Days", nameTextStyle: { fontSize: 10 } },
+      series: priorities.map(p => ({
+        name: p, type: "bar", barMaxWidth: 22,
+        itemStyle: { color: colours[p], borderRadius: [3, 3, 0, 0] },
+        data: rigs.map(rig => {
+          const found = rows.find(r => r.rig === rig && r.priority === p);
+          return found ? +(+found.avg_days).toFixed(1) : null;
+        }),
+      })),
+    }, true);
+  }
+
+  function renderFinMrBuckets(rows) {
+    // rows = [{bucket: "<7 days", mr_count: N}, ...] ordered by bucket_sort
+    const dom = document.getElementById("chart-fin-mr-buckets");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!rows.length) { c.clear(); return; }
+    const colours = ["#22c55e", "#86efac", "#f59e0b", "#f97316", "#ef4444"];
+    const labels = rows.map(r => r.bucket);
+    const values = rows.map(r => +r.mr_count);
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      grid: { top: 14, bottom: 28, left: 44, right: 20 },
+      xAxis: { type: "category", data: labels, axisLabel: { fontSize: 11 } },
+      yAxis: { type: "value", name: "MRs", nameTextStyle: { fontSize: 10 } },
+      series: [{
+        type: "bar", data: values,
+        itemStyle: { color: p => colours[Math.min(p.dataIndex, colours.length - 1)], borderRadius: [3, 3, 0, 0] },
+        label: { show: true, position: "top", fontSize: 11 },
+        barMaxWidth: 52,
+      }],
+    }, true);
+  }
+
+  function renderFinMrTrend(rows) {
+    const dom = document.getElementById("chart-fin-mr-trend");
+    const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
+    if (!rows.length) { c.clear(); return; }
+    c.setOption({
+      tooltip: { trigger: "axis", formatter: params => `<b>${params[0].axisValue}</b><br/>Avg days: <b>${(+params[0].value).toFixed(1)}</b>` },
+      grid: { top: 14, bottom: 36, left: 48, right: 24 },
+      xAxis: { type: "category", data: rows.map(r => r.month), axisLabel: { fontSize: 10, rotate: 35 } },
+      yAxis: { type: "value", name: "Avg Days", nameTextStyle: { fontSize: 10 } },
+      series: [{
+        type: "line", data: rows.map(r => +(+r.avg_days).toFixed(1)),
+        smooth: true, symbol: "circle", symbolSize: 5,
+        lineStyle: { color: "#3b82f6", width: 2 },
+        itemStyle: { color: "#3b82f6" },
+        areaStyle: { color: "rgba(59,130,246,0.12)" },
+      }],
+    }, true);
+  }
+
   function renderWfDeparturesByRig(rows) {
     const dom = document.getElementById("chart-wf-departures-rig");
     const c   = echarts.getInstanceByDom(dom) || echarts.init(dom);
@@ -3029,6 +3296,10 @@
         || document.getElementById("insight-roster")?.classList.contains("active")) {
       loadWorkforce();
     }
+    _financeLoaded = false;  // force Finance reload on filter change
+    if (document.getElementById("insight-finance")?.classList.contains("active")) {
+      loadFinance();
+    }
     document.getElementById("loading-overlay").classList.remove("hidden");
 
     const year = document.getElementById("year-select").value;
@@ -3109,19 +3380,31 @@
 
       // Years
       const sel = document.getElementById("year-select");
-      // Remove old dynamic options (keep "All years")
       while (sel.options.length > 1) sel.remove(1);
+      const curYear = new Date().getFullYear();
       for (const yr of data.years || []) {
         const opt = document.createElement("option");
         opt.value = yr;
         opt.textContent = yr;
-        if (yr === new Date().getFullYear()) opt.selected = true; // default current year
+        if (yr === curYear) opt.selected = true;
         sel.appendChild(opt);
       }
+      // Restore saved year (overrides default)
+      try {
+        const savedYear = localStorage.getItem("dashYear");
+        if (savedYear && [...sel.options].some(o => o.value === savedYear)) {
+          sel.value = savedYear;
+        }
+      } catch(e) {}
 
-      // Rigs
+      // Rigs — restore saved selection
       allRigs = data.rigs || [];
+      try {
+        const savedRigs = JSON.parse(localStorage.getItem("dashRigs") || "[]");
+        selectedRigs = savedRigs.filter(r => allRigs.some(a => a.Rig_Name === r));
+      } catch(e) { selectedRigs = []; }
       renderRigList(allRigs);
+      updateRigTrigger();
     } catch (err) {
       console.error("Meta load failed:", err);
     }
@@ -3233,6 +3516,7 @@
 
   document.getElementById("rig-clear").addEventListener("click", () => {
     selectedRigs = [];
+    try { localStorage.removeItem("dashRigs"); } catch(e) {}
     updateRigTrigger();
     renderRigList(allRigs);
   });
@@ -3241,6 +3525,7 @@
   document.getElementById("rig-apply").addEventListener("click", () => {
     rigPanel.classList.remove("open");
     rigTrigger.classList.remove("open");
+    try { localStorage.setItem("dashRigs", JSON.stringify(selectedRigs)); } catch(e) {}
     loadDashboard();
   });
 
@@ -3289,7 +3574,10 @@
   });
 
   // Year change
-  document.getElementById("year-select").addEventListener("change", loadDashboard);
+  document.getElementById("year-select").addEventListener("change", function() {
+    try { localStorage.setItem("dashYear", this.value); } catch(e) {}
+    loadDashboard();
+  });
 
   // Refresh
   document.getElementById("refresh-btn").addEventListener("click", loadDashboard);
@@ -3359,6 +3647,17 @@
     "chart-info-chart-wf-cert-types":           `<b>Expiring Certificate Types</b> — Which certifications have the most expired or soon-to-expire records.`,
     "chart-info-roster-table":                  `<b>Crew Roster</b> — Live crew count, top designations, and rotation status per rig.`,
     "chart-info-roster-composition":            `<b>Workforce Composition</b> — Everyone with an open service record right now, split by rig type and whether they're on board or in another status (off board, leave, standby).`,
+    // ── Finance ──────────────────────────────────────────────────────────────
+    "kpi-fin-total-spend":      `<b>Total Invoice Spend</b> — Sum of all invoice amounts for the selected year.`,
+    "kpi-fin-vendor-count":     `<b>Vendor Count</b> — Number of distinct vendors invoiced in the selected period.`,
+    "kpi-fin-top-vendor-pct":   `<b>Top Vendor Share</b> — % of total spend going to the single largest vendor. High % = concentration risk.`,
+    "kpi-fin-mr-count":         `<b>MRs Fulfilled</b> — Material requisitions that have at least one matching GRN receipt in the selected year.`,
+    "kpi-fin-avg-days":         `<b>Avg Fulfilment Days</b> — Average days from MR raised date to GRN receipt date, for fulfilled requisitions.`,
+    "chart-info-fin-vendor-donut":  `<b>Vendor Spend Concentration</b> — Donut showing each vendor's share of total invoice spend. A healthy spread has no single slice dominating.`,
+    "chart-info-fin-vendor-table":  `<b>Vendor Breakdown</b> — Full list with spend amount, invoice count, and % share. Scroll for all vendors.`,
+    "chart-info-fin-mr-rig":        `<b>MR Fulfilment by Rig</b> — Average days from requisition to GRN per rig, split by priority (Urgent / Normal / Routine). Urgent MRs should fulfil faster than Routine.`,
+    "chart-info-fin-mr-buckets":    `<b>Fulfilment Distribution</b> — How many MRs fell into each time bracket. A healthy procurement process keeps most MRs under 30 days.`,
+    "chart-info-fin-mr-trend":      `<b>MR Fulfilment Trend</b> — Monthly average fulfilment days over the last 24 months. A downward trend means procurement is improving.`,
   };
 
   /* ── KPI info tooltip ── */
