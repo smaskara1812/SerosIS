@@ -33,6 +33,7 @@ urlpatterns = [
     path("api/dashboard/", views.dashboard_api, name="dashboard_api"),
     path("api/dashboard/meta/", views.dashboard_meta, name="dashboard_meta"),
     path("api/dashboard/hse/", views.dashboard_hse_api, name="dashboard_hse_api"),
+    path("api/dashboard/hse/hotspot/", views.dashboard_hse_hotspot_api, name="dashboard_hse_hotspot_api"),
     path("api/dashboard/workforce/", views.dashboard_workforce_api, name="dashboard_workforce_api"),
     path("api/dashboard/finance/", views.dashboard_finance_api, name="dashboard_finance_api"),
     path("api/dashboard/finance/meta/", views.dashboard_finance_meta, name="dashboard_finance_meta"),

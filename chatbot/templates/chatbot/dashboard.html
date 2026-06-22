@@ -637,6 +637,10 @@
         <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"></path><polyline points="9 12 11 14 15 10"></polyline></svg></span>
         <span class="sidebar-label">HSE Overview</span>
       </a>
+      <a class="sidebar-item" data-insight="haz-hotspot" title="Hazard Hotspot">
+        <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"></path></svg></span>
+        <span class="sidebar-label">Hazard Hotspot</span>
+      </a>
 
       <div class="sidebar-section-label">Workforce</div>
       <a class="sidebar-item" data-insight="workforce" title="Workforce Overview">
@@ -1009,6 +1013,93 @@
       </div>
 
     </div><!-- /#insight-hse -->
+
+    <!-- ══ Insight: Hazard Hotspot ══ -->
+    <div id="insight-haz-hotspot" class="insight-section">
+      <div class="section-hdr">Hazard Hotspot Analysis</div>
+      <p style="color:#64748b;font-size:13px;margin:0 0 8px">
+        Statistical analysis of hazard patterns across the fleet — no ML, purely frequency-based anomaly detection using mean ± 2σ control limits.
+      </p>
+      <p style="color:#94a3b8;font-size:12px;margin:0 0 16px;display:flex;align-items:center;gap:6px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Year and rig filters do not apply here — control limits need the full dataset to be statistically valid.
+      </p>
+
+      <!-- KPI row -->
+      <div id="haz-spinner" class="spinner-wrap"><div class="spinner"></div></div>
+      <div id="haz-kpis" style="display:none">
+        <div class="kpi-row" style="grid-template-columns:repeat(6,1fr);margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-label">Total Hazards <span class="chart-info" data-kpi="haz-total">i</span></div>
+            <div class="kpi-val" id="haz-kpi-total">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Open <span class="chart-info" data-kpi="haz-open">i</span></div>
+            <div class="kpi-val" id="haz-kpi-open">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Close Rate % <span class="chart-info" data-kpi="haz-close-rate">i</span></div>
+            <div class="kpi-val" id="haz-kpi-closerate">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Avg Close Days <span class="chart-info" data-kpi="haz-avg-close">i</span></div>
+            <div class="kpi-val" id="haz-kpi-avgclose">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Oldest Open (days) <span class="chart-info" data-kpi="haz-oldest">i</span></div>
+            <div class="kpi-val" id="haz-kpi-oldest">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">30+ Days Overdue <span class="chart-info" data-kpi="haz-overdue">i</span></div>
+            <div class="kpi-val" id="haz-kpi-overdue">—</div>
+          </div>
+        </div>
+
+        <!-- Heatmap full width -->
+        <div class="chart-card" style="margin-bottom:20px">
+          <div class="chart-title">Hazard Frequency Heatmap — Rig × Month (Last 24 Months) <span class="chart-info" data-kpi="haz-heatmap">i</span></div>
+          <div class="chart-body" id="chart-haz-heatmap" style="height:320px"></div>
+        </div>
+
+        <!-- Pareto + Closeout by Rig -->
+        <div class="charts-2col" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">Category Pareto — Top 15 Hazard Types <span class="chart-info" data-kpi="haz-pareto">i</span></div>
+            <div class="chart-body" id="chart-haz-pareto" style="height:380px"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Close-out Performance by Rig <span class="chart-info" data-kpi="haz-closeout">i</span></div>
+            <div class="chart-body" id="chart-haz-closeout" style="height:380px"></div>
+          </div>
+        </div>
+
+        <!-- Age distribution + Current open exposure -->
+        <div class="charts-2col" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">Open Hazard Age Distribution <span class="chart-info" data-kpi="haz-age">i</span></div>
+            <div class="chart-body" id="chart-haz-age" style="height:280px"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Current Open Exposure by Rig <span class="chart-info" data-kpi="haz-exposure">i</span></div>
+            <div class="chart-body" id="chart-haz-exposure" style="height:280px"></div>
+          </div>
+        </div>
+
+        <!-- Monthly stacked control chart — full width -->
+        <div class="chart-card" style="margin-bottom:20px">
+          <div class="chart-title">Monthly Hazards by Rig — Control Chart (Mean ± 2σ) <span class="chart-info" data-kpi="haz-control">i</span></div>
+          <div class="chart-body" id="chart-haz-control" style="height:340px"></div>
+        </div>
+
+        <!-- Crew tenure — full width -->
+        <div class="chart-card">
+          <div class="chart-title">Hazard Rate by Crew Tenure <span class="chart-info" data-kpi="haz-tenure">i</span></div>
+          <div id="chart-haz-tenure-wrap">
+            <div class="chart-body" id="chart-haz-tenure" style="height:260px"></div>
+          </div>
+        </div>
+      </div><!-- /#haz-kpis -->
+    </div><!-- /#insight-haz-hotspot -->
 
     <div id="insight-workforce" class="insight-section">
 
@@ -1740,6 +1831,7 @@
     try { localStorage.setItem("lastDashInsight", name); } catch(e) {}
     // Lazy-load HSE data on first visit
     if (name === "hse") loadHse();
+    if (name === "haz-hotspot") loadHazHotspot();
     // Lazy-load Workforce data on first visit (Crew Roster shares the same payload)
     if (name === "workforce" || name === "roster") loadWorkforce();
     // Lazy-load Finance data on first visit
@@ -2432,6 +2524,7 @@
   /* ── Insight 4: HSE Overview renderers ── */
 
   let _hseLoaded = false;
+  let _hazHotspotLoaded = false;
 
   async function loadHse() {
     if (_hseLoaded) return;
@@ -2480,6 +2573,288 @@
     } finally {
       if (spinner) spinner.style.display = "none";
     }
+  }
+
+  /* ── Insight: Hazard Hotspot ── */
+
+  async function loadHazHotspot() {
+    if (_hazHotspotLoaded) return;
+    const spinner = document.getElementById("haz-spinner");
+    if (spinner) spinner.style.display = "flex";
+    try {
+      const r = await fetch("/api/dashboard/hse/hotspot/");
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+
+      // KPI tiles
+      const kpi = d.fleet_kpi || {};
+      document.getElementById("haz-kpi-total").textContent    = (kpi.total    ?? "—").toLocaleString();
+      document.getElementById("haz-kpi-open").textContent     = (kpi.open     ?? "—").toLocaleString();
+      document.getElementById("haz-kpi-closerate").textContent= (kpi.close_rate != null ? kpi.close_rate + "%" : "—");
+      document.getElementById("haz-kpi-avgclose").textContent = (kpi.avg_close_days ?? "—");
+      document.getElementById("haz-kpi-oldest").textContent   = (kpi.max_open_days  ?? "—");
+      document.getElementById("haz-kpi-overdue").textContent  = (kpi.overdue_30     ?? "—").toLocaleString();
+
+      document.getElementById("haz-kpis").style.display = "block";
+
+      _renderHazHeatmap(d.heatmap || []);
+      _renderHazPareto(d.pareto || []);
+      _renderHazCloseout(d.closeout || []);
+      _renderHazAge(d.age_dist || []);
+      _renderHazExposure(d.open_exposure || []);
+      _renderHazControlStacked(d.monthly_by_rig || {});
+      if ((d.crew_tenure || []).length) _renderHazTenure(d.crew_tenure);
+      else document.getElementById("chart-haz-tenure-wrap").innerHTML = `<p style="color:#94a3b8;font-size:13px;padding:20px">No crew tenure data available.</p>`;
+
+      _hazHotspotLoaded = true;
+    } catch (e) {
+      console.error("Hazard Hotspot load error:", e);
+    } finally {
+      if (spinner) spinner.style.display = "none";
+    }
+  }
+
+  function _renderHazHeatmap(rows) {
+    const rigs   = [...new Set(rows.map(r => r.rig))].sort();
+    const months = [...new Set(rows.map(r => r.month))].sort();
+    const lookup = {};
+    rows.forEach(r => { lookup[r.rig + "|" + r.month] = r.count; });
+    const data = [];
+    rigs.forEach((rig, ri) => {
+      months.forEach((mo, mi) => {
+        const v = lookup[rig + "|" + mo] || 0;
+        data.push([mi, ri, v]);
+      });
+    });
+    const maxV = Math.max(...data.map(d => d[2]), 1);
+    const c = initChart("chart-haz-heatmap");
+    if (!c) return;
+    c.setOption({
+      tooltip: { formatter: p => `${rigs[p.data[1]]} · ${months[p.data[0]]}<br/><b>${p.data[2]} hazards</b>` },
+      grid: { top: 20, right: 100, bottom: 60, left: 80 },
+      xAxis: { type: "category", data: months, axisLabel: { rotate: 45, fontSize: 10 } },
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 11 } },
+      visualMap: { min: 0, max: maxV, calculable: true, orient: "vertical", right: 10, top: 20,
+                   inRange: { color: ["#f0fdf4", "#bbf7d0", "#4ade80", "#16a34a", "#14532d"] } },
+      series: [{ type: "heatmap", data, label: { show: maxV < 50, fontSize: 9 },
+                 emphasis: { itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,.3)" } } }]
+    });
+  }
+
+  function _renderHazPareto(rows) {
+    const c = initChart("chart-haz-pareto");
+    if (!c) return;
+    const labels = rows.map(r => r.type);
+    const counts = rows.map(r => r.count);
+    const cumul  = rows.map(r => r.cumul_pct);
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: params => {
+          const i = params[0].dataIndex;
+          return `<b>${labels[i]}</b><br/>Count: <b>${counts[i].toLocaleString()}</b><br/>Cumulative: <b>${cumul[i]}%</b>`;
+        }
+      },
+      legend: { data: ["Count", "Cumulative %"], top: 0, right: 0, textStyle: { fontSize: 11 } },
+      grid: { top: 30, right: 70, bottom: 20, left: 10, containLabel: true },
+      xAxis: [
+        { type: "value", name: "Count", nameTextStyle: { fontSize: 10 } },
+        { type: "value", name: "%", min: 0, max: 100, nameTextStyle: { fontSize: 10 },
+          axisLabel: { formatter: "{value}%" }, splitLine: { show: false } }
+      ],
+      yAxis: [{ type: "category", data: labels,
+                axisLabel: { fontSize: 10, width: 130, overflow: "truncate" },
+                inverse: true }],
+      series: [
+        { name: "Count", type: "bar", xAxisIndex: 0, yAxisIndex: 0,
+          data: counts, barMaxWidth: 18,
+          itemStyle: { color: "#3dbdb0" },
+          label: { show: true, position: "right", fontSize: 9, formatter: "{c}" } },
+        { name: "Cumulative %", type: "line", xAxisIndex: 1, yAxisIndex: 0,
+          data: cumul, symbol: "none",
+          lineStyle: { color: "#f97316", width: 2 },
+          markLine: { data: [{ xAxis: 80, lineStyle: { color: "#94a3b8", type: "dashed" },
+                               label: { formatter: "80%", position: "end", fontSize: 9 } }], silent: true } }
+      ]
+    });
+  }
+
+  function _renderHazCloseout(rows) {
+    const c = initChart("chart-haz-closeout");
+    if (!c) return;
+    const rigs = rows.map(r => r.rig);
+    const avgs = rows.map(r => r.avg_close_days ?? null);
+    const open = rows.map(r => r.open);
+    const bad  = rows.map(r => r.bad_date_count || 0);
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: params => {
+          const i = params[0].dataIndex;
+          let s = `<b>${rigs[i]}</b><br/>Avg close: <b>${avgs[i] != null ? avgs[i] + " days" : "—"}</b><br/>Open cards: <b>${open[i]}</b>`;
+          if (bad[i] > 0) s += `<br/><span style="color:#f97316">⚠ ${bad[i]} records with close date before event date (excluded)</span>`;
+          return s;
+        } },
+      grid: { top: 20, right: 50, bottom: 10, left: 10, containLabel: true },
+      xAxis: { type: "value", name: "Avg Days", nameTextStyle: { fontSize: 10 } },
+      yAxis: { type: "category", data: rigs, axisLabel: { fontSize: 11 }, inverse: true },
+      series: [
+        { type: "bar", data: avgs, barMaxWidth: 18,
+          itemStyle: { color: p => p.data > 30 ? "#dc2626" : p.data > 14 ? "#f97316" : "#3dbdb0" },
+          label: { show: true, position: "right", fontSize: 9, formatter: p => p.value ? p.value + "d" : "—" } }
+      ]
+    });
+  }
+
+  function _renderHazAge(rows) {
+    const c = initChart("chart-haz-age");
+    if (!c) return;
+    const buckets = ["0-7d", "8-14d", "15-30d", "31-60d", "61-90d", "90+d"];
+    const lookup  = Object.fromEntries(rows.map(r => [r.bucket, r.count]));
+    const data    = buckets.map(b => lookup[b] || 0);
+    const colors  = ["#3dbdb0", "#4ade80", "#f97316", "#dc2626", "#991b1b", "#500724"];
+    c.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      grid: { top: 20, right: 20, bottom: 30, left: 20, containLabel: true },
+      xAxis: { type: "category", data: buckets },
+      yAxis: { type: "value", name: "Open Cards" },
+      series: [{ type: "bar", data: data.map((v, i) => ({ value: v, itemStyle: { color: colors[i] } })),
+                 barMaxWidth: 40,
+                 label: { show: true, position: "top", fontSize: 10, formatter: "{c}" } }]
+    });
+  }
+
+  function _renderHazControlStacked(payload) {
+    const c = initChart("chart-haz-control");
+    if (!c) return;
+    const rows = payload.rows || [];
+    const mean = payload.mean || 0;
+    const ucl  = payload.ucl  || 0;
+    const lcl  = payload.lcl  || 0;
+
+    // Build sorted month list and rig list
+    const monthSet = new Set(rows.map(r => r.month));
+    const months   = [...monthSet].sort();
+    const rigSet   = new Set(rows.map(r => r.rig));
+    const rigs     = [...rigSet].sort();
+
+    // Lookup: rig+month → count
+    const lookup = {};
+    rows.forEach(r => { lookup[r.rig + "|" + r.month] = r.count; });
+
+    // Month totals for coloring bars above UCL
+    const monthTotals = months.map(m => rigs.reduce((s, rig) => s + (lookup[rig + "|" + m] || 0), 0));
+
+    const PALETTE = ["#3dbdb0","#1a3f7a","#f97316","#8b5cf6","#dc2626","#059669","#f59e0b","#0ea5e9","#ec4899","#84cc16","#6366f1","#14b8a6"];
+
+    const barSeries = rigs.map((rig, i) => ({
+      name: rig,
+      type: "bar",
+      stack: "hazards",
+      barMaxWidth: 28,
+      itemStyle: { color: PALETTE[i % PALETTE.length] },
+      data: months.map(m => lookup[rig + "|" + m] || 0),
+      emphasis: { focus: "series" },
+    }));
+
+    const lineSeries = [
+      { name: "Mean",  type: "line", data: months.map(() => mean), symbol: "none",
+        lineStyle: { color: "#475569", type: "dashed", width: 1.5 }, z: 10 },
+      { name: "UCL",   type: "line", data: months.map(() => ucl),  symbol: "none",
+        lineStyle: { color: "#dc2626", type: "dashed", width: 1.5 },
+        areaStyle: { color: "rgba(220,38,38,.06)" }, z: 10 },
+      { name: "LCL",   type: "line", data: months.map(() => lcl),  symbol: "none",
+        lineStyle: { color: "#3dbdb0", type: "dashed", width: 1.2 }, z: 10 },
+    ];
+
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: params => {
+          const mo = params[0]?.axisValue;
+          const idx = months.indexOf(mo);
+          const total = monthTotals[idx] || 0;
+          const flag  = total > ucl ? " 🔺 above UCL" : total < lcl ? " 🔻 below LCL" : "";
+          let html = `<b>${mo}</b>  total: <b>${total}</b>${flag}<br/>`;
+          params.filter(p => p.seriesType === "bar" && p.value > 0)
+                .sort((a, b) => b.value - a.value)
+                .forEach(p => { html += `${p.marker}${p.seriesName}: <b>${p.value}</b><br/>`; });
+          html += `<span style="color:#94a3b8;font-size:11px">Mean ${mean} · UCL ${ucl} · LCL ${lcl}</span>`;
+          return html;
+        }
+      },
+      legend: { type: "scroll", top: 0, textStyle: { fontSize: 10 } },
+      grid: { top: 40, right: 20, bottom: 50, left: 20, containLabel: true },
+      xAxis: { type: "category", data: months, axisLabel: { rotate: 45, fontSize: 9 } },
+      yAxis: { type: "value", name: "Hazards" },
+      series: [...barSeries, ...lineSeries],
+    });
+  }
+
+  function _renderHazExposure(rows) {
+    const c = initChart("chart-haz-exposure");
+    if (!c) return;
+    // Sort by open count desc, filter rigs with at least some open
+    const sorted = [...rows].sort((a, b) => b.open - a.open);
+    const rigs     = sorted.map(r => r.rig);
+    const open     = sorted.map(r => r.open || 0);
+    const overdue  = sorted.map(r => r.overdue_30 || 0);
+    const oldest   = sorted.map(r => r.oldest_open_days ?? null);
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: params => {
+          const i  = params[0].dataIndex;
+          const ag = oldest[i] != null ? oldest[i] + "d" : "—";
+          return `<b>${rigs[i]}</b><br/>Open: <b>${open[i]}</b><br/>30+ days overdue: <b>${overdue[i]}</b><br/>Oldest open: <b>${ag}</b>`;
+        }
+      },
+      legend: { data: ["Open", "30+ Days Overdue"], top: 0, textStyle: { fontSize: 10 } },
+      grid: { top: 30, right: 20, bottom: 10, left: 10, containLabel: true },
+      xAxis: { type: "value" },
+      yAxis: { type: "category", data: rigs, inverse: true, axisLabel: { fontSize: 11 } },
+      series: [
+        { name: "Open", type: "bar", data: open, barMaxWidth: 16,
+          itemStyle: { color: "#f97316" },
+          label: { show: true, position: "right", fontSize: 9, formatter: "{c}" } },
+        { name: "30+ Days Overdue", type: "bar", data: overdue, barMaxWidth: 16,
+          itemStyle: { color: "#dc2626" },
+          label: { show: true, position: "right", fontSize: 9,
+                   formatter: p => p.value > 0 ? p.value : "" } },
+      ]
+    });
+  }
+
+  function _renderHazTenure(rows) {
+    const c = initChart("chart-haz-tenure");
+    if (!c) return;
+    const order  = ["0-14d", "15-28d", "29-56d", "57+d"];
+    const sorted = order.map(b => rows.find(r => r.tenure_bucket === b)).filter(Boolean);
+    const labels = sorted.map(r => r.tenure_bucket);
+    const rates  = sorted.map(r => r.rate_per_person);
+    const counts = sorted.map(r => r.hazard_count);
+    c.setOption({
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        formatter: params => {
+          const i = params[0].dataIndex;
+          return `<b>${labels[i]}</b><br/>Rate/person: <b>${rates[i]}</b><br/>Total hazards: <b>${counts[i]}</b>`;
+        }
+      },
+      legend: { data: ["Rate per Person", "Total Hazards"], top: 0, textStyle: { fontSize: 10 } },
+      grid: { top: 30, right: 60, bottom: 30, left: 20, containLabel: true },
+      xAxis: { type: "category", data: labels },
+      yAxis: [
+        { type: "value", name: "Rate/person", nameTextStyle: { fontSize: 9 } },
+        { type: "value", name: "Count", nameTextStyle: { fontSize: 9 }, splitLine: { show: false } }
+      ],
+      series: [
+        { name: "Rate per Person", type: "bar", data: rates, yAxisIndex: 0, barMaxWidth: 40,
+          itemStyle: { color: "#f97316" },
+          label: { show: true, position: "top", fontSize: 9, formatter: p => p.value.toFixed(3) } },
+        { name: "Total Hazards", type: "line", data: counts, yAxisIndex: 1,
+          symbol: "circle", symbolSize: 6,
+          lineStyle: { color: "#1a3f7a" }, itemStyle: { color: "#1a3f7a" } }
+      ]
+    });
   }
 
   // Preferred colors for known hazard types — falls back to PALETTE for any new type added in DB
@@ -3284,10 +3659,14 @@
   }
 
   async function loadDashboard() {
-    _hseLoaded = false;  // force HSE reload on filter change
+    _hseLoaded = false;
+    _hazHotspotLoaded = false;
     // If HSE tab is active, reload it now so filter change takes effect
     if (document.getElementById("insight-hse")?.classList.contains("active")) {
       loadHse();
+    }
+    if (document.getElementById("insight-haz-hotspot")?.classList.contains("active")) {
+      loadHazHotspot();
     }
     _workforceLoaded = false;  // force Workforce/Roster reload on filter change
     if (document.getElementById("insight-workforce")?.classList.contains("active")
@@ -3645,6 +4024,21 @@
     "chart-info-chart-wf-cert-types":           `<b>Expiring Certificate Types</b> — Which certifications have the most expired or soon-to-expire records.`,
     "chart-info-roster-table":                  `<b>Crew Roster</b> — Live crew count, top designations, and rotation status per rig.`,
     "chart-info-roster-composition":            `<b>Workforce Composition</b> — Everyone with an open service record right now, split by rig type and whether they're on board or in another status (off board, leave, standby).`,
+    // ── Hazard Hotspot ─────────────────────────────────────────────────────────
+    "haz-total":      `<b>Total Hazards</b> — All hazard ID cards ever submitted, across all rigs and all time.`,
+    "haz-open":       `<b>Open Hazards</b> — Cards with status "Open" — not yet closed out. Target: trend toward zero.`,
+    "haz-close-rate": `<b>Close Rate %</b> — Closed cards ÷ total cards × 100. Measures how well the fleet resolves raised hazards.`,
+    "haz-avg-close":  `<b>Avg Close Days</b> — Mean days from hazard event date to close-out date, for all closed cards.`,
+    "haz-oldest":     `<b>Oldest Open Card (days)</b> — Age in days of the longest-outstanding open hazard card across the fleet.`,
+    "haz-overdue":    `<b>30+ Days Overdue</b> — Open cards that have been outstanding for more than 30 days without close-out.`,
+    "haz-heatmap":    `<b>Hazard Frequency Heatmap</b> — Each cell = number of hazards raised on that rig in that month (last 24 months). Darker = higher frequency. Helps spot rigs or time windows with elevated reporting.`,
+    "haz-pareto":     `<b>Category Pareto</b> — Top 15 hazard types by total count (bars, left axis) with cumulative % line (right axis). Roughly 80% of hazards typically come from a small subset of types.`,
+    "haz-closeout":   `<b>Close-out by Rig</b> — Average days to close a hazard card, per rig. Longer bars = slower resolution. Helps identify rigs where hazard management needs attention.`,
+    "haz-age":        `<b>Open Age Distribution</b> — Current open cards bucketed by how long they've been outstanding. A healthy fleet keeps most cards under 14 days.`,
+    "haz-control":    `<b>Monthly Control Chart</b> — Hazards reported per month (last 36 months). UCL/LCL = mean ± 2σ computed across all months. Points above UCL signal statistically unusual spikes worth investigating.`,
+    "haz-exposure":   `<b>Current Open Exposure by Rig</b> — Snapshot of right now: how many hazard cards are still open per rig (orange) and how many of those have been outstanding for more than 30 days without close-out (red). A rig with high open + high overdue needs management attention.`,
+    "haz-control":    `<b>Monthly Hazards by Rig — Control Chart</b> — Each bar is one month (last 24 months), stacked by rig so you can see which rig drove any spike. UCL/LCL = mean ± 2σ across all months. Bars touching or exceeding the UCL (red dashed line) are statistically unusual — hover to see the breakdown.`,
+    "haz-tenure":     `<b>Hazard Rate by Crew Tenure</b> — Hazards per person for crew grouped by how long they've been on the rig (0–14d, 15–28d, etc.). Higher rate early may indicate new-crew orientation risk. Last 2 years.`,
     // ── Finance ──────────────────────────────────────────────────────────────
     "kpi-fin-total-spend":      `<b>Total Invoice Spend</b> — Sum of all invoice amounts for the selected year.`,
     "kpi-fin-vendor-count":     `<b>Vendor Count</b> — Number of distinct vendors invoiced in the selected period.`,

@@ -743,6 +743,12 @@ def dashboard_hse_api(request):
     return JsonResponse(_build_hse(year, rig_filter))
 
 
+@require_GET
+def dashboard_hse_hotspot_api(request):
+    from .analytics.hse import get_haz_hotspot_data
+    return JsonResponse(get_haz_hotspot_data())
+
+
 def _build_workforce(year, rig_filter):
     from .analytics.tools import get_workforce_dashboard
     rig = rig_filter[0] if rig_filter else None
