@@ -2908,21 +2908,18 @@
         trigger: "item",
         formatter: p => {
           const pct = grandTotal ? ((p.value / grandTotal) * 100).toFixed(1) : "—";
-          return `${p.name}<br/>Spend: <b>${fmtINR(p.value)}</b> (${pct}%)`;
+          const hint = p.name !== "Others" ? `<br/><span style="opacity:0.6;font-size:0.75em">Click to view invoices</span>` : "";
+          return `${p.name}<br/>Spend: <b>${fmtINR(p.value)}</b> (${pct}%)${hint}`;
         },
       },
       legend: { type: "scroll", bottom: 4, textStyle: { fontSize: 10 }, itemGap: 6 },
       series: [{
         type: "pie", radius: ["36%", "62%"], center: ["50%", "44%"],
         data,
-        // Labels inside the slice only for slices ≥ 8% — avoids outside clipping entirely
         label: {
-          show: true,
-          position: "inside",
+          show: true, position: "inside",
           formatter: p => p.percent >= 8 ? p.percent.toFixed(0) + "%" : "",
-          fontSize: 11,
-          color: "#fff",
-          fontWeight: "bold",
+          fontSize: 11, color: "#fff", fontWeight: "bold",
         },
         labelLine: { show: false },
         emphasis: {
@@ -2937,12 +2934,12 @@
     const wrap = document.getElementById("fin-vendor-table-wrap");
     if (!wrap) return;
     if (!vendors.length) { wrap.innerHTML = `<p style="padding:12px;color:#94a3b8;">No invoice data.</p>`; return; }
-    const rows = vendors.map(v => {
+    const rows = vendors.map((v, i) => {
       const pct = grandTotal ? ((v.total_spend / grandTotal) * 100).toFixed(1) : "—";
       return `<tr>
         <td style="padding:5px 8px;border-bottom:1px solid #1e293b;">${v.vendor}</td>
         <td style="padding:5px 8px;border-bottom:1px solid #1e293b;text-align:right;">${fmtINR(v.total_spend)}</td>
-        <td style="padding:5px 8px;border-bottom:1px solid #1e293b;text-align:right;">${v.invoice_count}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #1e293b;text-align:right;">${v.invoice_count ?? "—"}</td>
         <td style="padding:5px 8px;border-bottom:1px solid #1e293b;text-align:right;">${pct}%</td>
       </tr>`;
     }).join("");
@@ -3702,5 +3699,6 @@
     } catch(e) {}
   })();
 </script>
+
 </body>
 </html>

@@ -617,3 +617,128 @@ def get_crew_rotation_listing(
         "rows": rows,
         **_paginate(total, page, page_size),
     }
+
+
+# ── Invoice Listing ───────────────────────────────────────────────────────────
+
+INVOICE_SORT_COLUMNS = {
+    "date":   "i.Invoice_Dt",
+    "amount": "i.Invoice_Amt",
+    "vendor": "v.Vendor_Name",
+    "l1":     "i.L1_Approval_Status",
+    "l2":     "i.L2_Approval_Status",
+    "l3":     "i.L3_Approval_Status",
+}
+
+_APPROVAL_LABEL = {"A": "Approved", "R": "Rejected", "P": "Pending"}
+
+
+def get_invoice_listing(
+    page: int | None = None,
+    page_size: int | None = None,
+    year: int | None = None,
+    vendor: str | None = None,
+    search: str | None = None,
+    sort: str | None = None,
+    sort_dir: str | None = None,
+) -> dict:
+    page      = _clean_page(page)
+    page_size = _clean_page_size(page_size)
+
+    conditions = [
+        "COALESCE(i.Marked_As_Deleted, '') != 'Y'",
+        "i.Invoice_Amt IS NOT NULL",
+    ]
+    params: list = []
+
+    if year:
+        conditions.append("YEAR(i.Invoice_Dt) = %s")
+        params.append(year)
+    if vendor:
+        conditions.append("v.Vendor_Name = %s")
+        params.append(vendor)
+    if search:
+        conditions.append("""(
+            i.Invoice_No      LIKE %s OR
+            v.Vendor_Name     LIKE %s OR
+            i.PO_No           LIKE %s OR
+            i.IMS_No          LIKE %s OR
+            i.Inv_Hdr_Remarks LIKE %s
+        )""")
+        like = f"%{search}%"
+        params.extend([like, like, like, like, like])
+
+    where = " AND ".join(conditions)
+
+    total_rows = _query(f"""
+        SELECT COUNT(*) AS cnt
+        FROM eos_Invoice_Hdr i
+        JOIN Mstx_Vendor v ON i.Vendor_Id = v.Vendor_Id
+        WHERE {where}
+    """, tuple(params))
+    total = total_rows[0]["cnt"] if total_rows else 0
+
+    sort_col = INVOICE_SORT_COLUMNS.get(sort, "i.Invoice_Dt")
+    sort_dir = "ASC" if sort_dir == "asc" else "DESC"
+    offset   = (page - 1) * page_size
+
+    rows = _query(f"""
+        SELECT
+            i.Invoice_Hdr_Id              AS id,
+            i.Invoice_No                  AS invoice_no,
+            DATE(i.Invoice_Dt)            AS date,
+            v.Vendor_Name                 AS vendor,
+            i.Invoice_Amt                 AS amount,
+            i.PO_No                       AS po_no,
+            i.IMS_No                      AS ims_no,
+            i.L1_Approval_Status          AS l1_status,
+            DATE(i.L1_Approval_Dt)        AS l1_dt,
+            i.L2_Approval_Status          AS l2_status,
+            DATE(i.L2_Approval_Dt)        AS l2_dt,
+            i.L3_Approval_Status          AS l3_status,
+            DATE(i.L3_Approval_Dt)        AS l3_dt,
+            DATE(i.Verification_Dt)       AS verified_dt,
+            i.Service_Rating              AS service_rating,
+            i.SAP_Document_No             AS sap_doc_no,
+            DATE(i.SAP_Posting_Dt)        AS sap_posting_dt,
+            i.Inv_Hdr_Remarks             AS remarks
+        FROM eos_Invoice_Hdr i
+        JOIN Mstx_Vendor v ON i.Vendor_Id = v.Vendor_Id
+        WHERE {where}
+        ORDER BY {sort_col} {sort_dir}
+        LIMIT %s OFFSET %s
+    """, tuple(params) + (page_size, offset))
+
+    def _str(v):
+        return str(v) if v is not None else None
+
+    serialised = []
+    for r in rows:
+        serialised.append({
+            "id":             r["id"],
+            "invoice_no":     r["invoice_no"] or "—",
+            "date":           _str(r["date"]),
+            "vendor":         r["vendor"],
+            "amount":         float(r["amount"]) if r["amount"] is not None else None,
+            "po_no":          r["po_no"] or "—",
+            "ims_no":         r["ims_no"] or "—",
+            "l1_status":      r["l1_status"],
+            "l1_label":       _APPROVAL_LABEL.get(r["l1_status"] or "", r["l1_status"] or "—"),
+            "l1_dt":          _str(r["l1_dt"]),
+            "l2_status":      r["l2_status"],
+            "l2_label":       _APPROVAL_LABEL.get(r["l2_status"] or "", r["l2_status"] or "—"),
+            "l2_dt":          _str(r["l2_dt"]),
+            "l3_status":      r["l3_status"],
+            "l3_label":       _APPROVAL_LABEL.get(r["l3_status"] or "", r["l3_status"] or "—"),
+            "l3_dt":          _str(r["l3_dt"]),
+            "verified_dt":    _str(r["verified_dt"]),
+            "service_rating": r["service_rating"] or "—",
+            "sap_doc_no":     r["sap_doc_no"] or "—",
+            "sap_posting_dt": _str(r["sap_posting_dt"]),
+            "remarks":        r["remarks"] or "",
+        })
+
+    return {
+        "rows": serialised,
+        **_paginate(total, page, page_size),
+    }

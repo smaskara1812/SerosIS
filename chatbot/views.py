@@ -760,9 +760,6 @@ def dashboard_workforce_api(request):
 
 # ── Finance dashboard ─────────────────────────────────────────────────────────
 
-def dashboard_finance_page(request):
-    return render(request, "chatbot/finance_dashboard.html")
-
 
 @require_http_methods(["GET"])
 def dashboard_finance_meta(request):
@@ -991,6 +988,51 @@ def listings_staff_api(request):
         dept=g.get("dept") or None,
         status=g.get("status") or None,
         gender=g.get("gender") or None,
+        search=g.get("search") or None,
+        sort=g.get("sort") or None,
+        sort_dir=g.get("sort_dir") or None,
+    )
+    return JsonResponse(data)
+
+
+def listings_invoices_page(request):
+    return render(request, "chatbot/listings/invoices.html")
+
+
+@require_GET
+def listings_invoices_meta_api(request):
+    from .analytics.tools import _query
+    years   = _query("""
+        SELECT DISTINCT YEAR(Invoice_Dt) AS yr
+        FROM eos_Invoice_Hdr
+        WHERE COALESCE(Marked_As_Deleted, '') != 'Y' AND Invoice_Amt IS NOT NULL
+        ORDER BY yr DESC
+    """)
+    vendors = _query("""
+        SELECT DISTINCT v.Vendor_Name AS name
+        FROM eos_Invoice_Hdr i
+        JOIN Mstx_Vendor v ON i.Vendor_Id = v.Vendor_Id
+        WHERE COALESCE(i.Marked_As_Deleted, '') != 'Y' AND i.Invoice_Amt IS NOT NULL
+        ORDER BY v.Vendor_Name
+    """)
+    return JsonResponse({
+        "years":   [r["yr"] for r in years],
+        "vendors": [r["name"] for r in vendors],
+    })
+
+
+@require_GET
+def listings_invoices_api(request):
+    from .analytics.listings import get_invoice_listing
+    g = request.GET
+    page      = g.get("page")
+    page_size = g.get("page_size")
+    year      = g.get("year")
+    data = get_invoice_listing(
+        page=int(page) if page and page.isdigit() else None,
+        page_size=int(page_size) if page_size and page_size.isdigit() else None,
+        year=int(year) if year and year.isdigit() else None,
+        vendor=g.get("vendor") or None,
         search=g.get("search") or None,
         sort=g.get("sort") or None,
         sort_dir=g.get("sort_dir") or None,

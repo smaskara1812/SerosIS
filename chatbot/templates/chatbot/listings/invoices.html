@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoices — Seros Listings</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5; min-height: 100vh;
+    }
+    .nav {
+      background: #1a3f7a; color: #fff; padding: 0 28px; height: 54px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    }
+    .nav-brand { font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .nav-brand span { opacity: 0.45; font-weight: 400; font-size: 0.8rem; }
+    .nav-links { display: flex; gap: 20px; align-items: center; }
+    .nav-links a { color: rgba(255,255,255,0.55); text-decoration: none; font-size: 0.85rem; transition: color 0.15s; }
+    .nav-links a:hover, .nav-links a.active { color: #fff; }
+
+    .page-body { padding: 24px 28px 48px; max-width: 1600px; margin: 0 auto; }
+    .page-title { font-size: 1.25rem; font-weight: 700; color: #1a3f7a; margin-bottom: 16px; }
+
+    /* Filter bar */
+    .filter-bar {
+      background: #fff; border-radius: 10px; padding: 14px 18px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07); margin-bottom: 16px;
+    }
+    .filter-bar label { font-size: 0.7rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; }
+    .filter-bar select, .filter-bar input[type="text"] {
+      border: 1px solid #e2e8f0; border-radius: 7px; padding: 6px 10px;
+      font-size: 0.83rem; color: #1a3f7a; font-family: inherit; outline: none; transition: border-color 0.15s;
+    }
+    .filter-bar select:focus, .filter-bar input:focus { border-color: #1a3f7a; }
+    #search-input { width: 220px; }
+    .filter-spacer { flex: 1; }
+    .results-count { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+    .export-btn {
+      background: #1a3f7a; color: #fff; border: none; border-radius: 7px;
+      padding: 7px 14px; font-size: 0.82rem; font-family: inherit; cursor: pointer; transition: background 0.12s;
+    }
+    .export-btn:hover { background: #0f2a6a; }
+
+    /* Table */
+    .listing-table-wrap {
+      background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden;
+    }
+    table.listing-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    .listing-table th {
+      text-align: left; font-size: 0.7rem; font-weight: 700; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: 0.5px; padding: 12px 14px;
+      border-bottom: 2px solid #f1f5f9; white-space: nowrap; cursor: pointer; user-select: none;
+    }
+    .listing-table th.sortable:hover { color: #1a3f7a; }
+    .listing-table th .sort-arrow { font-size: 0.65rem; margin-left: 3px; opacity: 0.5; }
+    .listing-table th.sorted .sort-arrow { opacity: 1; color: #1a3f7a; }
+    .listing-table td { padding: 11px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+    .listing-table tr.row-main { cursor: pointer; }
+    .listing-table tr.row-main.row-odd td  { background: #fff; }
+    .listing-table tr.row-main.row-even td { background: #f6f8fa; }
+    .listing-table tr.row-main:hover td { background: #eef2f7; }
+    .listing-table td.sr-no { color: #94a3b8; font-size: 0.78rem; }
+    .listing-table tr.row-detail { display: none; }
+    .listing-table tr.row-detail.open { display: table-row; }
+    .listing-table tr.row-detail.row-odd td  { background: #fff; }
+    .listing-table tr.row-detail.row-even td { background: #f6f8fa; }
+
+    .badge { display: inline-block; border-radius: 10px; padding: 2px 9px; font-size: 0.74rem; font-weight: 700; white-space: nowrap; }
+    .badge.approved { background: #f0fdf4; color: #16a34a; }
+    .badge.rejected { background: #fef2f2; color: #dc2626; }
+    .badge.pending  { background: #fffbeb; color: #d97706; }
+    .badge.na       { background: #f1f5f9; color: #94a3b8; }
+
+
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+    .detail-field { font-size: 0.8rem; }
+    .detail-field-label { font-size: 0.68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+    .detail-field-value { color: #334155; line-height: 1.5; }
+    .detail-full { grid-column: 1 / -1; }
+
+    .empty-state { padding: 60px 0; text-align: center; color: #94a3b8; font-size: 0.9rem; }
+    .loading-row td { text-align: center; padding: 40px; color: #94a3b8; }
+
+    /* Pagination */
+    .pagination-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; gap: 12px; flex-wrap: wrap;
+    }
+    .pagination-bar .page-info { font-size: 0.8rem; color: #64748b; }
+    .page-btns { display: flex; gap: 6px; align-items: center; }
+    .page-btn {
+      border: 1px solid #e2e8f0; background: #fff; border-radius: 6px;
+      padding: 5px 11px; font-size: 0.8rem; color: #1a3f7a; cursor: pointer; transition: background 0.12s;
+    }
+    .page-btn:hover:not(:disabled) { background: #f1f5f9; }
+    .page-btn:disabled { color: #cbd5e1; cursor: default; }
+    .page-btn.active { background: #1a3f7a; color: #fff; border-color: #1a3f7a; }
+    .page-size-sel { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 8px; font-size: 0.8rem; color: #1a3f7a; font-family: inherit; outline: none; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">Seros AI <span>/ Invoices</span></div>
+  <div class="nav-links">
+    <a href="/">Chat</a>
+    <a href="/dashboard/">Dashboard</a>
+    <a href="/listings/" class="active">Listings</a>
+    <a href="/health/">Health</a>
+    <a href="/manuals/">Manuals</a>
+  </div>
+</nav>
+
+<div class="page-body">
+  <div class="page-title">Invoice Register</div>
+
+  <div class="filter-bar">
+    <label>Year</label>
+    <select id="filter-year"><option value="">All years</option></select>
+
+    <label>Vendor</label>
+    <select id="filter-vendor"><option value="">All vendors</option></select>
+
+    <label>Search</label>
+    <input type="text" id="search-input" placeholder="Invoice #, PO #, IMS #, vendor…" />
+
+    <div class="filter-spacer"></div>
+    <span class="results-count" id="results-count"></span>
+    <button class="export-btn" id="export-btn">Export CSV</button>
+  </div>
+
+  <div class="listing-table-wrap">
+    <table class="listing-table" id="main-table">
+      <thead>
+        <tr>
+          <th style="width:42px">#</th>
+          <th class="sortable" data-sort="date">Date <span class="sort-arrow">↕</span></th>
+          <th>Invoice No</th>
+          <th class="sortable" data-sort="vendor">Vendor <span class="sort-arrow">↕</span></th>
+          <th class="sortable" data-sort="amount" style="text-align:right">Amount <span class="sort-arrow">↕</span></th>
+          <th>PO No</th>
+          <th class="sortable" data-sort="l1">L1 <span class="sort-arrow">↕</span></th>
+          <th class="sortable" data-sort="l2">L2 <span class="sort-arrow">↕</span></th>
+          <th class="sortable" data-sort="l3">L3 <span class="sort-arrow">↕</span></th>
+          <th style="width:28px"></th>
+        </tr>
+      </thead>
+      <tbody id="table-body">
+        <tr class="loading-row"><td colspan="10">Loading…</td></tr>
+      </tbody>
+    </table>
+    <div class="pagination-bar" id="pagination-bar" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="page-info" id="page-info"></span>
+        <select class="page-size-sel" id="page-size-sel">
+          <option value="25">25 / page</option>
+          <option value="50" selected>50 / page</option>
+          <option value="75">75 / page</option>
+          <option value="100">100 / page</option>
+        </select>
+      </div>
+      <div class="page-btns" id="page-btns"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let _state = { page: 1, pageSize: 50, sort: "date", sortDir: "desc", year: "", vendor: "", search: "" };
+  let _debounce = null;
+
+  function fmtINR(v) {
+    if (v == null || isNaN(+v)) return "—";
+    const n = Math.abs(+v);
+    if (n >= 1e7) return "₹" + (n / 1e7).toFixed(2) + " Cr";
+    if (n >= 1e5) return "₹" + (n / 1e5).toFixed(2) + " L";
+    if (n >= 1e3) return "₹" + (n / 1e3).toFixed(1) + "K";
+    return "₹" + n.toFixed(0);
+  }
+
+  function approvalBadge(status, label) {
+    if (!status) return `<span class="badge na">—</span>`;
+    const cls = status === "A" ? "approved" : status === "R" ? "rejected" : "pending";
+    return `<span class="badge ${cls}">${label}</span>`;
+  }
+
+  async function loadMeta() {
+    const res  = await fetch("/api/listings/invoices/meta/");
+    const data = await res.json();
+    const ySel = document.getElementById("filter-year");
+    for (const yr of data.years || []) {
+      const o = document.createElement("option"); o.value = yr; o.textContent = yr; ySel.appendChild(o);
+    }
+    const vSel = document.getElementById("filter-vendor");
+    for (const v of data.vendors || []) {
+      const o = document.createElement("option"); o.value = v; o.textContent = v; vSel.appendChild(o);
+    }
+  }
+
+  async function load() {
+    const params = new URLSearchParams({
+      page: _state.page, page_size: _state.pageSize,
+      sort: _state.sort, sort_dir: _state.sortDir,
+    });
+    if (_state.year)   params.set("year", _state.year);
+    if (_state.vendor) params.set("vendor", _state.vendor);
+    if (_state.search) params.set("search", _state.search);
+
+    const tbody = document.getElementById("table-body");
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="10">Loading…</td></tr>`;
+
+    const res  = await fetch("/api/listings/invoices/?" + params.toString());
+    const data = await res.json();
+    const rows = data.rows || [];
+    const pg   = data;
+
+    document.getElementById("results-count").textContent =
+      `${pg.total.toLocaleString()} invoice${pg.total !== 1 ? "s" : ""}`;
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">No invoices match your filters.</div></td></tr>`;
+      document.getElementById("pagination-bar").style.display = "none";
+      return;
+    }
+
+    const offset = (_state.page - 1) * _state.pageSize;
+    tbody.innerHTML = rows.map((r, i) => {
+      const cls  = i % 2 === 0 ? "row-odd" : "row-even";
+      const srNo = offset + i + 1;
+      return `
+        <tr class="row-main ${cls}" data-idx="${i}">
+          <td class="sr-no">${srNo}</td>
+          <td>${r.date || "—"}</td>
+          <td style="font-family:monospace;font-size:0.8rem">${r.invoice_no}</td>
+          <td>${r.vendor}</td>
+          <td style="text-align:right;font-weight:600">${fmtINR(r.amount)}</td>
+          <td style="font-size:0.78rem;color:#64748b">${r.po_no}</td>
+          <td>${approvalBadge(r.l1_status, r.l1_label)}</td>
+          <td>${approvalBadge(r.l2_status, r.l2_label)}</td>
+          <td>${approvalBadge(r.l3_status, r.l3_label)}</td>
+          <td style="color:#94a3b8;font-size:0.75rem" class="expand-arrow">▶</td>
+        </tr>
+        <tr class="row-detail ${cls}" data-detail="${i}">
+          <td colspan="10" style="padding:14px 20px 18px">
+            <div class="detail-grid">
+              <div class="detail-field">
+                <div class="detail-field-label">IMS No</div>
+                <div class="detail-field-value">${r.ims_no}</div>
+              </div>
+              <div class="detail-field">
+                <div class="detail-field-label">L1 Decision</div>
+                <div class="detail-field-value">${r.l1_label}${r.l1_dt ? " · " + r.l1_dt : ""}</div>
+              </div>
+              <div class="detail-field">
+                <div class="detail-field-label">L2 Decision</div>
+                <div class="detail-field-value">${r.l2_label}${r.l2_dt ? " · " + r.l2_dt : ""}</div>
+              </div>
+              <div class="detail-field">
+                <div class="detail-field-label">L3 Decision</div>
+                <div class="detail-field-value">${r.l3_label}${r.l3_dt ? " · " + r.l3_dt : ""}</div>
+              </div>
+              <div class="detail-field">
+                <div class="detail-field-label">Verified On</div>
+                <div class="detail-field-value">${r.verified_dt || "—"}</div>
+              </div>
+              <div class="detail-field">
+                <div class="detail-field-label">Service Rating</div>
+                <div class="detail-field-value">${r.service_rating}</div>
+              </div>
+              <div class="detail-field">
+                <div class="detail-field-label">SAP Doc No</div>
+                <div class="detail-field-value">${r.sap_doc_no}</div>
+              </div>
+              <div class="detail-field">
+                <div class="detail-field-label">SAP Posted</div>
+                <div class="detail-field-value">${r.sap_posting_dt || "—"}</div>
+              </div>
+              ${r.remarks ? `<div class="detail-field detail-full">
+                <div class="detail-field-label">Remarks</div>
+                <div class="detail-field-value">${r.remarks}</div>
+              </div>` : ""}
+            </div>
+          </td>
+        </tr>`;
+    }).join("");
+
+    // Row expand/collapse
+    tbody.querySelectorAll("tr.row-main").forEach(tr => {
+      tr.addEventListener("click", () => {
+        const idx    = tr.dataset.idx;
+        const detail = tbody.querySelector(`tr[data-detail="${idx}"]`);
+        const arrow  = tr.querySelector(".expand-arrow");
+        const open   = detail.classList.toggle("open");
+        if (arrow) arrow.textContent = open ? "▼" : "▶";
+      });
+    });
+
+    // Pagination
+    renderPagination(pg);
+  }
+
+  function renderPagination(pg) {
+    const bar = document.getElementById("pagination-bar");
+    bar.style.display = "flex";
+    const start = (_state.page - 1) * _state.pageSize + 1;
+    const end   = Math.min(_state.page * _state.pageSize, pg.total);
+    document.getElementById("page-info").textContent = `Showing ${start}–${end} of ${pg.total.toLocaleString()}`;
+
+    const btns = document.getElementById("page-btns");
+    btns.innerHTML = "";
+    const addBtn = (label, page, disabled, active) => {
+      const b = document.createElement("button");
+      b.className = "page-btn" + (active ? " active" : "");
+      b.textContent = label; b.disabled = disabled;
+      b.addEventListener("click", () => { _state.page = page; load(); });
+      btns.appendChild(b);
+    };
+    addBtn("‹ Prev", _state.page - 1, _state.page <= 1, false);
+    const total_pages = pg.total_pages;
+    let pages = [];
+    if (total_pages <= 7) {
+      pages = Array.from({length: total_pages}, (_, i) => i + 1);
+    } else {
+      pages = [1];
+      if (_state.page > 3) pages.push("…");
+      for (let p = Math.max(2, _state.page - 1); p <= Math.min(total_pages - 1, _state.page + 1); p++) pages.push(p);
+      if (_state.page < total_pages - 2) pages.push("…");
+      pages.push(total_pages);
+    }
+    for (const p of pages) {
+      if (p === "…") { const s = document.createElement("span"); s.textContent = "…"; s.style.cssText = "padding:0 4px;color:#94a3b8"; btns.appendChild(s); }
+      else addBtn(p, p, false, p === _state.page);
+    }
+    addBtn("Next ›", _state.page + 1, _state.page >= total_pages, false);
+  }
+
+  // Sort headers
+  document.querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const s = th.dataset.sort;
+      if (_state.sort === s) {
+        _state.sortDir = _state.sortDir === "desc" ? "asc" : "desc";
+      } else {
+        _state.sort = s; _state.sortDir = "desc";
+      }
+      _state.page = 1;
+      document.querySelectorAll("th.sortable").forEach(t => t.classList.remove("sorted"));
+      th.classList.add("sorted");
+      th.querySelector(".sort-arrow").textContent = _state.sortDir === "desc" ? "↓" : "↑";
+      load();
+    });
+  });
+  // Default sort arrow
+  document.querySelector(`th[data-sort="${_state.sort}"]`)?.classList.add("sorted");
+
+  // Filter listeners
+  document.getElementById("filter-year").addEventListener("change", e => {
+    _state.year = e.target.value; _state.page = 1; load();
+  });
+  document.getElementById("filter-vendor").addEventListener("change", e => {
+    _state.vendor = e.target.value; _state.page = 1; load();
+  });
+  document.getElementById("search-input").addEventListener("input", e => {
+    clearTimeout(_debounce);
+    _debounce = setTimeout(() => { _state.search = e.target.value.trim(); _state.page = 1; load(); }, 350);
+  });
+  document.getElementById("page-size-sel").addEventListener("change", e => {
+    _state.pageSize = +e.target.value; _state.page = 1; load();
+  });
+
+  // CSV export
+  document.getElementById("export-btn").addEventListener("click", async () => {
+    const params = new URLSearchParams({
+      page: 1, page_size: 2000,
+      sort: _state.sort, sort_dir: _state.sortDir,
+    });
+    if (_state.year)   params.set("year", _state.year);
+    if (_state.vendor) params.set("vendor", _state.vendor);
+    if (_state.search) params.set("search", _state.search);
+    const res  = await fetch("/api/listings/invoices/?" + params.toString());
+    const data = await res.json();
+    const headers = ["Date","Invoice No","Vendor","Amount","PO No","IMS No","L1","L2","L3","SAP Doc","SAP Posted","Remarks"];
+    const csvRows = [headers.join(",")];
+    for (const r of data.rows || []) {
+      csvRows.push([
+        r.date, r.invoice_no, `"${r.vendor}"`, r.amount,
+        r.po_no, r.ims_no,
+        r.l1_label, r.l2_label, r.l3_label,
+        r.sap_doc_no, r.sap_posting_dt,
+        `"${(r.remarks || "").replace(/"/g, '""')}"`
+      ].join(","));
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const a    = document.createElement("a");
+    a.href     = URL.createObjectURL(blob);
+    a.download = `invoices_${_state.year || "all"}.csv`;
+    a.click();
+  });
+
+  // Check if opened with a pre-set vendor (from dashboard drill-through)
+  (async () => {
+    await loadMeta();
+    const urlParams = new URLSearchParams(window.location.search);
+    const preVendor = urlParams.get("vendor");
+    const preYear   = urlParams.get("year");
+    if (preVendor) {
+      document.getElementById("filter-vendor").value = preVendor;
+      _state.vendor = preVendor;
+    }
+    if (preYear) {
+      document.getElementById("filter-year").value = preYear;
+      _state.year = preYear;
+    }
+    load();
+  })();
+</script>
+</body>
+</html>
