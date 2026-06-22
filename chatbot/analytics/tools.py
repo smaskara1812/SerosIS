@@ -1925,3 +1925,168 @@ def list_expiring_crew_certificates(status: str | None = None, limit: int = 10) 
         "certificates": rows,
     }
 
+
+# ── Finance dashboard ─────────────────────────────────────────────────────────
+
+def get_finance_dashboard(year: int | None = None) -> dict:
+    """
+    Two panels:
+      1. Vendor spend concentration — top vendors by invoice amount + % share.
+      2. MR fulfilment time — avg days from MR raised to GRN receipt, by rig and priority.
+    """
+    year_cond_inv = "AND YEAR(i.Invoice_Dt) = %s" if year else ""
+    year_cond_mr  = "AND YEAR(m.MR_Dt) = %s"      if year else ""
+    inv_params    = (year,) if year else ()
+    mr_params     = (year,) if year else ()
+
+    # ── 1a. Vendor spend — top 15 ────────────────────────────────────────────
+    vendor_rows = _query(f"""
+        SELECT
+            v.Vendor_Name                          AS vendor,
+            COUNT(*)                               AS invoice_count,
+            ROUND(SUM(i.Invoice_Amt), 0)           AS total_spend
+        FROM eos_Invoice_Hdr i
+        JOIN Mstx_Vendor v ON i.Vendor_Id = v.Vendor_Id
+        WHERE COALESCE(i.Marked_As_Deleted, '') != 'Y'
+          AND i.Invoice_Amt IS NOT NULL
+          {year_cond_inv}
+        GROUP BY v.Vendor_Id, v.Vendor_Name
+        ORDER BY total_spend DESC
+        LIMIT 15
+    """, inv_params)
+
+    # ── 1b. Vendor spend — grand total (for % calculation) ───────────────────
+    total_row = _query(f"""
+        SELECT ROUND(SUM(i.Invoice_Amt), 0) AS grand_total
+        FROM eos_Invoice_Hdr i
+        WHERE COALESCE(i.Marked_As_Deleted, '') != 'Y'
+          AND i.Invoice_Amt IS NOT NULL
+          {year_cond_inv}
+    """, inv_params)
+    grand_total = float(total_row[0]["grand_total"] or 0) if total_row else 0
+
+    vendors = []
+    top_spend = sum(float(r["total_spend"] or 0) for r in vendor_rows)
+    for r in vendor_rows:
+        spend = float(r["total_spend"] or 0)
+        vendors.append({
+            "vendor":        r["vendor"],
+            "invoice_count": r["invoice_count"],
+            "total_spend":   spend,
+            "pct_of_total":  round(spend / grand_total * 100, 1) if grand_total else 0,
+        })
+    others_spend = grand_total - top_spend
+    if others_spend > 0:
+        vendors.append({
+            "vendor":        "Others",
+            "invoice_count": None,
+            "total_spend":   round(others_spend, 0),
+            "pct_of_total":  round(others_spend / grand_total * 100, 1) if grand_total else 0,
+        })
+
+    # ── 1c. Monthly spend trend (last 24 months, top 5 vendors) ─────────────
+    # MySQL doesn't allow LIMIT inside an IN subquery, so resolve top-5 names first.
+    top5_names = [v["vendor"] for v in vendor_rows[:5] if v["vendor"] != "Others"]
+    if top5_names:
+        placeholders = ", ".join(["%s"] * len(top5_names))
+        monthly_trend = _query(f"""
+            SELECT
+                DATE_FORMAT(i.Invoice_Dt, '%%Y-%%m')   AS month,
+                v.Vendor_Name                            AS vendor,
+                ROUND(SUM(i.Invoice_Amt), 0)             AS spend
+            FROM eos_Invoice_Hdr i
+            JOIN Mstx_Vendor v ON i.Vendor_Id = v.Vendor_Id
+            WHERE COALESCE(i.Marked_As_Deleted, '') != 'Y'
+              AND i.Invoice_Amt IS NOT NULL
+              AND i.Invoice_Dt >= DATE_SUB(CURDATE(), INTERVAL 24 MONTH)
+              AND v.Vendor_Name IN ({placeholders})
+            GROUP BY DATE_FORMAT(i.Invoice_Dt, '%%Y-%%m'), v.Vendor_Id, v.Vendor_Name
+            ORDER BY DATE_FORMAT(i.Invoice_Dt, '%%Y-%%m'), spend DESC
+        """, tuple(top5_names))
+    else:
+        monthly_trend = []
+
+    # ── 2a. MR fulfilment — avg days by rig and priority ─────────────────────
+    by_rig_priority = _query(f"""
+        SELECT
+            r.Rig_Name                                        AS rig,
+            m.Priority                                        AS priority,
+            COUNT(*)                                          AS mr_count,
+            ROUND(AVG(DATEDIFF(g.Receipt_Dt, m.MR_Dt)), 1)   AS avg_days,
+            ROUND(MIN(DATEDIFF(g.Receipt_Dt, m.MR_Dt)), 0)   AS min_days,
+            ROUND(MAX(DATEDIFF(g.Receipt_Dt, m.MR_Dt)), 0)   AS max_days
+        FROM eos_Material_Requisition_Hdr m
+        JOIN eos_GRN_Hdr g  ON g.MR_Hdr_Id = m.MR_Hdr_Id
+        JOIN eos_Mst_Rig r  ON m.Rig_id = r.Rig_Id
+        WHERE g.Receipt_Dt >= m.MR_Dt
+          AND COALESCE(m.Del_Dt, '') = ''
+          {year_cond_mr}
+        GROUP BY r.Rig_Id, r.Rig_Name, m.Priority
+        ORDER BY r.Rig_Name, avg_days DESC
+    """, mr_params)
+
+    # ── 2b. MR fulfilment — distribution buckets ─────────────────────────────
+    buckets = _query(f"""
+        SELECT
+            CASE
+                WHEN DATEDIFF(g.Receipt_Dt, m.MR_Dt) < 7   THEN '<7 days'
+                WHEN DATEDIFF(g.Receipt_Dt, m.MR_Dt) < 30  THEN '7-30 days'
+                WHEN DATEDIFF(g.Receipt_Dt, m.MR_Dt) < 60  THEN '30-60 days'
+                WHEN DATEDIFF(g.Receipt_Dt, m.MR_Dt) < 90  THEN '60-90 days'
+                ELSE '>90 days'
+            END                       AS bucket,
+            COUNT(*)                  AS mr_count,
+            MIN(DATEDIFF(g.Receipt_Dt, m.MR_Dt)) AS bucket_sort
+        FROM eos_Material_Requisition_Hdr m
+        JOIN eos_GRN_Hdr g ON g.MR_Hdr_Id = m.MR_Hdr_Id
+        WHERE g.Receipt_Dt >= m.MR_Dt
+          AND COALESCE(m.Del_Dt, '') = ''
+          {year_cond_mr}
+        GROUP BY bucket
+        ORDER BY bucket_sort
+    """, mr_params)
+
+    # ── 2c. MR fulfilment — monthly avg trend ────────────────────────────────
+    mr_monthly = _query(f"""
+        SELECT
+            DATE_FORMAT(m.MR_Dt, '%%Y-%%m')                  AS month,
+            ROUND(AVG(DATEDIFF(g.Receipt_Dt, m.MR_Dt)), 1)   AS avg_days,
+            COUNT(*)                                           AS mr_count
+        FROM eos_Material_Requisition_Hdr m
+        JOIN eos_GRN_Hdr g ON g.MR_Hdr_Id = m.MR_Hdr_Id
+        WHERE g.Receipt_Dt >= m.MR_Dt
+          AND COALESCE(m.Del_Dt, '') = ''
+          AND m.MR_Dt >= DATE_SUB(CURDATE(), INTERVAL 24 MONTH)
+        GROUP BY DATE_FORMAT(m.MR_Dt, '%%Y-%%m')
+        ORDER BY DATE_FORMAT(m.MR_Dt, '%%Y-%%m')
+    """, ())
+
+    # ── 2d. MR summary KPIs ───────────────────────────────────────────────────
+    mr_summary = _query(f"""
+        SELECT
+            COUNT(*)                                        AS total_fulfilled,
+            ROUND(AVG(DATEDIFF(g.Receipt_Dt, m.MR_Dt)), 1) AS overall_avg_days,
+            ROUND(MIN(DATEDIFF(g.Receipt_Dt, m.MR_Dt)), 0) AS fastest_days,
+            ROUND(MAX(DATEDIFF(g.Receipt_Dt, m.MR_Dt)), 0) AS slowest_days
+        FROM eos_Material_Requisition_Hdr m
+        JOIN eos_GRN_Hdr g ON g.MR_Hdr_Id = m.MR_Hdr_Id
+        WHERE g.Receipt_Dt >= m.MR_Dt
+          AND COALESCE(m.Del_Dt, '') = ''
+          {year_cond_mr}
+    """, mr_params)
+
+    return {
+        "filters": {"year": year},
+        "vendor_spend": {
+            "grand_total": grand_total,
+            "vendors":     vendors,
+            "monthly_trend": monthly_trend,
+        },
+        "mr_fulfilment": {
+            "summary":        mr_summary[0] if mr_summary else {},
+            "by_rig_priority": by_rig_priority,
+            "buckets":        buckets,
+            "monthly_trend":  mr_monthly,
+        },
+    }
+

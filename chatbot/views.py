@@ -758,6 +758,34 @@ def dashboard_workforce_api(request):
     return JsonResponse(_build_workforce(year, rig_filter))
 
 
+# ── Finance dashboard ─────────────────────────────────────────────────────────
+
+def dashboard_finance_page(request):
+    return render(request, "chatbot/finance_dashboard.html")
+
+
+@require_http_methods(["GET"])
+def dashboard_finance_meta(request):
+    from .analytics.tools import _query
+    years = _query("""
+        SELECT DISTINCT YEAR(Invoice_Dt) AS yr FROM eos_Invoice_Hdr
+        WHERE Invoice_Dt IS NOT NULL
+        UNION
+        SELECT DISTINCT YEAR(MR_Dt) FROM eos_Material_Requisition_Hdr
+        WHERE MR_Dt IS NOT NULL
+        ORDER BY yr DESC
+    """)
+    return JsonResponse({"years": [r["yr"] for r in years if r["yr"]]})
+
+
+@require_http_methods(["GET"])
+def dashboard_finance_api(request):
+    from .analytics.tools import get_finance_dashboard
+    year_param = request.GET.get("year")
+    year = int(year_param) if year_param and year_param.isdigit() else None
+    return JsonResponse(get_finance_dashboard(year=year))
+
+
 # ── Listings ─────────────────────────────────────────────────────────────────
 
 def listings_page(request):

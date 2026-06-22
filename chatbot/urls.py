@@ -7,6 +7,7 @@ urlpatterns = [
     path("health/", views.health_page, name="health"),
     path("manuals/", views.manuals_page, name="manuals"),
     path("dashboard/", views.dashboard_page, name="dashboard"),
+    path("dashboard/finance/", views.dashboard_finance_page, name="dashboard_finance"),
     path("listings/", views.listings_page, name="listings"),
     path("listings/incidents/", views.listings_incidents_page, name="listings_incidents"),
     path("listings/hazard-cards/", views.listings_hazard_cards_page, name="listings_hazard_cards"),
@@ -19,6 +20,8 @@ urlpatterns = [
     path("api/dashboard/meta/", views.dashboard_meta, name="dashboard_meta"),
     path("api/dashboard/hse/", views.dashboard_hse_api, name="dashboard_hse_api"),
     path("api/dashboard/workforce/", views.dashboard_workforce_api, name="dashboard_workforce_api"),
+    path("api/dashboard/finance/", views.dashboard_finance_api, name="dashboard_finance_api"),
+    path("api/dashboard/finance/meta/", views.dashboard_finance_meta, name="dashboard_finance_meta"),
 
     # ── Listings API ────────────────────────────────────────────────────────
     path("api/listings/meta/", views.listings_meta_api, name="listings_meta_api"),
