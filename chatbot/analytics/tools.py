@@ -2042,7 +2042,14 @@ def get_finance_dashboard(year: int | None = None) -> dict:
         WHERE g.Receipt_Dt >= m.MR_Dt
           AND COALESCE(m.Del_Dt, '') = ''
           {year_cond_mr}
-        GROUP BY bucket
+        GROUP BY
+            CASE
+                WHEN DATEDIFF(g.Receipt_Dt, m.MR_Dt) < 7   THEN '<7 days'
+                WHEN DATEDIFF(g.Receipt_Dt, m.MR_Dt) < 30  THEN '7-30 days'
+                WHEN DATEDIFF(g.Receipt_Dt, m.MR_Dt) < 60  THEN '30-60 days'
+                WHEN DATEDIFF(g.Receipt_Dt, m.MR_Dt) < 90  THEN '60-90 days'
+                ELSE '>90 days'
+            END
         ORDER BY bucket_sort
     """, mr_params)
 
