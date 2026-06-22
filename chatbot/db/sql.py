@@ -10,19 +10,25 @@ Why a translator and not per-query rewrites:
     engines share one source of truth.
 
 What it translates (MySQL → MSSQL):
-    eos_TableName            →  eos.TableName
-    CURDATE()                →  CAST(GETDATE() AS DATE)
-    NOW()                    →  GETDATE()
-    DATE(x)                  →  CAST(x AS DATE)
-    DATE_FORMAT(x, '%Y-%m')  →  FORMAT(x, 'yyyy-MM')
-    DATE_SUB(x, INTERVAL n u) → DATEADD(u, -n, x)
-    DATE_ADD(x, INTERVAL n u) → DATEADD(u, n, x)
-    CURDATE() + INTERVAL n u →  DATEADD(u, n, CURDATE())   (then CURDATE → ...)
-    DATEDIFF(a, b)           →  DATEDIFF(day, b, a)        (note arg flip)
-    CAST(x AS CHAR)          →  CAST(x AS VARCHAR(50))
-    LIMIT n                  →  OFFSET 0 ROWS FETCH NEXT n ROWS ONLY
-    LIMIT %s                 →  OFFSET 0 ROWS FETCH NEXT <n> ROWS ONLY  (param inlined)
-    LIMIT %s OFFSET %s       →  OFFSET <m> ROWS FETCH NEXT <n> ROWS ONLY (params inlined)
+    eos_TableName              →  eos.TableName
+    CURDATE()                  →  CAST(GETDATE() AS DATE)
+    NOW()                      →  GETDATE()
+    DATE(x)                    →  CAST(x AS DATE)
+    DATE_FORMAT(x, '%Y-%m')    →  CONVERT(VARCHAR(7), x, 120)   [fast path]
+    DATE_FORMAT(x, '%Y-%m-%d') →  CONVERT(VARCHAR(10), x, 120)  [fast path]
+    DATE_FORMAT(x, '%Y')       →  CAST(YEAR(x) AS VARCHAR(4))   [fast path]
+    DATE_FORMAT(x, other)      →  FORMAT(x, 'mssql-fmt')        [fallback]
+    DATE_SUB(x, INTERVAL n u)  →  DATEADD(u, -n, x)
+    DATE_ADD(x, INTERVAL n u)  →  DATEADD(u, n, x)
+    CURDATE() + INTERVAL n u   →  DATEADD(u, n, CURDATE())      (then CURDATE → ...)
+    DATEDIFF(a, b)             →  DATEDIFF(day, b, a)            (note arg flip)
+    IF(cond, t, f)             →  IIF(cond, t, f)                (IFNULL excluded)
+    (col IS NULL)              →  CASE WHEN col IS NULL THEN 1 ELSE 0 END
+    (col IS NOT NULL)          →  CASE WHEN col IS NOT NULL THEN 1 ELSE 0 END
+    CAST(x AS CHAR)            →  CAST(x AS VARCHAR(50))
+    LIMIT n                    →  OFFSET 0 ROWS FETCH NEXT n ROWS ONLY
+    LIMIT %s                   →  OFFSET 0 ROWS FETCH NEXT <n> ROWS ONLY  (param inlined)
+    LIMIT %s OFFSET %s         →  OFFSET <m> ROWS FETCH NEXT <n> ROWS ONLY (params inlined)
 
 Param inlining for LIMIT: MSSQL's FETCH NEXT can accept parameters, but the
 order of LIMIT vs OFFSET params is flipped vs the FETCH clause, and propagating
@@ -121,6 +127,14 @@ def _replace_func(sql: str, name_regex: str, transform) -> str:
 
 # ── Individual transforms ─────────────────────────────────────────────────────
 
+def _tx_if(args: list[str]) -> str:
+    # MySQL: IF(condition, true_val, false_val) — scalar function.
+    # MSSQL: IIF(condition, true_val, false_val) — same semantics, SQL Server 2012+.
+    if len(args) == 3:
+        return f"IIF({args[0]}, {args[1]}, {args[2]})"
+    return f"IF({', '.join(args)})"
+
+
 def _tx_datediff(args: list[str]) -> str:
     # MySQL: DATEDIFF(end, start) returns days.
     # MSSQL: DATEDIFF(datepart, start, end) — note arg order flip.
@@ -167,6 +181,18 @@ def _tx_date_format(args: list[str]) -> str:
     # in f-strings; it's escaped for the DB driver which does its own %s
     # substitution). Normalize both.
     fmt_clean = fmt.strip("'").replace("%%", "%")
+
+    # Fast paths: CONVERT is 10-50× faster than FORMAT() in SQL Server for
+    # common date-to-string patterns (FORMAT uses CLR internally).
+    if fmt_clean == "%Y-%m":
+        # style 120 = 'YYYY-MM-DD HH:MI:SS'; VARCHAR(7) truncates to 'YYYY-MM'
+        return f"CONVERT(VARCHAR(7), {expr}, 120)"
+    if fmt_clean == "%Y-%m-%d":
+        return f"CONVERT(VARCHAR(10), {expr}, 120)"
+    if fmt_clean == "%Y":
+        return f"CAST(YEAR({expr}) AS VARCHAR(4))"
+
+    # Fallback: FORMAT() for any other pattern
     mssql_fmt = (
         fmt_clean
         .replace("%Y", "yyyy")
@@ -229,6 +255,25 @@ def _translate_eos_tables(sql: str) -> str:
 def _translate_cast_char(sql: str) -> str:
     """`CAST(x AS CHAR)`  →  `CAST(x AS VARCHAR(50))`"""
     return re.sub(r"\bAS\s+CHAR\s*\)", "AS VARCHAR(50))", sql, flags=re.IGNORECASE)
+
+
+# Matches (col IS NULL) or (col IS NOT NULL) used as a sort key — MySQL boolean
+# trick for NULLS LAST / NULLS FIRST. MSSQL doesn't allow predicate expressions
+# in ORDER BY, so rewrite as CASE WHEN.
+# Pattern is intentionally narrow (single non-space token before IS) to avoid
+# accidentally matching compound predicates inside WHERE/JOIN conditions.
+_BOOL_IS_NULL_RE = re.compile(
+    r"\(\s*(\S+)\s+IS\s+(NOT\s+)?NULL\s*\)", re.IGNORECASE
+)
+
+def _translate_bool_is_null(sql: str) -> str:
+    """`(col IS NULL)` → `CASE WHEN col IS NULL THEN 1 ELSE 0 END`"""
+    def _repl(m: re.Match) -> str:
+        col     = m.group(1)
+        not_kw  = (m.group(2) or "").strip()
+        not_str = f"NOT " if not_kw else ""
+        return f"CASE WHEN {col} IS {not_str}NULL THEN 1 ELSE 0 END"
+    return _BOOL_IS_NULL_RE.sub(_repl, sql)
 
 
 def _translate_curdate_now(sql: str) -> str:
@@ -294,6 +339,8 @@ def translate_mssql(sql: str, params: tuple) -> tuple[str, tuple]:
 
     # 2. Balanced-paren function rewrites — order matters: DATE_FORMAT/_SUB/_ADD
     #    must run BEFORE DATE() because their names share the "DATE" prefix.
+    #    IF() must run BEFORE any function whose name contains "IF" (none currently,
+    #    but keeping it early avoids future surprises). NULLIF is excluded by \b.
     sql = _replace_func(sql, "DATE_FORMAT", _tx_date_format)
     sql = _replace_func(sql, "DATE_SUB",    _tx_date_sub)
     sql = _replace_func(sql, "DATE_ADD",    _tx_date_add)
@@ -301,6 +348,7 @@ def translate_mssql(sql: str, params: tuple) -> tuple[str, tuple]:
     sql = _replace_func(sql, "DATE",        _tx_date)
     sql = _replace_func(sql, "CONCAT_WS",   _tx_concat_ws)
     sql = _replace_func(sql, "TRIM",        _tx_trim)
+    sql = _replace_func(sql, r"IF(?!NULL)",  _tx_if)   # (?!NULL) skips IFNULL()
 
     # 3. Now-style functions.
     sql = _translate_curdate_now(sql)
@@ -308,6 +356,7 @@ def translate_mssql(sql: str, params: tuple) -> tuple[str, tuple]:
     # 4. Type and identifier rewrites.
     sql = _translate_cast_char(sql)
     sql = _translate_eos_tables(sql)
+    sql = _translate_bool_is_null(sql)
 
     # 5. LIMIT clauses (may consume trailing params).
     sql, params = _translate_limit(sql, params)
