@@ -67,12 +67,33 @@ def get_rig_snapshot(rig_id: int, year: int) -> dict:
 
 
 def get_rig_crew_groups(rig_id: int) -> dict:
-    """Active crew group assignments with employee names."""
+    """Active crew group assignments with employee names, on-board status, and hitch info."""
+    # Groups + current rotation (days to off date)
     groups = _query("""
-        SELECT DISTINCT cg.Crew_Grp_Id, cg.Crew_Grp_Name, cg.Hitch
+        SELECT
+            cg.Crew_Grp_Id,
+            cg.Crew_Grp_Name,
+            cg.Hitch,
+            cur.Crew_Grp_Off_Dt                              AS current_off_date,
+            DATEDIFF(cur.Crew_Grp_Off_Dt, CURDATE())        AS days_to_off,
+            nxt.next_on_date                                 AS next_on_date,
+            DATEDIFF(nxt.next_on_date, CURDATE())            AS days_to_next_hitch,
+            IF(cur.Crew_Grp_Id IS NOT NULL, 1, 0)           AS is_current_rotation
         FROM eos_Mst_Crew_Grp cg
+        LEFT JOIN (
+            SELECT Crew_Grp_Id, Crew_Grp_Off_Dt
+            FROM eos_Crew_Grp_Rotation
+            WHERE Crew_Grp_On_Dt <= CURDATE()
+              AND (Crew_Grp_Off_Dt IS NULL OR Crew_Grp_Off_Dt >= CURDATE())
+        ) cur ON cur.Crew_Grp_Id = cg.Crew_Grp_Id
+        LEFT JOIN (
+            SELECT Crew_Grp_Id, MIN(Crew_Grp_On_Dt) AS next_on_date
+            FROM eos_Crew_Grp_Rotation
+            WHERE Crew_Grp_On_Dt > CURDATE()
+            GROUP BY Crew_Grp_Id
+        ) nxt ON nxt.Crew_Grp_Id = cg.Crew_Grp_Id
         WHERE cg.Rig_Id = %s
-        ORDER BY cg.Crew_Grp_Name
+        ORDER BY is_current_rotation DESC, cg.Crew_Grp_Name
     """, (rig_id,))
 
     members = _query("""
@@ -85,7 +106,8 @@ def get_rig_crew_groups(rig_id: int) -> dict:
             ) AS emp_name,
             sd.Serv_Subtype_Id,
             sst.Serv_Subtype_Name AS status,
-            cd.Crew_Grp_From      AS assigned_from
+            IF(sd.Serv_Subtype_Id = 7, 1, 0) AS is_on_board,
+            cd.Crew_Grp_From AS assigned_from
         FROM eos_Crew_Grp_Dtl cd
         JOIN eos_Mst_Crew_Grp   cg  ON cg.Crew_Grp_Id  = cd.Crew_Grp_Id
         JOIN eos_Mst_Fs_Employee e   ON e.Fs_Emp_Id     = cd.Fs_Emp_Id
@@ -95,7 +117,9 @@ def get_rig_crew_groups(rig_id: int) -> dict:
               AND sd.Serv_Subtype_To IS NULL
         LEFT JOIN Mst_Serv_Subtype sst ON sst.Serv_Subtype_Id = sd.Serv_Subtype_Id
         WHERE cd.Rig_Id = %s AND cd.Crew_Grp_To IS NULL
-        ORDER BY cg.Crew_Grp_Name, e.Fs_Emp_Lname
+        ORDER BY cg.Crew_Grp_Name,
+                 IF(sd.Serv_Subtype_Id = 7, 0, 1),
+                 e.Fs_Emp_Lname
     """, (rig_id,))
 
     return {
@@ -345,6 +369,24 @@ def get_rig_safety(rig_id: int, year: int) -> dict:
         ORDER BY d.Drill_Dt DESC
     """, (rig_id, year))
 
+    try:
+        root_cause = _query("""
+            SELECT
+                COALESCE(rc.Root_Cause_Name, 'Not Classified') AS root_cause,
+                COUNT(*)                                         AS count,
+                SUM(COALESCE(i.NPT_Hrs_Loss, 0))               AS npt_hrs
+            FROM eos_Incident_Details i
+            LEFT JOIN eos_Incident_Root_Cause irc ON irc.Incident_Id = i.Incident_Id
+            LEFT JOIN eos_Mst_Root_Cause rc ON rc.Root_Cause_Id = irc.Root_Cause_Id
+            WHERE i.Rig_Id = %s AND YEAR(i.Incident_Date) = %s
+              AND COALESCE(i.Marked_As_Deleted, '') != 'Y'
+            GROUP BY COALESCE(rc.Root_Cause_Name, 'Not Classified')
+            ORDER BY count DESC
+            LIMIT 10
+        """, (rig_id, year))
+    except Exception:
+        root_cause = []
+
     return {
         "incidents": {
             "kpi":     dict(inc_kpi[0]) if inc_kpi else {},
@@ -358,7 +400,8 @@ def get_rig_safety(rig_id: int, year: int) -> dict:
             "by_type": [dict(r) for r in haz_by_type],
             "recent":  [dict(r) for r in haz_recent],
         },
-        "drills": [dict(r) for r in drills],
+        "drills":      [dict(r) for r in drills],
+        "root_causes": [dict(r) for r in root_cause],
     }
 
 

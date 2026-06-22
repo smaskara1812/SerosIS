@@ -45,10 +45,12 @@
     .hbadge-gray   { background: rgba(148,163,184,0.2); color: #cbd5e1; }
     .hbadge-blue   { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.75); }
     .banner-right { display: flex; align-items: center; gap: 10px; }
+    .year-wrap { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 6px 12px; }
+    .year-lbl { font-size: 0.75rem; font-weight: 600; color: rgba(255,255,255,0.7); white-space: nowrap; letter-spacing: 0.3px; }
     .year-sel {
-      background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 8px; padding: 7px 12px; font-size: 0.83rem; font-family: inherit;
-      outline: none; cursor: pointer;
+      background: transparent; color: #fff; border: none;
+      font-size: 0.9rem; font-weight: 700; font-family: inherit;
+      outline: none; cursor: pointer; padding: 0;
     }
     .year-sel option { background: #1a3f7a; }
 
@@ -77,7 +79,7 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #eef1f5;
       display: flex; flex-direction: column; gap: 4px;
     }
-    .snap-label { font-size: 0.67rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+    .snap-label { font-size: 0.67rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
     .snap-value { font-size: 1.4rem; font-weight: 800; color: #1a3f7a; line-height: 1; }
     .snap-value.good { color: #16a34a; }
     .snap-value.warn { color: #d97706; }
@@ -87,7 +89,7 @@
     /* ── Section header ── */
     .section-hdr {
       display: flex; align-items: center; gap: 10px; margin: 28px 0 14px;
-      font-size: 0.72rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px;
+      font-size: 0.72rem; font-weight: 800; color: #374151; text-transform: uppercase; letter-spacing: 0.8px;
     }
     .section-hdr::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
 
@@ -97,7 +99,7 @@
       background: #fff; border-radius: 12px; padding: 20px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #eef1f5;
     }
-    .info-card-title { font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+    .info-card-title { font-size: 0.72rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
     .info-row { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.82rem; gap: 12px; }
     .info-row:last-child { border-bottom: none; }
     .info-lbl { color: #64748b; flex-shrink: 0; }
@@ -112,7 +114,7 @@
       background: #fff; border-radius: 10px; padding: 16px 18px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #eef1f5;
     }
-    .kpi-label { font-size: 0.67rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .kpi-label { font-size: 0.67rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
     .kpi-value { font-size: 1.55rem; font-weight: 800; color: #1a3f7a; line-height: 1; }
     .kpi-value.good { color: #16a34a; }
     .kpi-value.warn { color: #d97706; }
@@ -200,6 +202,37 @@
     .well-key { color: #94a3b8; }
     .well-val { color: #374151; font-weight: 600; }
 
+    /* ── (i) info tooltip — matches dashboard style ── */
+    .chart-info {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px; border-radius: 50%;
+      background: #e2e8f0; color: #64748b;
+      font-size: 9px; font-weight: 600; font-style: normal !important; letter-spacing: 0;
+      cursor: default; user-select: none;
+      transition: background 0.15s, color 0.15s;
+      line-height: 1; flex-shrink: 0; margin-left: 5px; vertical-align: middle;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .chart-info:hover { background: #1a3f7a; color: #fff; }
+    #kpi-tooltip {
+      position: fixed; z-index: 9999; max-width: 280px;
+      background: #1e293b; color: #f1f5f9;
+      font-size: 0.78rem; line-height: 1.55;
+      padding: 10px 13px; border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      pointer-events: none; display: none;
+    }
+    #kpi-tooltip b { color: #3dbdb0; }
+
+    /* ── Collapsible crew card ── */
+    .crew-card-body { overflow: hidden; transition: max-height 0.25s ease; }
+    .crew-card.collapsed .crew-card-body { max-height: 0; }
+    .crew-card:not(.collapsed) .crew-card-body { max-height: 2000px; }
+    .crew-toggle { cursor: pointer; user-select: none; }
+    .crew-toggle-icon { font-size: 0.75rem; transition: transform 0.2s; display: inline-block; }
+    .crew-card.collapsed .crew-toggle-icon { transform: rotate(-90deg); }
+    .crew-on-board-ring { border-top: 3px solid #16a34a; }
+
     /* ── Loading ── */
     .panel-loading { text-align: center; padding: 70px 20px; color: #94a3b8; }
     .spinner { width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top-color: #1a3f7a; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
@@ -254,7 +287,10 @@
       </div>
     </div>
     <div class="banner-right">
-      <select class="year-sel" id="year-sel" onchange="onYearChange()"></select>
+      <div class="year-wrap">
+        <span class="year-lbl">📅 Year</span>
+        <select class="year-sel" id="year-sel" onchange="onYearChange()"></select>
+      </div>
     </div>
   </div>
 </div>
@@ -274,7 +310,7 @@
   <div class="tab-panel active" id="panel-overview">
     <div class="panel-loading" id="ov-loading"><div class="spinner"></div>Loading overview…</div>
     <div id="ov-content" style="display:none">
-      <div class="section-hdr">At a Glance <span class="chart-sub" id="snap-year-label"></span></div>
+      <div class="section-hdr">At a Glance <span class="chart-sub" id="snap-year-label"></span> <span class="chart-info" data-kpi="snap-glance">i</span></div>
       <div class="snapshot-grid" id="snap-grid"></div>
       <div class="section-hdr">Rig Profile</div>
       <div class="info-grid-3" id="ov-info"></div>
@@ -285,25 +321,15 @@
   <div class="tab-panel" id="panel-people">
     <div class="panel-loading" id="pe-loading"><div class="spinner"></div>Loading people data…</div>
     <div id="pe-content" style="display:none">
-      <div class="kpi-row kpi-3" id="pe-kpi"></div>
-      <div class="charts-2col">
-        <div class="chart-card">
-          <div class="chart-title">Monthly POB Manhours <span class="chart-sub">Seros vs Third-Party</span></div>
-          <div id="ch-pob" class="ch ch-260"></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">Avg Daily POB <span class="chart-sub">From drilling log</span></div>
-          <div id="ch-dpob" class="ch ch-260"></div>
-        </div>
-      </div>
-      <div class="section-hdr">Current On-Rig Breakdown</div>
+      <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)" id="pe-kpi"></div>
+      <div class="section-hdr">Current On-Rig Breakdown <span class="chart-info" data-kpi="onrig-breakdown">i</span></div>
       <div class="table-card">
         <table class="dt"><thead><tr><th>Service Status</th><th>Count</th></tr></thead>
         <tbody id="onboard-tb"></tbody></table>
       </div>
-      <div class="section-hdr">Crew Groups & Members</div>
+      <div class="section-hdr">Crew Groups & Members <span class="chart-info" data-kpi="crew-groups">i</span></div>
       <div class="crew-grid" id="crew-grid"></div>
-      <div class="section-hdr">Upcoming Rotations</div>
+      <div class="section-hdr">Upcoming Rotations <span class="chart-info" data-kpi="upcoming-rotations">i</span></div>
       <div class="table-card">
         <div id="rotation-rows"></div>
       </div>
@@ -315,7 +341,7 @@
     <div class="panel-loading" id="sa-loading"><div class="spinner"></div>Loading safety data…</div>
     <div id="sa-content" style="display:none">
 
-      <div class="section-hdr">Incidents</div>
+      <div class="section-hdr">Incidents <span class="chart-info" data-kpi="incidents">i</span></div>
       <div class="kpi-row kpi-5" id="inc-kpi"></div>
       <div class="charts-2col">
         <div class="chart-card">
@@ -333,7 +359,7 @@
         <tbody id="inc-tb"></tbody></table>
       </div>
 
-      <div class="section-hdr">Hazard Cards</div>
+      <div class="section-hdr">Hazard Cards <span class="chart-info" data-kpi="hazard-cards">i</span></div>
       <div class="kpi-row kpi-4" id="haz-kpi"></div>
       <div class="charts-2col">
         <div class="chart-card">
@@ -364,7 +390,7 @@
     <div class="panel-loading" id="fi-loading"><div class="spinner"></div>Loading finance data…</div>
     <div id="fi-content" style="display:none">
 
-      <div class="section-hdr">Invoice Spend</div>
+      <div class="section-hdr">Invoice Spend <span class="chart-info" data-kpi="invoice-spend">i</span></div>
       <div class="kpi-row kpi-4" id="inv-kpi"></div>
       <div class="charts-2col">
         <div class="chart-card">
@@ -377,7 +403,7 @@
         </div>
       </div>
 
-      <div class="section-hdr">Approval Efficiency</div>
+      <div class="section-hdr">Approval Efficiency <span class="chart-info" data-kpi="approval-efficiency">i</span></div>
       <div class="charts-wide">
         <div class="chart-card">
           <div class="chart-title">Approval Funnel <span class="chart-sub">Invoices pending at each level</span></div>
@@ -389,7 +415,7 @@
         </div>
       </div>
 
-      <div class="section-hdr">Material Requisitions</div>
+      <div class="section-hdr">Material Requisitions <span class="chart-info" data-kpi="material-req">i</span></div>
       <div class="kpi-row kpi-4" id="mr-kpi"></div>
       <div class="charts-2col">
         <div class="chart-card">
@@ -409,14 +435,14 @@
     <div class="panel-loading" id="op-loading"><div class="spinner"></div>Loading operations data…</div>
     <div id="op-content" style="display:none">
 
-      <div class="section-hdr">Drilling Hours</div>
+      <div class="section-hdr">Drilling Hours <span class="chart-info" data-kpi="drilling-hours">i</span></div>
       <div class="kpi-row kpi-5" id="drill-kpi"></div>
       <div class="chart-card full" style="margin-bottom:20px">
-        <div class="chart-title">Monthly Hours Breakdown <span class="chart-sub">Operating / Standby / Repair / Other · Utilisation %</span></div>
+        <div class="chart-title">Monthly Hours Breakdown <span class="chart-sub">Operating / Standby / Repair / Other (Zero-Rate + Move) · Utilisation %</span></div>
         <div id="ch-drill-trend" class="ch ch-340"></div>
       </div>
 
-      <div class="section-hdr">Non-Productive Time (NPT)</div>
+      <div class="section-hdr">Non-Productive Time (NPT) <span class="chart-info" data-kpi="npt">i</span></div>
       <div class="kpi-row kpi-3" id="npt-kpi"></div>
       <div class="charts-2col">
         <div class="chart-card">
@@ -606,36 +632,10 @@ async function loadPeople() {
   _pe = true;
 
   const totalOb = (d.onboard||[]).reduce((s,r)=>s+(+r.crew_count||0),0);
-  const last = d.pob_trend?.length ? d.pob_trend[d.pob_trend.length-1] : null;
-  document.getElementById('pe-kpi').innerHTML = `
-    ${kpiCard('On Rig (All Statuses)', totalOb, 'Current assignments')}
-    ${kpiCard('Seros Manhours', last ? fmtInt(last.seros_hrs) : '—', last ? last.month : '')}
-    ${kpiCard('Total Manhours', last ? fmtInt(last.total_hrs) : '—', last ? last.month : '')}
-  `;
+  document.getElementById('pe-kpi').innerHTML =
+    kpiCard('On Rig (All Statuses)', totalOb, 'Current service records open');
 
   show('pe-loading','pe-content');
-
-  // Charts — AFTER panel is visible
-  initChart('ch-pob', {
-    tooltip: { trigger:'axis' },
-    legend: { bottom: 0, textStyle: { fontSize: 11 } },
-    grid: { top: 10, right: 12, bottom: 44, left: 56 },
-    xAxis: { type:'category', data:(d.pob_trend||[]).map(r=>r.month), axisLabel:{fontSize:10} },
-    yAxis: { type:'value', name:'Manhours', nameTextStyle:{fontSize:10} },
-    series: [
-      { name:'Seros', type:'bar', stack:'s', data:(d.pob_trend||[]).map(r=>r.seros_hrs), itemStyle:{color:'#1a3f7a'} },
-      { name:'Third Party', type:'bar', stack:'s', data:(d.pob_trend||[]).map(r=>r.tp_hrs), itemStyle:{color:'#3dbdb0'} },
-    ]
-  });
-
-  initChart('ch-dpob', {
-    tooltip: { trigger:'axis' },
-    grid: { top:10, right:12, bottom:30, left:44 },
-    xAxis: { type:'category', data:(d.daily_pob||[]).map(r=>r.month), axisLabel:{fontSize:10} },
-    yAxis: { type:'value', name:'Avg POB', nameTextStyle:{fontSize:10} },
-    series: [{ type:'line', smooth:true, data:(d.daily_pob||[]).map(r=>r.avg_pob),
-      areaStyle:{opacity:0.15}, itemStyle:{color:'#2563eb'}, lineStyle:{width:2.5} }]
-  });
 
   // On-board table
   document.getElementById('onboard-tb').innerHTML = (d.onboard||[]).map(r =>
@@ -652,33 +652,79 @@ async function loadPeople() {
     byGroup[m.group_name].push(m);
   });
 
+  const initials = name => name.trim().split(/\s+/).filter(Boolean).map(w=>w[0]||'').slice(0,2).join('').toUpperCase();
+  const memberBadge = m => {
+    if (m.is_on_board == 1) return `<span class="badge b-green crew-status" title="Currently on rig">On Board</span>`;
+    if (m.status) return `<span class="badge b-amber crew-status" title="${esc(m.status)}">${esc(m.status)}</span>`;
+    return `<span class="badge b-gray crew-status">Off Board</span>`;
+  };
+  const avatarColor = m => m.is_on_board == 1 ? 'background:#dcfce7;color:#166534' : 'background:#fef9c3;color:#92400e';
+
   document.getElementById('crew-grid').innerHTML = groups.length
-    ? groups.map(g => {
+    ? groups.map((g, idx) => {
         const mbs = byGroup[g.Crew_Grp_Name] || [];
-        const initials = name => name.trim().split(' ').map(w=>w[0]||'').slice(0,2).join('').toUpperCase();
-        const statusCls = s => s && s.toLowerCase().includes('board') ? 'b-green' : 'b-gray';
-        return `<div class="crew-card">
-          <div class="crew-card-hdr">
-            <div class="crew-grp-name">Group ${esc(g.Crew_Grp_Name)}</div>
-            <div class="crew-grp-meta">${mbs.length} members · ${g.Hitch || '—'}-day hitch</div>
+        const onBoardCount = mbs.filter(m => m.is_on_board == 1).length;
+        const isCurrent = g.is_current_rotation == 1;
+        const hitchInfo = isCurrent && g.days_to_off != null
+          ? `<span style="color:#16a34a;font-weight:700">${g.days_to_off}d left on rig</span>`
+          : g.days_to_next_hitch != null
+            ? `<span style="color:#d97706">${g.days_to_next_hitch}d to next on-rig</span>`
+            : g.Hitch ? `${g.Hitch}-day hitch schedule` : '—';
+        return `<div class="crew-card${isCurrent?' crew-on-board-ring':''} collapsed" id="cg-${idx}">
+          <div class="crew-card-hdr crew-toggle" onclick="toggleCrew(${idx})">
+            <div>
+              <div class="crew-grp-name">
+                ${isCurrent ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#16a34a;margin-right:6px;vertical-align:middle"></span>' : ''}
+                ${esc(g.Crew_Grp_Name)}
+                ${isCurrent ? '<span class="badge b-green" style="margin-left:6px;vertical-align:middle">Current Rotation</span>' : ''}
+              </div>
+              <div class="crew-grp-meta" style="margin-top:3px">
+                <span class="badge b-green" style="margin-right:4px">${onBoardCount} on board</span>
+                <span class="badge b-gray">${mbs.length - onBoardCount} off board</span>
+                &nbsp;·&nbsp; ${hitchInfo}
+              </div>
+            </div>
+            <span class="crew-toggle-icon">▼</span>
           </div>
-          ${mbs.length ? mbs.map(m => `
-            <div class="crew-member">
-              <div class="crew-avatar">${initials(m.emp_name)}</div>
-              <div class="crew-name">${esc(m.emp_name)}</div>
-              ${m.status ? `<span class="badge ${statusCls(m.status)} crew-status">${esc(m.status)}</span>` : ''}
-            </div>`).join('') : '<div class="no-data" style="padding:12px">No active assignments</div>'}
+          <div class="crew-card-body">
+            <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+              <thead><tr style="background:#f8fafc">
+                <th style="padding:7px 14px;text-align:left;font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;border-bottom:1px solid #eef1f5">Employee</th>
+                <th style="padding:7px 14px;text-align:left;font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;border-bottom:1px solid #eef1f5">Status</th>
+              </tr></thead>
+              <tbody>
+              ${mbs.length ? mbs.map(m => `<tr style="border-bottom:1px solid #f8fafc">
+                  <td style="padding:8px 14px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div class="crew-avatar" style="${avatarColor(m)}">${initials(m.emp_name)}</div>
+                      <span style="color:#374151;font-weight:500">${esc(m.emp_name)}</span>
+                    </div>
+                  </td>
+                  <td style="padding:8px 14px">${memberBadge(m)}</td>
+                </tr>`).join('') : `<tr><td colspan="2" class="no-data" style="padding:12px">No active assignments</td></tr>`}
+              </tbody>
+            </table>
+          </div>
         </div>`;
       }).join('')
     : '<div class="no-data">No crew groups found for this rig</div>';
 
-  // Rotations
-  document.getElementById('rotation-rows').innerHTML = (d.rotations||[]).map(r =>
-    `<div class="rotation-row">
+  // Rotations — show days to handover
+  const today = new Date(); today.setHours(0,0,0,0);
+  document.getElementById('rotation-rows').innerHTML = (d.rotations||[]).map(r => {
+    const onDate = r.on_date ? new Date(r.on_date) : null;
+    const daysTo = onDate ? Math.round((onDate - today) / 86400000) : null;
+    const daysBadge = daysTo != null
+      ? `<span style="padding:2px 8px;border-radius:12px;font-size:0.68rem;font-weight:700;background:${daysTo<=3?'#fee2e2':daysTo<=14?'#fef9c3':'#f0fdf4'};color:${daysTo<=3?'#dc2626':daysTo<=14?'#92400e':'#16a34a'}">${daysTo===0?'Today':daysTo===1?'Tomorrow':daysTo+'d away'}</span>`
+      : '';
+    return `<div class="rotation-row">
       <div class="rotation-grps">${esc(r.crew_group)} <span class="rotation-arrow">→</span> ${esc(r.relieving_group)}</div>
-      <div class="rotation-dates">${esc(r.on_date||'').slice(0,10)} – ${esc(r.off_date||'').slice(0,10)}</div>
-    </div>`
-  ).join('') || '<div class="no-data">No upcoming rotations</div>';
+      <div style="display:flex;align-items:center;gap:10px">
+        ${daysBadge}
+        <div class="rotation-dates">${esc(r.on_date||'').slice(0,10)} – ${esc(r.off_date||'').slice(0,10)}</div>
+      </div>
+    </div>`;
+  }).join('') || '<div class="no-data">No upcoming rotations</div>';
 }
 
 // ── SAFETY ────────────────────────────────────────────────────────────
@@ -790,6 +836,7 @@ async function loadSafety() {
       <td>${r.response_time!=null?fmt(r.response_time):'—'}</td>
     </tr>`
   ).join('') || `<tr><td colspan="5" class="no-data">No drills in ${currentYear}</td></tr>`;
+
 }
 
 // ── FINANCE ────────────────────────────────────────────────────────────
@@ -937,7 +984,7 @@ async function loadOperations() {
       { name:'Operating', type:'bar', stack:'h', data:dt.map(r=>r.operating_hrs), itemStyle:{color:'#1a3f7a'} },
       { name:'Standby',   type:'bar', stack:'h', data:dt.map(r=>r.standby_hrs),  itemStyle:{color:'#3dbdb0'} },
       { name:'Repair',    type:'bar', stack:'h', data:dt.map(r=>r.repair_hrs),   itemStyle:{color:'#f59e0b'} },
-      { name:'Other',     type:'bar', stack:'h', data:dt.map(r=>r.other_hrs),    itemStyle:{color:'#e2e8f0'} },
+      { name:'Other (Zero-Rate + Move)', type:'bar', stack:'h', data:dt.map(r=>r.other_hrs), itemStyle:{color:'#cbd5e1'} },
       { name:'Util %', type:'line', yAxisIndex:1, data:dt.map(r=>r.utilisation_pct),
         lineStyle:{color:'#ef4444',width:2.5}, itemStyle:{color:'#ef4444'},
         label:{ show:true, position:'top', formatter: p=>p.value!=null?p.value+'%':'', fontSize:9, color:'#ef4444' } },
@@ -995,18 +1042,64 @@ async function loadOperations() {
     : '<div class="no-data">No drilling location data found</div>';
 }
 
+// ── Crew toggle ──────────────────────────────────────────────────────
+function toggleCrew(idx) {
+  document.getElementById('cg-'+idx).classList.toggle('collapsed');
+}
+
 // ── Utility ───────────────────────────────────────────────────────────
 function show(loaderId, contentId) {
   document.getElementById(loaderId).style.display  = 'none';
   document.getElementById(contentId).style.display = 'block';
 }
 
+// ── Tooltip system (matches dashboard) ───────────────────────────────
+const TIPS = {
+  'snap-glance':         'Cross-domain snapshot for the selected year: safety incidents, open hazard cards, crew currently on board, total invoice spend, drilling utilisation %, and MR fill rate.',
+  'onrig-breakdown':     'Employees with an open service record (<b>Serv_Subtype_To IS NULL</b>) on this rig, grouped by service type. <b>On Board</b> (Serv_Subtype_Id = 7) = physically present on rig.',
+  'crew-groups':         'Crew groups defined in <b>eos_Mst_Crew_Grp</b>. Members assigned via <b>eos_Crew_Grp_Dtl</b> (open Crew_Grp_To = still assigned).<br><b>Green</b> = on board now. <b>Amber</b> = off board / on leave.<br>Click any group card to expand or collapse.',
+  'upcoming-rotations':  'Scheduled handovers from <b>eos_Crew_Grp_Rotation</b>. Shows which group relieves which, the on/off dates, and days until each handover.',
+  'incidents':           '<b>LTI</b> = Lost Time Injury — person cannot work the next shift.<br><b>FAC</b> = First Aid Case.<br><b>MTC</b> = Medical Treatment Case.<br><b>NPT Hrs</b> = operational time lost due to the incident.<br>Source: <b>eos_Incident_Details</b>.',
+  'hazard-cards':        'Source: <b>eos_Hazard_ID_Card</b>.<br><b>O</b> = Open (not yet actioned). <b>C</b> = Closed.<br>Close-Out Rate = % of cards closed.<br>Avg close days = mean time from Event_Dt to Close_Out_Dt.',
+  'invoice-spend':       'Source: <b>eos_Invoice_Hdr</b> joined to eos_Mst_Cost_Centre by Rig_Id.<br>Approval levels: <b>L1 → L2 → L3</b>.<br>Avg approval days measured from Invoice_Dt to each level\'s approval date.',
+  'approval-efficiency': '<b>L1</b> = department head. <b>L2</b> = finance review. <b>L3</b> = final approval.<br>Pending count = invoices stalled at that level.<br>Avg days = mean processing time per level.',
+  'material-req':        'Source: <b>eos_Material_Requisition_Hdr</b>.<br><b>Fulfilled</b> = a GRN (Goods Receipt Note) exists in eos_GRN_Hdr.<br>Avg fulfilment days = Receipt_Dt − MR_Dt.<br>Priority is set on the MR itself.',
+  'drilling-hours':      'Source: <b>eos_Drilling_Dtl</b> (one row per rig per day).<br><b>Operating</b> = billable drilling time.<br><b>Standby</b> = rig ready but idle.<br><b>Repair</b> = maintenance downtime.<br><b>Other</b> = Zero-Rate (client suspension) + Rig Move hours.<br><b>Utilisation %</b> = Operating ÷ Total.',
+  'npt':                 '<b>Non-Productive Time</b> = hours where the rig was not drilling productively.<br>Source: <b>eos_Drilling_Dtl_Ops</b> where Drilling_Ops_Id = 24.<br>Reasons come from the operation description.',
+};
+
+let _tip = null;
+function _moveTip(e) {
+  if (!_tip) return;
+  const pad = 14, tw = _tip.offsetWidth, th = _tip.offsetHeight;
+  let x = e.clientX + pad, y = e.clientY - th - pad;
+  if (x + tw > window.innerWidth  - 8) x = e.clientX - tw - pad;
+  if (y < 8) y = e.clientY + pad;
+  _tip.style.left = x + 'px';
+  _tip.style.top  = y + 'px';
+}
+function initTooltips() {
+  _tip = document.getElementById('kpi-tooltip');  // DOM is ready at call time
+  if (!_tip) return;
+  document.querySelectorAll('.chart-info[data-kpi]').forEach(el => {
+    el.addEventListener('mouseenter', e => {
+      _tip.innerHTML = TIPS[el.dataset.kpi] || el.dataset.kpi;
+      _tip.style.display = 'block';
+      _moveTip(e);
+    });
+    el.addEventListener('mousemove', _moveTip);
+    el.addEventListener('mouseleave', () => { _tip.style.display = 'none'; });
+  });
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────
 async function init() {
   await initYears();
+  initTooltips();
   loadOverview();
 }
 init();
 </script>
+<div id="kpi-tooltip"></div>
 </body>
 </html>
