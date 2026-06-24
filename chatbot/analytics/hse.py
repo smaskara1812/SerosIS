@@ -65,27 +65,33 @@ def get_haz_hotspot_data() -> dict:
         cumul += r['count']
         r['cumul_pct'] = round(cumul / total_p * 100, 1)
 
-    # Close-out performance by rig
+    # Close-out performance by rig.
+    # Wrapped in a subquery so avg_close_days is a real column in the outer scope —
+    # SQL Server does not resolve SELECT-clause aliases inside ORDER BY expressions
+    # (only as bare top-level sort keys), so the NULL-sort trick must reference a
+    # proper derived-table column rather than the inner alias.
     closeout = _query("""
-        SELECT
-            r.Rig_Short_Name                                               AS rig,
-            COUNT(*)                                                        AS total,
-            SUM(CASE WHEN h.Haz_ID_Card_Status = 'O' THEN 1 ELSE 0 END)  AS open,
-            ROUND(100.0 * SUM(CASE WHEN h.Haz_ID_Card_Status = 'C' THEN 1 ELSE 0 END)
-                  / NULLIF(COUNT(*), 0), 1)                                 AS close_rate,
-            ROUND(AVG(CASE WHEN h.Close_Out_Dt IS NOT NULL
-                           AND DATEDIFF(h.Close_Out_Dt, h.Event_Dt) >= 0
-                           THEN DATEDIFF(h.Close_Out_Dt, h.Event_Dt)
-                      END), 1)                                              AS avg_close_days,
-            SUM(CASE WHEN h.Close_Out_Dt IS NOT NULL
-                      AND DATEDIFF(h.Close_Out_Dt, h.Event_Dt) < 0
-                     THEN 1 ELSE 0 END)                                     AS bad_date_count,
-            MAX(CASE WHEN h.Haz_ID_Card_Status = 'O'
-                     THEN DATEDIFF(CURDATE(), h.Event_Dt) END)              AS max_open_age
-        FROM eos_Hazard_ID_Card h
-        JOIN eos_Mst_Rig r ON r.Rig_Id = h.Rig_Id
-        WHERE h.Marked_As_Deleted != 'Y' AND r.Rig_Type_Id IN (1, 2)
-        GROUP BY r.Rig_Short_Name
+        SELECT * FROM (
+            SELECT
+                r.Rig_Short_Name                                               AS rig,
+                COUNT(*)                                                        AS total,
+                SUM(CASE WHEN h.Haz_ID_Card_Status = 'O' THEN 1 ELSE 0 END)  AS open,
+                ROUND(100.0 * SUM(CASE WHEN h.Haz_ID_Card_Status = 'C' THEN 1 ELSE 0 END)
+                      / NULLIF(COUNT(*), 0), 1)                                 AS close_rate,
+                ROUND(AVG(CASE WHEN h.Close_Out_Dt IS NOT NULL
+                               AND DATEDIFF(h.Close_Out_Dt, h.Event_Dt) >= 0
+                               THEN DATEDIFF(h.Close_Out_Dt, h.Event_Dt)
+                          END), 1)                                              AS avg_close_days,
+                SUM(CASE WHEN h.Close_Out_Dt IS NOT NULL
+                          AND DATEDIFF(h.Close_Out_Dt, h.Event_Dt) < 0
+                         THEN 1 ELSE 0 END)                                     AS bad_date_count,
+                MAX(CASE WHEN h.Haz_ID_Card_Status = 'O'
+                         THEN DATEDIFF(CURDATE(), h.Event_Dt) END)              AS max_open_age
+            FROM eos_Hazard_ID_Card h
+            JOIN eos_Mst_Rig r ON r.Rig_Id = h.Rig_Id
+            WHERE h.Marked_As_Deleted != 'Y' AND r.Rig_Type_Id IN (1, 2)
+            GROUP BY r.Rig_Short_Name
+        ) sub
         ORDER BY (avg_close_days IS NULL), avg_close_days DESC
     """)
 
