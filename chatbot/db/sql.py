@@ -26,6 +26,7 @@ What it translates (MySQL → MSSQL):
     (col IS NULL)              →  CASE WHEN col IS NULL THEN 1 ELSE 0 END
     (col IS NOT NULL)          →  CASE WHEN col IS NOT NULL THEN 1 ELSE 0 END
     CAST(x AS CHAR)            →  CAST(x AS VARCHAR(50))
+    AS open/type/key/...       →  AS [open]/[type]/[key]/...     (reserved word aliases)
     LIMIT n                    →  OFFSET 0 ROWS FETCH NEXT n ROWS ONLY
     LIMIT %s                   →  OFFSET 0 ROWS FETCH NEXT <n> ROWS ONLY  (param inlined)
     LIMIT %s OFFSET %s         →  OFFSET <m> ROWS FETCH NEXT <n> ROWS ONLY (params inlined)
@@ -257,6 +258,20 @@ def _translate_cast_char(sql: str) -> str:
     return re.sub(r"\bAS\s+CHAR\s*\)", "AS VARCHAR(50))", sql, flags=re.IGNORECASE)
 
 
+# T-SQL reserved keywords that are safe SQL identifiers in MySQL but require
+# bracket-quoting in SQL Server when used as column aliases.
+# pyodbc strips the brackets from the returned column name, so Python/JS callers
+# see the bare name unchanged (e.g. dict key is still 'open', not '[open]').
+_RESERVED_ALIAS_RE = re.compile(
+    r"\bAS\s+(open|close|type|key|file|read|fetch|full|level|user|table|index)\b",
+    re.IGNORECASE,
+)
+
+def _translate_reserved_aliases(sql: str) -> str:
+    """Bracket T-SQL reserved words used as column aliases: `AS open` → `AS [open]`."""
+    return _RESERVED_ALIAS_RE.sub(lambda m: f"AS [{m.group(1)}]", sql)
+
+
 # Matches (col IS NULL) or (col IS NOT NULL) used as a sort key — MySQL boolean
 # trick for NULLS LAST / NULLS FIRST. MSSQL doesn't allow predicate expressions
 # in ORDER BY, so rewrite as CASE WHEN.
@@ -355,6 +370,7 @@ def translate_mssql(sql: str, params: tuple) -> tuple[str, tuple]:
 
     # 4. Type and identifier rewrites.
     sql = _translate_cast_char(sql)
+    sql = _translate_reserved_aliases(sql)
     sql = _translate_eos_tables(sql)
     sql = _translate_bool_is_null(sql)
 
