@@ -96,21 +96,26 @@ def get_haz_hotspot_data() -> dict:
     """)
 
     # Open hazard age distribution (current snapshot)
+    # Derived table so GROUP BY/ORDER BY reference a real column, not an alias.
+    # SQL Server does not allow GROUP BY on a SELECT-clause alias.
     age_dist = _query("""
-        SELECT
-            CASE
-                WHEN DATEDIFF(CURDATE(), Event_Dt) <=  7 THEN '0-7d'
-                WHEN DATEDIFF(CURDATE(), Event_Dt) <= 14 THEN '8-14d'
-                WHEN DATEDIFF(CURDATE(), Event_Dt) <= 30 THEN '15-30d'
-                WHEN DATEDIFF(CURDATE(), Event_Dt) <= 60 THEN '31-60d'
-                WHEN DATEDIFF(CURDATE(), Event_Dt) <= 90 THEN '61-90d'
-                ELSE '90+d'
-            END AS bucket,
-            COUNT(*) AS count
-        FROM eos_Hazard_ID_Card
-        WHERE Haz_ID_Card_Status = 'O' AND Marked_As_Deleted != 'Y'
+        SELECT bucket, COUNT(*) AS count
+        FROM (
+            SELECT
+                CASE
+                    WHEN DATEDIFF(CURDATE(), Event_Dt) <=  7 THEN '0-7d'
+                    WHEN DATEDIFF(CURDATE(), Event_Dt) <= 14 THEN '8-14d'
+                    WHEN DATEDIFF(CURDATE(), Event_Dt) <= 30 THEN '15-30d'
+                    WHEN DATEDIFF(CURDATE(), Event_Dt) <= 60 THEN '31-60d'
+                    WHEN DATEDIFF(CURDATE(), Event_Dt) <= 90 THEN '61-90d'
+                    ELSE '90+d'
+                END AS bucket,
+                DATEDIFF(CURDATE(), Event_Dt) AS age_days
+            FROM eos_Hazard_ID_Card
+            WHERE Haz_ID_Card_Status = 'O' AND Marked_As_Deleted != 'Y'
+        ) sub
         GROUP BY bucket
-        ORDER BY MIN(DATEDIFF(CURDATE(), Event_Dt))
+        ORDER BY MIN(age_days)
     """)
 
     # Monthly hazards by rig — last 24 months (for stacked control chart)
@@ -168,30 +173,35 @@ def get_haz_hotspot_data() -> dict:
     try:
         tenure_rows = _query("""
             SELECT
-                CASE
-                    WHEN DATEDIFF(h.Event_Dt, cd.Crew_Grp_From) <  0  THEN NULL
-                    WHEN DATEDIFF(h.Event_Dt, cd.Crew_Grp_From) <= 14 THEN '0-14d'
-                    WHEN DATEDIFF(h.Event_Dt, cd.Crew_Grp_From) <= 28 THEN '15-28d'
-                    WHEN DATEDIFF(h.Event_Dt, cd.Crew_Grp_From) <= 56 THEN '29-56d'
-                    ELSE '57+d'
-                END                              AS tenure_bucket,
-                COUNT(DISTINCT h.Haz_Id)         AS hazard_count,
-                COUNT(DISTINCT cd.Fs_Emp_Id)     AS crew_count,
-                ROUND(
-                    COUNT(DISTINCT h.Haz_Id) * 1.0
-                    / NULLIF(COUNT(DISTINCT cd.Fs_Emp_Id), 0), 3
-                )                                AS rate_per_person
-            FROM eos_Hazard_ID_Card h
-            JOIN eos_Mst_Rig r ON r.Rig_Id = h.Rig_Id
-            JOIN eos_Crew_Grp_Dtl cd ON cd.Rig_Id = h.Rig_Id
-              AND cd.Crew_Grp_From <= h.Event_Dt
-              AND (cd.Crew_Grp_To IS NULL OR cd.Crew_Grp_To > h.Event_Dt)
-            WHERE h.Marked_As_Deleted != 'Y'
-              AND r.Rig_Type_Id IN (1, 2)
-              AND h.Event_Dt >= DATE_SUB(CURDATE(), INTERVAL 2 YEAR)
+                tenure_bucket,
+                COUNT(DISTINCT haz_id)    AS hazard_count,
+                COUNT(DISTINCT emp_id)    AS crew_count,
+                ROUND(COUNT(DISTINCT haz_id) * 1.0
+                      / NULLIF(COUNT(DISTINCT emp_id), 0), 3) AS rate_per_person
+            FROM (
+                SELECT
+                    h.Haz_Id AS haz_id,
+                    cd.Fs_Emp_Id AS emp_id,
+                    DATEDIFF(h.Event_Dt, cd.Crew_Grp_From) AS tenure_days,
+                    CASE
+                        WHEN DATEDIFF(h.Event_Dt, cd.Crew_Grp_From) <  0  THEN NULL
+                        WHEN DATEDIFF(h.Event_Dt, cd.Crew_Grp_From) <= 14 THEN '0-14d'
+                        WHEN DATEDIFF(h.Event_Dt, cd.Crew_Grp_From) <= 28 THEN '15-28d'
+                        WHEN DATEDIFF(h.Event_Dt, cd.Crew_Grp_From) <= 56 THEN '29-56d'
+                        ELSE '57+d'
+                    END AS tenure_bucket
+                FROM eos_Hazard_ID_Card h
+                JOIN eos_Mst_Rig r ON r.Rig_Id = h.Rig_Id
+                JOIN eos_Crew_Grp_Dtl cd ON cd.Rig_Id = h.Rig_Id
+                  AND cd.Crew_Grp_From <= h.Event_Dt
+                  AND (cd.Crew_Grp_To IS NULL OR cd.Crew_Grp_To > h.Event_Dt)
+                WHERE h.Marked_As_Deleted != 'Y'
+                  AND r.Rig_Type_Id IN (1, 2)
+                  AND h.Event_Dt >= DATE_SUB(CURDATE(), INTERVAL 2 YEAR)
+            ) sub
+            WHERE tenure_bucket IS NOT NULL
             GROUP BY tenure_bucket
-            HAVING tenure_bucket IS NOT NULL
-            ORDER BY MIN(DATEDIFF(h.Event_Dt, cd.Crew_Grp_From))
+            ORDER BY MIN(tenure_days)
         """)
         crew_tenure = [dict(r) for r in tenure_rows]
     except Exception:
