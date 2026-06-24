@@ -166,7 +166,7 @@ def get_haz_hotspot_data() -> dict:
         JOIN eos_Mst_Rig r ON r.Rig_Id = h.Rig_Id
         WHERE h.Marked_As_Deleted != 'Y' AND r.Rig_Type_Id IN (1, 2)
         GROUP BY r.Rig_Short_Name
-        ORDER BY open DESC
+        ORDER BY 2 DESC
     """)
 
     # Crew tenure risk — hazards relative to how long crew had been on rig
