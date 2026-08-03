@@ -25,6 +25,7 @@ from .tools import (
     get_workforce_dashboard,
     list_overdue_crew_rotations,
     list_expiring_crew_certificates,
+    get_finance_dashboard,
 )
 
 _CURRENT_YEAR = datetime.now().year
@@ -51,36 +52,59 @@ def _get_rig_cache() -> list[dict]:
 
 
 def _extract_rig(text: str) -> str | None:
-    """Find a rig name or short name in the user message (case-insensitive)."""
+    """Find the first rig name or short name in the user message."""
+    result = _extract_rigs(text)
+    return result[0] if result else None
+
+
+def _extract_rigs(text: str) -> list[str]:
+    """Find up to 2 rig names in the user message (longest match first)."""
     lower = text.lower()
     rigs = _get_rig_cache()
-    # Try longest names first to avoid partial collisions (e.g. "SK1" vs "SK01")
     candidates = sorted(
         [(r["Rig_Name"], r["Rig_Short_Name"]) for r in rigs],
         key=lambda x: len(x[0]),
         reverse=True,
     )
+    found: list[str] = []
+    consumed: set[str] = set()
     for full_name, short_name in candidates:
-        if full_name.lower() in lower:
-            return full_name
-        # Word-boundary match for short names — plain substring containment
-        # let short abbreviations like "EW" match inside ordinary words
-        # (e.g. "crEW"), silently returning the wrong rig.
-        if short_name and re.search(r'\b' + re.escape(short_name.lower()) + r'\b', lower):
-            return short_name
-    return None
+        if len(found) >= 2:
+            break
+        fn_lower = full_name.lower()
+        if fn_lower in lower and fn_lower not in consumed:
+            found.append(full_name)
+            consumed.add(fn_lower)
+        elif short_name:
+            sn_lower = short_name.lower()
+            if re.search(r'\b' + re.escape(sn_lower) + r'\b', lower) and sn_lower not in consumed:
+                found.append(short_name)
+                consumed.add(sn_lower)
+    return found
 
 
 def _extract_year(text: str) -> int | None:
-    m = re.search(r'\b(20\d{2})\b', text)
-    if m:
-        return int(m.group(1))
-    lower = text.lower()
-    if "this year" in lower or "current year" in lower:
-        return _CURRENT_YEAR
-    if "last year" in lower or "previous year" in lower:
-        return _CURRENT_YEAR - 1
-    return None
+    result = _extract_years(text)
+    return result[0] if result else None
+
+
+def _extract_years(text: str) -> list[int]:
+    """Find up to 2 four-digit years in the user message."""
+    found: list[int] = list(dict.fromkeys(int(m) for m in re.findall(r'\b(20\d{2})\b', text)))[:2]
+    if not found:
+        lower = text.lower()
+        if "this year" in lower or "current year" in lower:
+            found.append(_CURRENT_YEAR)
+        if "last year" in lower or "previous year" in lower:
+            found.append(_CURRENT_YEAR - 1)
+    return found
+
+
+def _is_comparison(msg: str) -> bool:
+    return any(kw in msg for kw in [
+        " vs ", " vs.", "versus", "compare ", "compared to", "vs each other",
+        "year over year", "yoy", "year on year",
+    ])
 
 
 def _extract_limit(text: str, default: int = 5) -> int:
@@ -141,16 +165,8 @@ def _extract_month(text: str) -> int | None:
     return None
 
 
-def route(user_message: str, context: dict | None = None) -> dict | None:
-    """
-    Match the user message to an analytics tool and return its result.
-    Returns None if no analytics intent is detected → falls through to RAG.
-    context: optional dict with 'rig' and 'year' extracted from prior messages.
-    """
-    msg   = user_message.lower().strip()
-    rig   = _extract_rig(msg)   or (context or {}).get("rig")
-    year  = _extract_year(msg)  or (context or {}).get("year")
-    limit = _extract_limit(msg)
+def _match_tool(msg: str, rig, year, limit: int, context: dict | None) -> dict | None:
+    """Core intent matching with explicit rig/year/limit — no extraction done here."""
 
     # ── Rig count ──────────────────────────────────────────────────────────────
     if any(p in msg for p in [
@@ -383,4 +399,64 @@ def route(user_message: str, context: dict | None = None) -> dict | None:
     ]):
         return get_drilling_hours(rig=rig, year=year)
 
+    # ── Finance dashboard ──────────────────────────────────────────────────────
+    if any(p in msg for p in [
+        "finance dashboard", "finance overview", "finance summary", "finance report",
+        "vendor spend", "vendor payment", "vendor cost", "top vendor",
+        "which vendor", "highest vendor", "most paid vendor", "vendor invoice",
+        "invoice spend", "invoice amount", "total invoice", "invoice total",
+        "mr fulfilment", "mr fulfillment", "material requisition", "fulfilment time",
+        "fulfillment time", "how long does mr", "procurement lead time",
+        "how fast do we receive", "grn days", "days to receive",
+        "spend concentration", "spend breakdown", "finance kpi",
+        "invoice count", "how much are we paying", "what are we paying",
+    ]):
+        return get_finance_dashboard(year=year)
+
     return None
+
+
+def route(user_message: str, context: dict | None = None) -> dict | None:
+    """
+    Match the user message to an analytics tool and return its result.
+    Returns None if no analytics intent is detected → falls through to RAG.
+    Supports two-rig comparison ("EE02 vs SR03") and year-over-year ("2025 vs 2026").
+    """
+    msg   = user_message.lower().strip()
+    limit = _extract_limit(msg)
+
+    if _is_comparison(msg):
+        rigs  = _extract_rigs(msg)
+        years = _extract_years(msg)
+
+        # ── Two-rig comparison ─────────────────────────────────────────────────
+        if len(rigs) == 2:
+            year = years[0] if years else (context or {}).get("year")
+            a = _match_tool(msg, rig=rigs[0], year=year, limit=limit, context=context)
+            b = _match_tool(msg, rig=rigs[1], year=year, limit=limit, context=context)
+            if a and b:
+                return {
+                    "comparison": "rig",
+                    "rig_a": rigs[0], "data_a": a,
+                    "rig_b": rigs[1], "data_b": b,
+                    "tool": a.get("tool", ""),
+                }
+
+        # ── Year-over-year comparison ──────────────────────────────────────────
+        if len(years) == 2:
+            rig = (rigs[0] if rigs else None) or (context or {}).get("rig")
+            a = _match_tool(msg, rig=rig, year=years[0], limit=limit, context=context)
+            b = _match_tool(msg, rig=rig, year=years[1], limit=limit, context=context)
+            if a and b:
+                return {
+                    "comparison": "year",
+                    "year_a": years[0], "data_a": a,
+                    "year_b": years[1], "data_b": b,
+                    "rig": rig,
+                    "tool": a.get("tool", ""),
+                }
+
+    # ── Standard single-rig / single-year route ────────────────────────────────
+    rig  = _extract_rig(msg)  or (context or {}).get("rig")
+    year = _extract_year(msg) or (context or {}).get("year")
+    return _match_tool(msg, rig=rig, year=year, limit=limit, context=context)

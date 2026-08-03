@@ -160,6 +160,12 @@
 
     <div class="filter-spacer"></div>
     <div class="results-count" id="results-count"></div>
+    <button id="print-pdf-btn" onclick="printPDF()" style="
+      background:#1a3f7a; color:#fff; border:none; padding:6px 14px;
+      border-radius:6px; font-size:13px; cursor:pointer; display:flex;
+      align-items:center; gap:6px; white-space:nowrap;">
+      &#x1F4C4; Print PDF
+    </button>
   </div>
 
   <div class="listing-table-wrap">
@@ -371,6 +377,34 @@
     await loadMeta();
     await loadData();
   })();
+
+  function printPDF() {
+    const btn = document.getElementById("print-pdf-btn");
+    btn.textContent = "Generating…";
+    btn.disabled = true;
+    const params = new URLSearchParams();
+    if (state.rig)           params.set("rig", state.rig);
+    if (state.year)          params.set("year", state.year);
+    if (state.hazard_type)   params.set("hazard_type", state.hazard_type);
+    if (state.status)        params.set("status", state.status);
+    if (state.tfs)           params.set("tfs", state.tfs);
+    if (state.work_location) params.set("work_location", state.work_location);
+    if (state.search)        params.set("search", state.search);
+    const url = "/api/listings/hazard-cards/pdf/?" + params.toString();
+    fetch(url)
+      .then(r => {
+        if (!r.ok) throw new Error("Server error " + r.status);
+        return r.blob();
+      })
+      .then(blob => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.target = "_blank";
+        a.click();
+      })
+      .catch(err => alert("PDF generation failed: " + err.message))
+      .finally(() => { btn.innerHTML = "&#x1F4C4; Print PDF"; btn.disabled = false; });
+  }
 </script>
 </body>
 </html>

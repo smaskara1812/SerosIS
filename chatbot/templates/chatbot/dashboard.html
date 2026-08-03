@@ -641,6 +641,10 @@
         <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"></path></svg></span>
         <span class="sidebar-label">Hazard Hotspot</span>
       </a>
+      <a class="sidebar-item" data-insight="haz-corr" title="Hazard vs Downtime">
+        <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2"/><circle cx="12" cy="10" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="9" cy="14" r="2"/><line x1="2" y1="22" x2="22" y2="2"/></svg></span>
+        <span class="sidebar-label">Hazard vs Downtime</span>
+      </a>
 
       <div class="sidebar-section-label">Workforce</div>
       <a class="sidebar-item" data-insight="workforce" title="Workforce Overview">
@@ -1100,6 +1104,66 @@
         </div>
       </div><!-- /#haz-kpis -->
     </div><!-- /#insight-haz-hotspot -->
+
+    <!-- ── Hazard vs Downtime Correlation ── -->
+    <div id="insight-haz-corr" class="insight-section">
+
+      <div id="haz-corr-spinner" style="display:none;justify-content:center;align-items:center;height:120px;gap:10px;color:#64748b;font-size:0.875rem;">
+        <div style="width:18px;height:18px;border:2px solid #3dbdb0;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
+        Computing…
+      </div>
+
+      <!-- Conclusion banner — filled by JS -->
+      <div id="haz-corr-conclusion" style="border-radius:8px;padding:12px 16px;font-size:0.85rem;line-height:1.5;margin-bottom:16px;display:none;"></div>
+
+      <!-- Quadrant map -->
+      <div class="chart-card">
+        <div class="chart-title">Rig Position Map — Hazard Reporting vs Downtime</div>
+        <div class="chart-body" id="chart-haz-quadrant" style="height:420px;"></div>
+        <!-- Quadrant legend -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;font-size:0.78rem;">
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#d1fae5;border-radius:6px;color:#065f46;">
+            <span style="width:10px;height:10px;border-radius:50%;background:#10b981;flex-shrink:0;"></span>
+            <b>Best Practice</b> — High reporting, low downtime
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#fef3c7;border-radius:6px;color:#92400e;">
+            <span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>
+            <b>High Risk + Aware</b> — High reporting, high downtime
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#f1f5f9;border-radius:6px;color:#475569;">
+            <span style="width:10px;height:10px;border-radius:50%;background:#94a3b8;flex-shrink:0;"></span>
+            <b>Low Activity</b> — Low reporting, low downtime
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#fee2e2;border-radius:6px;color:#991b1b;">
+            <span style="width:10px;height:10px;border-radius:50%;background:#ef4444;flex-shrink:0;"></span>
+            <b>Danger Zone</b> — Low reporting, high downtime
+          </div>
+        </div>
+      </div>
+
+      <!-- Status table -->
+      <div class="chart-card" style="margin-top:12px;">
+        <div class="chart-title">Rig Status Summary</div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
+          <thead>
+            <tr style="background:#f8fafc;color:#64748b;text-transform:uppercase;font-size:0.72rem;letter-spacing:.05em;">
+              <th style="padding:10px 14px;text-align:left;border-bottom:1px solid #e2e8f0;">Rig</th>
+              <th style="padding:10px 14px;text-align:right;border-bottom:1px solid #e2e8f0;">Avg Hazards / Month</th>
+              <th style="padding:10px 14px;text-align:right;border-bottom:1px solid #e2e8f0;">Avg Downtime hrs / Month</th>
+              <th style="padding:10px 14px;text-align:right;border-bottom:1px solid #e2e8f0;">Months of Data</th>
+              <th style="padding:10px 14px;text-align:center;border-bottom:1px solid #e2e8f0;">Status</th>
+            </tr>
+          </thead>
+          <tbody id="haz-corr-table-body">
+            <tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">Loading…</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:10px;font-size:0.75rem;color:#94a3b8;">
+          Quadrant boundaries are set at the median across all rigs. Downtime = Repair + Zero-Rate hours from daily drilling log.
+        </div>
+      </div>
+
+    </div><!-- /#insight-haz-corr -->
 
     <div id="insight-workforce" class="insight-section">
 
@@ -1832,6 +1896,7 @@
     // Lazy-load HSE data on first visit
     if (name === "hse") loadHse();
     if (name === "haz-hotspot") loadHazHotspot();
+    if (name === "haz-corr") loadHazCorr();
     // Lazy-load Workforce data on first visit (Crew Roster shares the same payload)
     if (name === "workforce" || name === "roster") loadWorkforce();
     // Lazy-load Finance data on first visit
@@ -2525,6 +2590,7 @@
 
   let _hseLoaded = false;
   let _hazHotspotLoaded = false;
+  let _hazCorrLoaded = false;
 
   async function loadHse() {
     if (_hseLoaded) return;
@@ -3162,6 +3228,178 @@
     }, true);
   }
 
+  /* ── Insight: Hazard vs Downtime Correlation ── */
+
+  async function loadHazCorr() {
+    if (_hazCorrLoaded) return;
+    const spinner = document.getElementById("haz-corr-spinner");
+    if (spinner) spinner.style.display = "flex";
+    try {
+      const resp = await fetch("/api/dashboard/hse/correlation/");
+      if (!resp.ok) throw new Error(resp.status);
+      const d = await resp.json();
+      _hazCorrLoaded = true;
+      _renderCorrConclusion(d);
+      _renderHazQuadrant(d);
+      _renderHazStatusTable(d.per_rig || []);
+    } catch(e) {
+      console.error("Haz-corr load error", e);
+    } finally {
+      if (spinner) spinner.style.display = "none";
+    }
+  }
+
+  function _renderCorrConclusion(d) {
+    const el = document.getElementById("haz-corr-conclusion");
+    if (!el) return;
+
+    let text, bg, border, color;
+    const r = d.r, sig = d.significant;
+
+    if (r == null) {
+      text   = "Insufficient data to compute a correlation.";
+      bg     = "#f8fafc"; border = "#e2e8f0"; color = "#64748b";
+    } else if (!sig) {
+      text   = `No statistically significant relationship found between hazard reporting and downtime across the fleet (r = ${r}). `
+             + `More data over time may clarify the pattern.`;
+      bg     = "#f8fafc"; border = "#e2e8f0"; color = "#475569";
+    } else if (r < -0.1) {
+      text   = `✅ Rigs that file more hazard cards tend to have <b>less downtime</b> (r = ${r}, statistically significant across ${d.n} rig-months). `
+             + `Proactive reporting appears to be preventing equipment failures — the safety culture is working.`;
+      bg     = "#d1fae5"; border = "#6ee7b7"; color = "#065f46";
+    } else {
+      text   = `⚠️ Rigs that file more hazard cards also tend to have <b>more downtime</b> (r = ${r}, statistically significant). `
+             + `Hazard spikes may be early warnings of operational problems worth investigating.`;
+      bg     = "#fef3c7"; border = "#fcd34d"; color = "#92400e";
+    }
+
+    el.innerHTML = text;
+    el.style.background   = bg;
+    el.style.border       = `1px solid ${border}`;
+    el.style.color        = color;
+    el.style.display      = "block";
+  }
+
+  function _renderHazQuadrant(d) {
+    const c = initChart("chart-haz-quadrant");
+    if (!c || !d.per_rig || !d.per_rig.length) return;
+
+    const medH = d.median_hazards;
+    const medD = d.median_downtime;
+
+    const qCfg = {
+      best:   { color: "#10b981", name: "Best Practice" },
+      risk:   { color: "#f59e0b", name: "High Risk + Aware" },
+      low:    { color: "#94a3b8", name: "Low Activity" },
+      danger: { color: "#ef4444", name: "Danger Zone" },
+    };
+
+    // Group rigs by quadrant for separate coloured series
+    const byQ = { best: [], risk: [], low: [], danger: [] };
+    for (const row of d.per_rig) {
+      byQ[row.quadrant].push({
+        value: [row.avg_hazards, row.avg_downtime],
+        name:  row.rig,
+        label: { show: true, formatter: () => row.rig, position: "top",
+                 fontSize: 11, color: "#334155", fontWeight: "600" },
+      });
+    }
+
+    const scatterSeries = Object.entries(qCfg).map(([q, cfg]) => ({
+      name:       cfg.name,
+      type:       "scatter",
+      symbolSize: 16,
+      itemStyle:  { color: cfg.color },
+      data:       byQ[q],
+      tooltip: {
+        formatter: p => {
+          const row = d.per_rig.find(r => r.rig === p.data.name);
+          return `<b>${p.data.name}</b><br/>`
+               + `Avg hazards: <b>${p.data.value[0]}/mo</b><br/>`
+               + `Avg downtime: <b>${p.data.value[1]} hrs/mo</b><br/>`
+               + `<span style="color:${cfg.color};font-weight:600">${cfg.name}</span>`
+               + (row ? `<br/><span style="color:#94a3b8;font-size:0.9em">${row.months} months of data</span>` : "");
+        },
+      },
+    }));
+
+    // Invisible dummy series just to draw the median divider lines
+    scatterSeries.push({
+      name: "_ref", type: "scatter", data: [], silent: true,
+      markLine: {
+        silent: true,
+        symbol: "none",
+        lineStyle: { color: "#cbd5e1", type: "dashed", width: 1.5 },
+        label:  { show: false },
+        data: [{ xAxis: medH }, { yAxis: medD }],
+      },
+    });
+
+    // Quadrant background shading via markArea on first series
+    scatterSeries[0].markArea = {
+      silent: true,
+      data: [
+        // Danger zone: low haz (0..medH), high dt (medD..max)
+        [{ itemStyle: { color: "rgba(239,68,68,0.05)" }, xAxis: 0,    yAxis: medD },
+         { xAxis: medH, yAxis: "max" }],
+        // Best practice: high haz (medH..max), low dt (0..medD)
+        [{ itemStyle: { color: "rgba(16,185,129,0.05)" }, xAxis: medH, yAxis: 0 },
+         { xAxis: "max", yAxis: medD }],
+        // High risk: high haz, high dt
+        [{ itemStyle: { color: "rgba(245,158,11,0.05)" }, xAxis: medH, yAxis: medD },
+         { xAxis: "max", yAxis: "max" }],
+        // Low activity: low haz, low dt
+        [{ itemStyle: { color: "rgba(148,163,184,0.05)" }, xAxis: 0, yAxis: 0 },
+         { xAxis: medH, yAxis: medD }],
+      ],
+    };
+
+    c.setOption({
+      tooltip: { trigger: "item" },
+      legend:  { bottom: 0, data: Object.values(qCfg).map(c => c.name),
+                 textStyle: { fontSize: 11 } },
+      grid:    { top: 20, bottom: 56, left: 72, right: 20 },
+      xAxis: { name: "Avg Hazard Cards Filed / Month",
+               nameLocation: "middle", nameGap: 32,
+               type: "value", min: 0, axisLabel: { fontSize: 11 } },
+      yAxis: { name: "Avg Downtime hrs / Month",
+               nameLocation: "middle", nameGap: 56,
+               type: "value", min: 0, axisLabel: { fontSize: 11 } },
+      series: scatterSeries,
+    });
+  }
+
+  function _renderHazStatusTable(perRig) {
+    const tbody = document.getElementById("haz-corr-table-body");
+    if (!tbody) return;
+    if (!perRig.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No data</td></tr>`;
+      return;
+    }
+
+    const badge = q => {
+      const cfg = {
+        best:   { bg: "#d1fae5", color: "#065f46", text: "Best Practice" },
+        risk:   { bg: "#fef3c7", color: "#92400e", text: "High Risk + Aware" },
+        low:    { bg: "#f1f5f9", color: "#475569", text: "Low Activity" },
+        danger: { bg: "#fee2e2", color: "#991b1b", text: "Danger Zone" },
+      }[q] || { bg: "#f1f5f9", color: "#475569", text: q };
+      return `<span style="background:${cfg.bg};color:${cfg.color};padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:600;white-space:nowrap;">${cfg.text}</span>`;
+    };
+
+    const order = { danger: 0, risk: 1, low: 2, best: 3 };
+    const sorted = [...perRig].sort((a, b) => order[a.quadrant] - order[b.quadrant]);
+
+    tbody.innerHTML = sorted.map(row => `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:10px 14px;font-weight:600">${row.rig}</td>
+        <td style="padding:10px 14px;text-align:right">${row.avg_hazards}</td>
+        <td style="padding:10px 14px;text-align:right">${row.avg_downtime}</td>
+        <td style="padding:10px 14px;text-align:right;color:#64748b">${row.months}</td>
+        <td style="padding:10px 14px;text-align:center">${badge(row.quadrant)}</td>
+      </tr>`).join("");
+  }
+
   let _workforceLoaded = false;
 
   async function loadWorkforce() {
@@ -3661,6 +3899,7 @@
   async function loadDashboard() {
     _hseLoaded = false;
     _hazHotspotLoaded = false;
+    // Correlation uses full dataset — filters don't change it, so no reload needed
     // If HSE tab is active, reload it now so filter change takes effect
     if (document.getElementById("insight-hse")?.classList.contains("active")) {
       loadHse();
@@ -4050,6 +4289,13 @@
     "chart-info-fin-mr-rig":        `<b>MR Fulfilment by Rig</b> — Average days from requisition to GRN per rig, split by priority (Urgent / Normal / Routine). Urgent MRs should fulfil faster than Routine.`,
     "chart-info-fin-mr-buckets":    `<b>Fulfilment Distribution</b> — How many MRs fell into each time bracket. A healthy procurement process keeps most MRs under 30 days.`,
     "chart-info-fin-mr-trend":      `<b>MR Fulfilment Trend</b> — Monthly average fulfilment days over the last 24 months. A downward trend means procurement is improving.`,
+
+    // Hazard vs Downtime Correlation
+    "corr-pearson-r":   `<b>Pearson r</b> — Linear correlation between hazard count and downtime hours across all rig-months. Range −1 to +1. Positive = more hazards accompany more downtime; negative = more hazards accompany less downtime (better reporting culture). ≥0.4 is moderate, ≥0.7 is strong.`,
+    "corr-spearman-r":  `<b>Spearman ρ</b> — Rank-based correlation; less sensitive to outliers than Pearson r. Both should point in the same direction. If they diverge significantly, a few extreme months are distorting the linear result.`,
+    "corr-p":           `<b>p-value</b> — Probability this correlation is due to random chance. p &lt; 0.05 = statistically significant (95% confidence). p ≥ 0.05 means the dataset is too small or noisy to draw firm conclusions.`,
+    "corr-n":           `<b>Rig-Months (n)</b> — Number of (rig, month) pairs where both a hazard card and a daily drilling log exist. Larger n = more reliable correlation.`,
+    "corr-direction":   `<b>Relationship</b> — Plain-English interpretation of the Pearson r value. <i>Positive</i>: hazard spikes and downtime tend to occur together. <i>Negative</i>: rigs that report more hazards tend to have less downtime — a sign that proactive reporting prevents incidents.`,
   };
 
   /* ── KPI info tooltip ── */

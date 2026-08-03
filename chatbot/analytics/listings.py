@@ -742,3 +742,115 @@ def get_invoice_listing(
         "rows": serialised,
         **_paginate(total, page, page_size),
     }
+
+
+# ── Certificate Listing ───────────────────────────────────────────────────────
+
+CERT_SORT_COLUMNS = {
+    "employee":  "e.Fs_Emp_Fname",
+    "cert_name": "mc.cert_name",
+    "expiry":    "fc.Fs_Cert_Valid_Till",
+    "issued":    "fc.Fs_Cert_Dt",
+}
+
+
+def get_certificate_listing(
+    page: int | None = None,
+    page_size: int | None = None,
+    status: str | None = None,      # 'expired' | 'due_30' | 'due_90' | 'valid'
+    cert_type: str | None = None,
+    search: str | None = None,
+    sort: str | None = None,
+    sort_dir: str | None = None,
+) -> dict:
+    page      = _clean_page(page)
+    page_size = _clean_page_size(page_size)
+
+    conditions = ["fc.Fs_Cert_Active = 'Y'", "fc.Fs_Cert_Valid_Till IS NOT NULL"]
+    params: list = []
+
+    if status == "expired":
+        conditions.append("fc.Fs_Cert_Valid_Till < CURDATE()")
+    elif status == "due_30":
+        conditions.append("fc.Fs_Cert_Valid_Till >= CURDATE()")
+        conditions.append("fc.Fs_Cert_Valid_Till < CURDATE() + INTERVAL 30 DAY")
+    elif status == "due_90":
+        conditions.append("fc.Fs_Cert_Valid_Till >= CURDATE()")
+        conditions.append("fc.Fs_Cert_Valid_Till < CURDATE() + INTERVAL 90 DAY")
+    elif status == "valid":
+        conditions.append("fc.Fs_Cert_Valid_Till >= CURDATE() + INTERVAL 90 DAY")
+
+    if cert_type:
+        conditions.append("mc.cert_name = %s")
+        params.append(cert_type)
+
+    if search:
+        conditions.append("""(
+            e.Fs_Emp_Fname LIKE %s OR
+            e.Fs_Emp_Lname LIKE %s OR
+            mc.cert_name   LIKE %s
+        )""")
+        like = f"%{search}%"
+        params.extend([like, like, like])
+
+    where = " AND ".join(conditions)
+
+    total_rows = _query(f"""
+        SELECT COUNT(*) AS cnt
+        FROM eos_Fs_Certificates fc
+        LEFT JOIN eos_Mst_Fs_Employee e ON fc.Fs_Emp_Id = e.Fs_Emp_Id
+        LEFT JOIN Mst_Cert mc ON fc.Cert_Id = mc.cert_id
+        WHERE {where}
+    """, tuple(params))
+    total = total_rows[0]["cnt"] if total_rows else 0
+
+    sort_col = CERT_SORT_COLUMNS.get(sort, "fc.Fs_Cert_Valid_Till")
+    sort_dir = "ASC" if sort_dir == "asc" else "DESC"
+    offset   = (page - 1) * page_size
+
+    rows = _query(f"""
+        SELECT
+            CONCAT_WS(' ', e.Fs_Emp_Fname, NULLIF(e.Fs_Emp_Mname, ''), e.Fs_Emp_Lname) AS employee_name,
+            mr.rank_name                                          AS rank_name,
+            mc.cert_name                                          AS cert_name,
+            DATE(fc.Fs_Cert_Dt)                                   AS issued_date,
+            DATE(fc.Fs_Cert_Valid_Till)                           AS expiry_date,
+            DATEDIFF(fc.Fs_Cert_Valid_Till, CURDATE())            AS days_until_expiry
+        FROM eos_Fs_Certificates fc
+        LEFT JOIN eos_Mst_Fs_Employee e ON fc.Fs_Emp_Id = e.Fs_Emp_Id
+        LEFT JOIN Mst_Rank mr           ON e.Rank_Id = mr.rank_id
+        LEFT JOIN Mst_Cert mc           ON fc.Cert_Id = mc.cert_id
+        WHERE {where}
+        ORDER BY {sort_col} {sort_dir}
+        LIMIT %s OFFSET %s
+    """, tuple(params) + (page_size, offset))
+
+    def _cert_status(days):
+        if days is None:
+            return "unknown"
+        d = int(days)
+        if d < 0:
+            return "expired"
+        if d <= 30:
+            return "due_30"
+        if d <= 90:
+            return "due_90"
+        return "valid"
+
+    serialised = []
+    for r in rows:
+        days = r["days_until_expiry"]
+        serialised.append({
+            "employee_name":     r["employee_name"] or "—",
+            "rank":              r["rank_name"] or "—",
+            "cert_name":         r["cert_name"] or "—",
+            "issued_date":       str(r["issued_date"]) if r["issued_date"] else None,
+            "expiry_date":       str(r["expiry_date"]) if r["expiry_date"] else None,
+            "days_until_expiry": int(days) if days is not None else None,
+            "status":            _cert_status(days),
+        })
+
+    return {
+        "rows": serialised,
+        **_paginate(total, page, page_size),
+    }

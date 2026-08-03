@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET, require_http_methods
 from langchain_core.messages import HumanMessage, AIMessage
@@ -749,6 +749,12 @@ def dashboard_hse_hotspot_api(request):
     return JsonResponse(get_haz_hotspot_data())
 
 
+@require_GET
+def dashboard_hse_correlation_api(request):
+    from .analytics.hse import get_haz_downtime_correlation
+    return JsonResponse(get_haz_downtime_correlation())
+
+
 def _build_workforce(year, rig_filter):
     from .analytics.tools import get_workforce_dashboard
     rig = rig_filter[0] if rig_filter else None
@@ -950,6 +956,34 @@ def listings_hazard_cards_api(request):
     return JsonResponse(data)
 
 
+@require_GET
+def listings_hazard_cards_pdf(request):
+    from .analytics.listings import get_hazard_card_listing
+    from .pdf_reports import generate_hazard_cards_pdf
+    g = request.GET
+    year = g.get("year")
+    rig  = g.get("rig") or None
+    result = get_hazard_card_listing(
+        page=1, page_size=2000,
+        rig=rig,
+        year=int(year) if year and year.isdigit() else None,
+        hazard_type=g.get("hazard_type") or None,
+        status=g.get("status") or None,
+        tfs=g.get("tfs") or None,
+        work_location=g.get("work_location") or None,
+        search=g.get("search") or None,
+    )
+    if "error" in result:
+        return JsonResponse(result, status=400)
+    rows = result.get("rows", [])
+    rig_label    = rig or "All Rigs"
+    period_label = year or "All Time"
+    pdf_bytes = generate_hazard_cards_pdf(rows, rig_label=rig_label, period_label=str(period_label))
+    response = HttpResponse(bytes(pdf_bytes), content_type="application/pdf")
+    response["Content-Disposition"] = 'inline; filename="hazard_cards.pdf"'
+    return response
+
+
 def listings_employees_page(request):
     return render(request, "chatbot/listings/employees.html")
 
@@ -1113,6 +1147,125 @@ def listings_invoices_api(request):
         page_size=int(page_size) if page_size and page_size.isdigit() else None,
         year=int(year) if year and year.isdigit() else None,
         vendor=g.get("vendor") or None,
+        search=g.get("search") or None,
+        sort=g.get("sort") or None,
+        sort_dir=g.get("sort_dir") or None,
+    )
+    return JsonResponse(data)
+
+
+_preview_cache: dict = {}  # key -> pdf bytes, ephemeral in-memory store
+
+
+@require_GET
+def pdf_template_get(request, report_name):
+    """Return a template JSON so the designer can load it."""
+    from .pdf_reports import load_template
+    rig = request.GET.get("rig") or None
+    try:
+        template = load_template(report_name, rig=rig)
+        return JsonResponse(template)
+    except FileNotFoundError as e:
+        return JsonResponse({"error": str(e)}, status=404)
+
+
+@csrf_exempt
+def pdf_template_save(request, report_name):
+    """Save a designer-exported template JSON to disk."""
+    if request.method not in ("POST", "PUT"):
+        return JsonResponse({"error": "use POST or PUT"}, status=405)
+    from .pdf_reports import save_template
+    import json as _json
+    rig = request.GET.get("rig") or None
+    try:
+        template = _json.loads(request.body)
+        path = save_template(report_name, template, rig=rig)
+        return JsonResponse({"saved": str(path)})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+@csrf_exempt
+def reportbro_preview(request):
+    """
+    ReportBro designer preview protocol:
+      PUT  → generate PDF, store with a key, return plain text "key:XXXX"
+      GET  → ?key=XXXX&outputFormat=pdf → return stored PDF bytes
+    """
+    cors_headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    }
+
+    def _cors(response):
+        for k, v in cors_headers.items():
+            response[k] = v
+        return response
+
+    if request.method == "OPTIONS":
+        return _cors(HttpResponse(status=200))
+
+    if request.method == "GET":
+        key = request.GET.get("key", "")
+        pdf = _preview_cache.pop(key, None)
+        if pdf is None:
+            return _cors(HttpResponse("not found", status=404))
+        return _cors(HttpResponse(bytes(pdf), content_type="application/pdf"))
+
+    if request.method == "PUT":
+        import json as _json
+        from reportbro import Report, ReportBroError
+        try:
+            body = _json.loads(request.body)
+        except Exception:
+            return _cors(HttpResponse("invalid JSON", status=400))
+
+        template = body.get("report")
+        data     = body.get("data", {})
+        try:
+            report = Report(template, data, is_test_data=True)
+            if report.errors:
+                return _cors(JsonResponse({"errors": report.errors}, status=400))
+            pdf = bytes(report.generate_pdf())
+            import uuid
+            key = str(uuid.uuid4())
+            _preview_cache[key] = pdf
+            return _cors(HttpResponse(f"key:{key}", content_type="text/plain"))
+        except ReportBroError as e:
+            return _cors(JsonResponse({"error": str(e)}, status=400))
+
+    return _cors(HttpResponse("method not allowed", status=405))
+
+
+@require_GET
+def listings_certificates_page(request):
+    return render(request, "chatbot/listings/certificates.html")
+
+
+@require_GET
+def listings_certificates_meta_api(request):
+    from .analytics.tools import _query
+    cert_types = _query("""
+        SELECT DISTINCT mc.cert_name AS name
+        FROM eos_Fs_Certificates fc
+        JOIN Mst_Cert mc ON fc.Cert_Id = mc.cert_id
+        WHERE fc.Fs_Cert_Active = 'Y' AND fc.Fs_Cert_Valid_Till IS NOT NULL
+        ORDER BY mc.cert_name
+    """)
+    return JsonResponse({"cert_types": [r["name"] for r in cert_types]})
+
+
+@require_GET
+def listings_certificates_api(request):
+    from .analytics.listings import get_certificate_listing
+    g = request.GET
+    page      = g.get("page")
+    page_size = g.get("page_size")
+    data = get_certificate_listing(
+        page=int(page) if page and page.isdigit() else None,
+        page_size=int(page_size) if page_size and page_size.isdigit() else None,
+        status=g.get("status") or None,
+        cert_type=g.get("cert_type") or None,
         search=g.get("search") or None,
         sort=g.get("sort") or None,
         sort_dir=g.get("sort_dir") or None,

@@ -12,12 +12,16 @@ urlpatterns = [
     path("rigs/<int:rig_id>/", views.rig_detail_page, name="rig_detail"),
 
     path("listings/", views.listings_page, name="listings"),
+    path("api/report-preview/", views.reportbro_preview, name="reportbro_preview"),
+    path("api/pdf-templates/<str:report_name>/", views.pdf_template_get, name="pdf_template_get"),
+    path("api/pdf-templates/<str:report_name>/save/", views.pdf_template_save, name="pdf_template_save"),
     path("listings/incidents/", views.listings_incidents_page, name="listings_incidents"),
     path("listings/hazard-cards/", views.listings_hazard_cards_page, name="listings_hazard_cards"),
     path("listings/employees/", views.listings_employees_page, name="listings_employees"),
     path("listings/staff/", views.listings_staff_page, name="listings_staff"),
     path("listings/crew-rotations/", views.listings_crew_rotations_page, name="listings_crew_rotations"),
     path("listings/invoices/", views.listings_invoices_page, name="listings_invoices"),
+    path("listings/certificates/", views.listings_certificates_page, name="listings_certificates"),
 
     # ── Rigs 360 API ───────────────────────────────────────────────────────
     path("api/rigs/", views.rigs_list_api, name="rigs_list_api"),
@@ -34,6 +38,7 @@ urlpatterns = [
     path("api/dashboard/meta/", views.dashboard_meta, name="dashboard_meta"),
     path("api/dashboard/hse/", views.dashboard_hse_api, name="dashboard_hse_api"),
     path("api/dashboard/hse/hotspot/", views.dashboard_hse_hotspot_api, name="dashboard_hse_hotspot_api"),
+    path("api/dashboard/hse/correlation/", views.dashboard_hse_correlation_api, name="dashboard_hse_correlation_api"),
     path("api/dashboard/workforce/", views.dashboard_workforce_api, name="dashboard_workforce_api"),
     path("api/dashboard/finance/", views.dashboard_finance_api, name="dashboard_finance_api"),
     path("api/dashboard/finance/meta/", views.dashboard_finance_meta, name="dashboard_finance_meta"),
@@ -42,6 +47,7 @@ urlpatterns = [
     path("api/listings/meta/", views.listings_meta_api, name="listings_meta_api"),
     path("api/listings/incidents/", views.listings_incidents_api, name="listings_incidents_api"),
     path("api/listings/hazard-cards/", views.listings_hazard_cards_api, name="listings_hazard_cards_api"),
+    path("api/listings/hazard-cards/pdf/", views.listings_hazard_cards_pdf, name="listings_hazard_cards_pdf"),
     path("api/listings/employees/meta/", views.listings_employees_meta_api, name="listings_employees_meta_api"),
     path("api/listings/employees/", views.listings_employees_api, name="listings_employees_api"),
     path("api/listings/staff/meta/", views.listings_staff_meta_api, name="listings_staff_meta_api"),
@@ -50,6 +56,8 @@ urlpatterns = [
     path("api/listings/crew-rotations/", views.listings_crew_rotations_api, name="listings_crew_rotations_api"),
     path("api/listings/invoices/meta/", views.listings_invoices_meta_api, name="listings_invoices_meta_api"),
     path("api/listings/invoices/", views.listings_invoices_api, name="listings_invoices_api"),
+    path("api/listings/certificates/meta/", views.listings_certificates_meta_api, name="listings_certificates_meta_api"),
+    path("api/listings/certificates/", views.listings_certificates_api, name="listings_certificates_api"),
 
     # ── Health API ──────────────────────────────────────────────────────────
     path("api/health/", views.health_api, name="health_api"),

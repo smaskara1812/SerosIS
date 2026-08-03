@@ -1,14 +1,23 @@
+# Environment
 .env
+
+# Python
 __pycache__/
 *.pyc
-vectorstore/
-data/manuals/
-db.sqlite3
+*.pyo
 venv/
-data/manuals/
-.claude/
-script_mssql.sql
+
+# Django
+db.sqlite3
+
+# Data & secrets (large files, local only)
 *.sql
-Seros_Data_full.sql
-Seros_Data_schema.sql
-count_all_tables.sql
+data/manuals/
+vectorstore/
+docstore/
+
+# macOS
+.DS_Store
+
+# Claude Code
+.claude/

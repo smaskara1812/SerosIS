@@ -1,5 +1,7 @@
 from .tools import _query
 import statistics as _stats
+import numpy as _np
+from scipy import stats as _scipy_stats
 
 
 def get_haz_hotspot_data() -> dict:
@@ -216,4 +218,118 @@ def get_haz_hotspot_data() -> dict:
         "monthly_by_rig": {"rows": monthly_rig, "mean": mean, "ucl": ucl, "lcl": lcl},
         "open_exposure":  [dict(r) for r in exposure_rows],
         "crew_tenure":    crew_tenure,
+    }
+
+
+def get_haz_downtime_correlation() -> dict:
+    """
+    Management-facing view: plots each rig as a single point on a
+    hazard-reporting vs downtime quadrant map.
+
+    Uses daily-log downtime (Repair + Zero-Rate hrs) as the Y axis —
+    broadest available downtime signal.
+
+    Returns fleet-level correlation stats (for the conclusion banner)
+    and per-rig averages classified into one of four quadrants.
+    """
+    EMPTY = {"r": None, "p": None, "significant": False, "n": 0,
+             "median_hazards": 0, "median_downtime": 0, "per_rig": []}
+
+    # Hazard count per rig per month
+    haz_rows = _query("""
+        SELECT
+            h.Rig_Id,
+            r.Rig_Short_Name                         AS rig,
+            DATE_FORMAT(h.Event_Dt, '%%Y-%%m')       AS month,
+            COUNT(*)                                  AS hazard_count
+        FROM eos_Hazard_ID_Card h
+        JOIN eos_Mst_Rig r ON r.Rig_Id = h.Rig_Id
+        WHERE h.Marked_As_Deleted != 'Y'
+          AND r.Rig_Type_Id IN (1, 2)
+        GROUP BY h.Rig_Id, r.Rig_Short_Name,
+                 DATE_FORMAT(h.Event_Dt, '%%Y-%%m')
+    """)
+
+    # Daily-log downtime per rig per month
+    dt_rows = _query("""
+        SELECT
+            dd.Rig_Id,
+            DATE_FORMAT(dd.Drilling_Dtl_Dt, '%%Y-%%m')   AS month,
+            ROUND(
+                SUM(COALESCE(dd.Repair_Service_Hrs, 0)
+                  + COALESCE(dd.Zero_Rate_Hrs, 0)), 2
+            )                                             AS downtime_hrs
+        FROM eos_Drilling_Dtl dd
+        JOIN eos_Mst_Rig r ON r.Rig_Id = dd.Rig_Id
+        WHERE dd.Cr_Status IS NOT NULL
+          AND r.Rig_Type_Id IN (1, 2)
+        GROUP BY dd.Rig_Id,
+                 DATE_FORMAT(dd.Drilling_Dtl_Dt, '%%Y-%%m')
+    """)
+
+    if not haz_rows or not dt_rows:
+        return EMPTY
+
+    # Inner join on (rig_id, month)
+    dt_lookup = {(int(r["Rig_Id"]), r["month"]): float(r["downtime_hrs"] or 0)
+                 for r in dt_rows}
+
+    paired: list = []
+    for row in haz_rows:
+        key = (int(row["Rig_Id"]), row["month"])
+        if key in dt_lookup:
+            paired.append({
+                "rig":          row["rig"],
+                "hazard_count": int(row["hazard_count"]),
+                "downtime_hrs": dt_lookup[key],
+            })
+
+    if len(paired) < 3:
+        return EMPTY
+
+    # Fleet-level correlation
+    x = _np.array([p["hazard_count"] for p in paired], dtype=float)
+    y = _np.array([p["downtime_hrs"]  for p in paired], dtype=float)
+    pr, pp = _scipy_stats.pearsonr(x, y)
+
+    # Per-rig averages
+    rig_groups: dict = {}
+    for p in paired:
+        g = rig_groups.setdefault(p["rig"], {"hazards": [], "downtime": []})
+        g["hazards"].append(p["hazard_count"])
+        g["downtime"].append(p["downtime_hrs"])
+
+    per_rig = []
+    for rig in sorted(rig_groups):
+        g = rig_groups[rig]
+        per_rig.append({
+            "rig":          rig,
+            "months":       len(g["hazards"]),
+            "avg_hazards":  round(float(_np.mean(g["hazards"])), 1),
+            "avg_downtime": round(float(_np.mean(g["downtime"])), 1),
+        })
+
+    # Quadrant classification — split at median of each axis
+    med_haz = float(_np.median([r["avg_hazards"]  for r in per_rig]))
+    med_dt  = float(_np.median([r["avg_downtime"] for r in per_rig]))
+
+    _QUADRANTS = {
+        (True,  False): ("best",   "Best Practice"),
+        (True,  True):  ("risk",   "High Risk + Aware"),
+        (False, False): ("low",    "Low Activity"),
+        (False, True):  ("danger", "Danger Zone"),
+    }
+    for r in per_rig:
+        hi_haz = r["avg_hazards"]  >= med_haz
+        hi_dt  = r["avg_downtime"] >= med_dt
+        r["quadrant"], r["quadrant_label"] = _QUADRANTS[(hi_haz, hi_dt)]
+
+    return {
+        "r":               round(float(pr), 3),
+        "p":               round(float(pp), 4),
+        "significant":     bool(pp < 0.05),
+        "n":               len(paired),
+        "median_hazards":  round(med_haz, 1),
+        "median_downtime": round(med_dt,  1),
+        "per_rig":         per_rig,
     }
