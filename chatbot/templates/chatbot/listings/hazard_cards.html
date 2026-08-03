@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -115,7 +116,7 @@
 <body>
 
 <nav class="nav">
-  <div class="nav-brand">Seros AI <span>/ Listings / Hazard Cards</span></div>
+  <div class="nav-brand"><img src="{% static 'chatbot/logos/seros_logo.png' %}" alt="Seros" style="height:28px;width:auto;object-fit:contain;filter:brightness(0) invert(1);">Seros AI <span>/ Listings / Hazard Cards</span></div>
   <div class="nav-links">
     <a href="/">Chat</a>
     <a href="/dashboard/">Dashboard</a>
