@@ -22,13 +22,27 @@ TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
     "django.contrib.staticfiles",
     "chatbot",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "serosIS.middleware.LoginRequiredMiddleware",
+]
+
+AUTHENTICATION_BACKENDS = [
+    "chatbot.auth_backend.SerosAuthBackend",
 ]
 
 ROOT_URLCONF = "serosIS.urls"
@@ -41,6 +55,9 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "chatbot.context_processors.seros_nav",
             ],
         },
     },
@@ -54,6 +71,10 @@ DATABASES = {
 }
 
 DATABASE_ROUTERS = ["serosIS.db_router.ChatHistoryRouter"]
+
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/login/"
 
 STATIC_URL = "/static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -1,31 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Seros — Manual Management</title>
-  <style>
+{% extends 'chatbot/base.html' %}
+{% load static %}
+
+{% block title %}Seros — Manual Management{% endblock %}
+
+{% block styles %}
+<style>
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #f0f2f5;
       min-height: 100vh;
-      padding: 40px 24px;
     }
 
-    .container { max-width: 760px; margin: 0 auto; }
 
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 32px;
-    }
-    header h1 { font-size: 1.3rem; font-weight: 700; color: #1a3f7a; }
-    .nav-links { display: flex; gap: 18px; }
-    .nav-links a { font-size: 0.85rem; color: #64748b; text-decoration: none; }
-    .nav-links a:hover { color: #1a3f7a; }
+    .container { max-width: 760px; margin: 0 auto; padding: 32px 24px 48px; }
 
     /* ── Section cards ── */
     .card {
@@ -198,18 +188,57 @@
     }
 
     footer { margin-top: 32px; text-align: center; font-size: 0.8rem; color: #94a3b8; }
-  </style>
-</head>
-<body>
+
+    /* ── Confirm modal ── */
+    .confirm-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(15,23,42,0.5); z-index: 800;
+      align-items: center; justify-content: center;
+      backdrop-filter: blur(2px);
+    }
+    .confirm-overlay.open { display: flex; }
+    .confirm-box {
+      background: #fff; border-radius: 14px; padding: 28px;
+      max-width: 400px; width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.22);
+      animation: mIn 0.25s cubic-bezier(.34,1.4,.64,1);
+    }
+    @keyframes mIn { from { transform: scale(0.88) translateY(20px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+    .confirm-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: #fee2e2; display: flex; align-items: center;
+      justify-content: center; margin-bottom: 16px;
+    }
+    .confirm-box h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; color: #111; }
+    .confirm-box p  { font-size: 0.85rem; color: #4b5563; line-height: 1.5; margin-bottom: 22px; word-break: break-all; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .c-btn { padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: 1px solid #e5e7eb; background: #fff; color: #374151; font-family: inherit; transition: all 0.15s; }
+    .c-btn:hover { background: #f3f4f6; }
+    .c-btn-danger { background: #dc2626; color: #fff; border-color: #dc2626; }
+    .c-btn-danger:hover { background: #b91c1c; }
+    .c-btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* ── Toast ── */
+    .toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 900; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    .toast { padding: 11px 16px; border-radius: 6px; font-size: 0.83rem; font-weight: 600; display: flex; align-items: center; gap: 8px; transform: translateX(120%); opacity: 0; transition: transform 0.3s cubic-bezier(.34,1.4,.64,1), opacity 0.3s; pointer-events: all; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.success { background: #fff; color: #059669; border: 1px solid #d1fae5; border-left: 3px solid #059669; }
+    .toast.error   { background: #fff; color: #dc2626; border: 1px solid #fee2e2; border-left: 3px solid #dc2626; }
+  
+  
+</style>
+{% endblock %}
+
+{% block content %}
+<script>
+(function(){const p=location.pathname;document.querySelectorAll('[data-nav]').forEach(function(a){const k=a.dataset.nav;if((k==='dashboard'&&(p==='/'||p==='/dashboard/'))||(k!=='dashboard'&&p.startsWith('/'+k+'/'))){a.classList.add('active');}});})();
+</script>
+
 <div class="container">
 
-  <header>
-    <h1>Manual Management</h1>
-    <div class="nav-links">
-      <a href="/">← Back to chat</a>
-      <a href="/health/">System Health</a>
-    </div>
-  </header>
+  <div style="margin-bottom:24px;">
+    <h1 style="font-size:1.25rem;font-weight:700;color:#1a3f7a;">Manual Management</h1>
+  </div>
 
   <!-- ── Upload ── -->
   <div class="card">
@@ -261,6 +290,23 @@
   <footer>Seros AI · Internal tool</footer>
 </div>
 
+<!-- Delete confirm modal -->
+<div class="confirm-overlay" id="del-overlay" onclick="if(event.target.id==='del-overlay')closeDelConfirm()">
+  <div class="confirm-box">
+    <div class="confirm-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+    </div>
+    <h3>Delete Manual?</h3>
+    <p id="del-confirm-msg"></p>
+    <div class="confirm-actions">
+      <button class="c-btn" onclick="closeDelConfirm()">Cancel</button>
+      <button class="c-btn c-btn-danger" id="del-confirm-btn" onclick="doDeleteFile()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
 <script>
   /* ── Helpers ── */
   function fmtSize(bytes) {
@@ -294,7 +340,7 @@
         <td>${escHtml(f.name)}</td>
         <td>${fmtSize(f.size)}</td>
         <td>${fmtDate(f.modified)}</td>
-        <td><button class="del-btn" onclick="deleteFile(${JSON.stringify(f.name)}, this)">Delete</button></td>
+        <td><button class="del-btn" onclick="deleteFile(${escHtml(JSON.stringify(f.name))}, this)">Delete</button></td>
       </tr>
     `).join('');
   }
@@ -303,12 +349,50 @@
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  async function deleteFile(name, btn) {
-    if (!confirm(`Delete "${name}"? This does not re-index automatically.`)) return;
-    btn.disabled = true;
-    const res = await fetch(`/api/manuals/${encodeURIComponent(name)}/delete/`, { method: 'DELETE' });
-    if (res.ok) loadFiles();
-    else { alert('Delete failed.'); btn.disabled = false; }
+  let _delName = null, _delBtn = null;
+
+  function deleteFile(name, btn) {
+    _delName = name;
+    _delBtn  = btn;
+    document.getElementById('del-confirm-msg').textContent =
+      `"${name}" will be permanently removed. This does not re-index automatically.`;
+    document.getElementById('del-overlay').classList.add('open');
+  }
+
+  function closeDelConfirm() {
+    document.getElementById('del-overlay').classList.remove('open');
+  }
+
+  async function doDeleteFile() {
+    if (!_delName) return;
+    const confirmBtn = document.getElementById('del-confirm-btn');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Deleting…';
+    closeDelConfirm();
+    if (_delBtn) _delBtn.disabled = true;
+    const res = await fetch(`/api/manuals/${encodeURIComponent(_delName)}/delete/`, { method: 'DELETE' });
+    if (res.ok) {
+      showToast('File deleted', 'success');
+      loadFiles();
+    } else {
+      showToast('Delete failed', 'error');
+      if (_delBtn) _delBtn.disabled = false;
+    }
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Delete';
+    _delName = null; _delBtn = null;
+  }
+
+  function showToast(msg, type) {
+    const el = document.createElement('div');
+    el.className = 'toast ' + type;
+    el.innerHTML = (type === 'success'
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+    ) + msg;
+    document.getElementById('toast-wrap').appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 350); }, 3200);
   }
 
   /* ── Upload ── */
@@ -460,5 +544,4 @@
     if (data.running) schedulePoll();
   });
 </script>
-</body>
-</html>
+{% endblock %}

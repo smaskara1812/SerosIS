@@ -1,0 +1,199 @@
+{% extends 'chatbot/base.html' %}
+{% load static %}
+
+{% block title %}Masters — Seros{% endblock %}
+
+{% block styles %}
+<style>
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+
+    .page-body { max-width: 1100px; margin: 0 auto; padding: 40px 28px; }
+    .page-header { margin-bottom: 28px; }
+    .page-title { font-size: 1.4rem; font-weight: 700; color: #1a3f7a; margin-bottom: 4px; }
+    .page-subtitle { font-size: 0.88rem; color: #64748b; }
+
+    /* Card grid — same as rig grid */
+    .master-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+    .master-card {
+      background: #fff; border-radius: 12px; padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07); border: 1.5px solid #eef1f5;
+      text-decoration: none; display: block; cursor: pointer;
+      transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+    }
+    .master-card:hover { box-shadow: 0 6px 20px rgba(26,63,122,0.12); transform: translateY(-2px); border-color: #1a3f7a; }
+
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+    .card-icon {
+      width: 42px; height: 42px; border-radius: 10px;
+      background: linear-gradient(135deg, #1a3f7a 0%, #2563eb 100%);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+    }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .badge-form { background: #dcfce7; color: #16a34a; }
+    .badge-domain { background: #e0e7ff; color: #3730a3; }
+
+    .card-name { font-size: 1.05rem; font-weight: 700; color: #1a3f7a; margin-bottom: 3px; }
+    .card-short { font-size: 0.78rem; color: #94a3b8; font-weight: 600; letter-spacing: 0.5px; }
+    .card-meta { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+    .card-meta-row { display: flex; justify-content: space-between; font-size: 0.78rem; }
+    .card-meta-label { color: #94a3b8; font-weight: 600; }
+    .card-meta-val { color: #374151; }
+  
+  
+</style>
+{% endblock %}
+
+{% block content %}
+<script>
+(function(){const p=location.pathname;document.querySelectorAll('[data-nav]').forEach(function(a){const k=a.dataset.nav;if((k==='dashboard'&&(p==='/'||p==='/dashboard/'))||(k!=='dashboard'&&p.startsWith('/'+k+'/'))){a.classList.add('active');}});})();
+</script>
+
+<div class="page-body">
+  <div class="page-header">
+    <div class="page-title">Masters</div>
+    <div class="page-subtitle">Add and edit core reference data used across the system</div>
+  </div>
+
+  <div class="master-grid">
+
+    <a href="/masters/rigs/" class="master-card">
+      <div class="card-top">
+        <div class="card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 20h20M4 20V8l8-4 8 4v12"/><path d="M10 20v-6h4v6"/>
+          </svg>
+        </div>
+        <div class="card-badges">
+          <span class="badge badge-form">Form</span>
+          <span class="badge badge-domain">Operations</span>
+        </div>
+      </div>
+      <div class="card-name">Rig</div>
+      <div class="card-short">RIG MASTER</div>
+      <div class="card-meta">
+        <div class="card-meta-row">
+          <span class="card-meta-label">Table</span>
+          <span class="card-meta-val">eos_Mst_Rig</span>
+        </div>
+        <div class="card-meta-row">
+          <span class="card-meta-label">Actions</span>
+          <span class="card-meta-val">Search / Add / Edit</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/masters/cost-centre/" class="master-card">
+      <div class="card-top">
+        <div class="card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+          </svg>
+        </div>
+        <div class="card-badges">
+          <span class="badge badge-form">Form</span>
+          <span class="badge badge-domain">Finance</span>
+        </div>
+      </div>
+      <div class="card-name">Cost Centre</div>
+      <div class="card-short">COST CENTRE MASTER</div>
+      <div class="card-meta">
+        <div class="card-meta-row">
+          <span class="card-meta-label">Table</span>
+          <span class="card-meta-val">eos_Mst_Cost_Centre</span>
+        </div>
+        <div class="card-meta-row">
+          <span class="card-meta-label">Actions</span>
+          <span class="card-meta-val">Add / Edit / Deactivate</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/masters/contractor/" class="master-card">
+      <div class="card-top">
+        <div class="card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+          </svg>
+        </div>
+        <div class="card-badges">
+          <span class="badge badge-form">Form</span>
+          <span class="badge badge-domain">Operations</span>
+        </div>
+      </div>
+      <div class="card-name">Contractor</div>
+      <div class="card-short">CONTRACTOR MASTER</div>
+      <div class="card-meta">
+        <div class="card-meta-row">
+          <span class="card-meta-label">Table</span>
+          <span class="card-meta-val">eos_Mst_Contractor</span>
+        </div>
+        <div class="card-meta-row">
+          <span class="card-meta-label">Actions</span>
+          <span class="card-meta-val">Add / Edit / Delete</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/masters/operator/" class="master-card">
+      <div class="card-top">
+        <div class="card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+          </svg>
+        </div>
+        <div class="card-badges">
+          <span class="badge badge-form">Form</span>
+          <span class="badge badge-domain">Operations</span>
+        </div>
+      </div>
+      <div class="card-name">Operator</div>
+      <div class="card-short">OPERATOR MASTER</div>
+      <div class="card-meta">
+        <div class="card-meta-row">
+          <span class="card-meta-label">Table</span>
+          <span class="card-meta-val">eos_Mst_Operator</span>
+        </div>
+        <div class="card-meta-row">
+          <span class="card-meta-label">Actions</span>
+          <span class="card-meta-val">Add / Edit / Deactivate</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/masters/cost-centre-type/" class="master-card">
+      <div class="card-top">
+        <div class="card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+        <div class="card-badges">
+          <span class="badge badge-form">Form</span>
+          <span class="badge badge-domain">Finance</span>
+        </div>
+      </div>
+      <div class="card-name">Cost Centre Type</div>
+      <div class="card-short">COST CENTRE TYPE MASTER</div>
+      <div class="card-meta">
+        <div class="card-meta-row">
+          <span class="card-meta-label">Table</span>
+          <span class="card-meta-val">eos_Mst_Cost_Centre_Type</span>
+        </div>
+        <div class="card-meta-row">
+          <span class="card-meta-label">Actions</span>
+          <span class="card-meta-val">Add / Edit / Deactivate</span>
+        </div>
+      </div>
+    </a>
+
+  </div>
+</div>
+{% endblock %}

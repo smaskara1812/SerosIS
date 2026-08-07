@@ -1,0 +1,735 @@
+{% extends 'chatbot/base.html' %}
+{% load static %}
+
+{% block title %}Rig Master — Seros{% endblock %}
+
+{% block styles %}
+<style>
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F2F4F8; --surface: #fff; --border: #E4E8EF;
+      --primary: #1a3f7a; --accent: #2563eb; --accent-light: #EEF3FF;
+      --text: #111827; --text-2: #4B5563; --text-3: #9CA3AF;
+      --success: #059669; --success-bg: #D1FAE5;
+      --danger: #DC2626; --danger-bg: #FEE2E2;
+      --stripe-a: #10B981; --stripe-i: #D1D5DB;
+      --row-hover: rgba(37,99,235,0.035); --row-sel: #EEF3FF; --row-sel-b: #2563eb;
+      --radius: 12px; --radius-sm: 6px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+      --shadow-lg: 0 20px 60px rgba(0,0,0,0.22);
+    }
+    html, body { height: 100%; }
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
+
+
+    .page-header { flex-shrink: 0; padding: 16px 24px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+    .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 0.74rem; color: var(--text-3); margin-bottom: 7px; }
+    .breadcrumb a { color: var(--text-3); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { opacity: 0.45; }
+    .page-title-row { display: flex; align-items: center; justify-content: space-between; }
+    .page-title { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+    .page-stats { display: flex; gap: 8px; }
+    .stat-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+    .stat-chip.total { background: #F1F5F9; color: #475569; }
+    .stat-chip.active { background: var(--success-bg); color: var(--success); }
+    .sdot-sm { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .main-layout { flex: 1; display: grid; grid-template-columns: 1fr 440px; overflow: hidden; }
+
+    /* LEFT */
+    .records-panel { display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+    .panel-head { flex-shrink: 0; background: linear-gradient(150deg, #0d2147 0%, #1d4a8c 100%); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .panel-head-title { font-size: 0.95rem; font-weight: 700; color: #fff; }
+    .panel-head-counts { font-size: 0.7rem; color: rgba(255,255,255,0.48); margin-top: 2px; }
+    .btn-new-pill { background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.22); color: #fff; padding: 7px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: background 0.15s; }
+    .btn-new-pill:hover { background: rgba(255,255,255,0.24); }
+
+    .panel-controls { flex-shrink: 0; background: var(--surface); padding: 12px 16px 0; }
+    .search-wrap { position: relative; margin-bottom: 10px; }
+    .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+    .search-input { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.83rem; color: var(--text); background: var(--bg); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    .search-input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .search-input::placeholder { color: var(--text-3); }
+    .sort-bar { display: flex; align-items: center; gap: 3px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .sort-label { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-3); margin-right: 4px; }
+    .sort-btn { padding: 4px 9px; border-radius: 4px; font-family: inherit; font-size: 0.7rem; font-weight: 600; border: 1px solid transparent; background: transparent; color: var(--text-3); cursor: pointer; display: inline-flex; align-items: center; gap: 2px; transition: all 0.12s; }
+    .sort-btn:hover { background: var(--bg); color: var(--text-2); }
+    .sort-btn.active { background: var(--accent-light); color: var(--accent); border-color: rgba(37,99,235,0.15); }
+
+    .records-scroll { flex: 1; overflow-y: auto; background: var(--surface); }
+    .record-row { display: flex; align-items: center; border-left: 4px solid var(--stripe-i); border-bottom: 1px solid #F0F2F7; cursor: pointer; transition: background 0.1s; }
+    .record-row.s-active { border-left-color: var(--stripe-a); }
+    .record-row:hover { background: var(--row-hover); }
+    .record-row.selected { background: var(--row-sel); border-left-color: var(--row-sel-b) !important; }
+    .record-row.selected .row-name { color: var(--primary); }
+    .row-content { flex: 1; padding: 11px 12px 11px 14px; min-width: 0; }
+    .row-name { font-size: 0.875rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+    .row-meta { font-size: 0.7rem; color: var(--text-3); display: flex; gap: 5px; align-items: center; white-space: nowrap; overflow: hidden; }
+    .row-tag { background: #F1F5F9; color: #475569; padding: 1px 6px; border-radius: 3px; font-size: 0.67rem; font-weight: 600; flex-shrink: 0; }
+    .row-code { font-family: 'SF Mono', monospace; font-size: 0.72rem; background: #F1F5F9; color: #475569; padding: 1px 7px; border-radius: 4px; font-weight: 600; }
+    .row-right { padding: 0 16px 0 8px; flex-shrink: 0; display: flex; align-items: center; gap: 5px; }
+    .sdot { width: 7px; height: 7px; border-radius: 50%; }
+    .sdot.a { background: var(--success); } .sdot.i { background: var(--stripe-i); }
+    .stext { font-size: 0.68rem; font-weight: 700; }
+    .stext.a { color: var(--success); } .stext.i { color: var(--text-3); }
+    .list-empty { text-align: center; padding: 60px 20px; color: var(--text-3); font-size: 0.85rem; }
+
+    /* RIGHT */
+    .form-panel { background: var(--bg); display: flex; flex-direction: column; overflow: hidden; padding: 20px; }
+    .form-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--text-3); }
+    .empty-icon { width: 56px; height: 56px; border-radius: 14px; background: #E9ECF1; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+    .empty-title { font-size: 0.9rem; font-weight: 600; color: var(--text-2); }
+    .empty-sub { font-size: 0.78rem; text-align: center; max-width: 200px; line-height: 1.5; }
+    .form-card { flex: 1; display: none; flex-direction: column; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+    .form-card.visible { display: flex; }
+    .form-card-header { flex-shrink: 0; padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .form-card-title { font-size: 0.88rem; font-weight: 700; color: var(--primary); }
+    .rec-badge { font-size: 0.68rem; font-weight: 600; background: var(--accent-light); color: var(--accent); padding: 3px 10px; border-radius: 10px; }
+    .form-body { flex: 1; overflow-y: auto; padding: 18px 20px; }
+    .form-section { margin-bottom: 18px; }
+    .form-section:last-child { margin-bottom: 0; }
+    .sec-label { display: block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-3); padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-row.single { grid-template-columns: 1fr; }
+    .form-group { margin-bottom: 12px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-2); margin-bottom: 5px; }
+    .req { color: var(--danger); margin-left: 2px; }
+    .form-control { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.83rem; color: var(--text); background: var(--surface); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .form-control::placeholder { color: var(--text-3); }
+    .form-control[readonly] { background: var(--bg); color: var(--text-3); }
+    select.form-control { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+    /* SearchSelect */
+    .ss-wrap { position: relative; display: flex; align-items: center; }
+    .ss-input { flex: 1; padding-right: 28px !important; }
+    .ss-chev { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); cursor: pointer; display: flex; align-items: center; line-height: 1; transition: color 0.15s, transform 0.2s; }
+    .ss-wrap.ss-open .ss-chev { color: var(--accent); transform: translateY(-50%) rotate(180deg); }
+    .ss-drop { display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 400; max-height: 220px; overflow-y: auto; }
+    .ss-drop.open { display: block; }
+    .ss-item { padding: 8px 12px; font-size: 0.83rem; cursor: pointer; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ss-item:hover, .ss-item.ss-hi { background: var(--accent-light); color: var(--accent); }
+    .ss-empty, .ss-loading { padding: 10px 12px; font-size: 0.82rem; color: var(--text-3); text-align: center; font-style: italic; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--border); margin-top: 6px; }
+    .toggle-label { font-size: 0.83rem; font-weight: 500; color: var(--text-2); }
+    .tog { position: relative; width: 40px; height: 22px; cursor: pointer; }
+    .tog input { opacity: 0; width: 0; height: 0; }
+    .tog-track { position: absolute; inset: 0; background: #D1D5DB; border-radius: 11px; transition: background 0.2s; }
+    .tog-thumb { position: absolute; width: 16px; height: 16px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .tog input:checked ~ .tog-track { background: var(--success); }
+    .tog input:checked ~ .tog-thumb { transform: translateX(18px); }
+    .form-footer { flex-shrink: 0; padding: 13px 20px; border-top: 1px solid var(--border); background: #FAFBFD; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; white-space: nowrap; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #163268; transform: translateY(-1px); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #047857; transform: translateY(-1px); }
+    .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
+    .btn-ghost:hover:not(:disabled) { background: var(--bg); }
+
+    /* ADD MODAL — wide for many fields */
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(10,20,40,0.55); z-index: 500; align-items: flex-start; justify-content: center; backdrop-filter: blur(3px); padding: 40px 20px; overflow-y: auto; }
+    .overlay.open { display: flex; }
+    .modal { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-lg); width: 680px; max-width: 95vw; display: flex; flex-direction: column; animation: mIn 0.28s cubic-bezier(0.34,1.4,0.64,1); overflow: hidden; margin: auto; }
+    @keyframes mIn { from { transform: scale(0.9) translateY(20px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+    .modal-head { flex-shrink: 0; padding: 18px 24px 16px; background: linear-gradient(150deg, #0d2147 0%, #1d4a8c 100%); display: flex; align-items: flex-start; justify-content: space-between; }
+    .modal-head-title { font-size: 1rem; font-weight: 700; color: #fff; }
+    .modal-head-sub { font-size: 0.73rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
+    .modal-close { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.8); width: 30px; height: 30px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: inherit; }
+    .modal-close:hover { background: rgba(255,255,255,0.24); }
+    .modal-body { padding: 20px 24px; }
+    .modal-foot { padding: 14px 24px; border-top: 1px solid var(--border); background: #FAFBFD; display: flex; justify-content: flex-end; gap: 10px; }
+    .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+    .modal-grid .form-group.full { grid-column: 1 / -1; }
+
+    .toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 900; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    .toast { padding: 12px 18px; border-radius: var(--radius-sm); font-size: 0.83rem; font-weight: 600; display: flex; align-items: center; gap: 8px; transform: translateX(120%); opacity: 0; transition: transform 0.3s cubic-bezier(.34,1.4,.64,1), opacity 0.3s; pointer-events: all; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.success { background: var(--surface); color: var(--success); border: 1px solid var(--success-bg); border-left: 3px solid var(--success); }
+    .toast.error   { background: var(--surface); color: var(--danger);  border: 1px solid var(--danger-bg);  border-left: 3px solid var(--danger); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  
+  
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="breadcrumb">
+    <a href="/">Home</a><span class="breadcrumb-sep">/</span>
+    <a href="/masters/">Masters</a><span class="breadcrumb-sep">/</span>
+    <span>Rig</span>
+  </div>
+  <div class="page-title-row">
+    <div class="page-title">Rig Master</div>
+    <div class="page-stats">
+      <span class="stat-chip total"><span class="sdot-sm"></span><span id="stat-total">—</span> total</span>
+      <span class="stat-chip active"><span class="sdot-sm"></span><span id="stat-active">—</span> active</span>
+    </div>
+  </div>
+</div>
+
+<div class="main-layout">
+  <!-- LEFT -->
+  <div class="records-panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-head-title">Rigs</div>
+        <div class="panel-head-counts"><span id="ph-active">—</span> active · <span id="ph-total">—</span> total</div>
+      </div>
+      <button class="btn-new-pill" onclick="openAddDialog()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New
+      </button>
+    </div>
+    <div class="panel-controls">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input class="search-input" id="filter-input" type="text" placeholder="Search name, short name, subtype…" oninput="applyFilter()" autocomplete="off">
+      </div>
+      <div class="sort-bar">
+        <span class="sort-label">Sort</span>
+        <button class="sort-btn active" id="sb-name" onclick="setSort('name')">Name <span class="si">↑</span></button>
+        <button class="sort-btn" id="sb-subtype" onclick="setSort('subtype')">Subtype <span class="si"></span></button>
+        <button class="sort-btn" id="sb-status" onclick="setSort('status')">Status <span class="si"></span></button>
+      </div>
+    </div>
+    <div class="records-scroll" id="records-list"><div class="list-empty">Loading rigs…</div></div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="form-panel">
+    <div class="form-empty" id="form-empty">
+      <div class="empty-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5"><path d="M2 20h20M4 20V8l8-4 8 4v12"/><path d="M10 20v-6h4v6"/></svg>
+      </div>
+      <div class="empty-title">No rig selected</div>
+      <div class="empty-sub">Click a rig to view and edit it</div>
+    </div>
+
+    <div class="form-card" id="form-card">
+      <div class="form-card-header">
+        <span class="form-card-title">Edit Rig</span>
+        <span class="rec-badge" id="rec-badge"></span>
+      </div>
+      <div class="form-body">
+        <input type="hidden" id="f-rig-id">
+        <div class="form-section">
+          <span class="sec-label">Basic Information</span>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Name <span class="req">*</span></label>
+              <input type="text" class="form-control" id="f-name" maxlength="40" placeholder="Full rig name">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Short Name <span class="req">*</span></label>
+              <input type="text" class="form-control" id="f-short-name" maxlength="8" placeholder="e.g. EE01">
+            </div>
+          </div>
+          <div class="form-row single">
+            <div class="form-group">
+              <label class="form-label">Old Rig Name</label>
+              <input type="text" class="form-control" id="f-old-name" maxlength="40" placeholder="Previous name">
+            </div>
+          </div>
+        </div>
+        <div class="form-section">
+          <span class="sec-label">Classification</span>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Rig Subtype <span class="req">*</span></label>
+              <select class="form-control" id="f-subtype" onchange="onSubChange('f')"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Rig Type</label>
+              <input type="text" class="form-control" id="f-type-name" readonly placeholder="Auto-filled">
+              <input type="hidden" id="f-type-id">
+            </div>
+          </div>
+        </div>
+        <div class="form-section">
+          <span class="sec-label">Dates</span>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Built Date <span class="req">*</span></label>
+              <input type="date" class="form-control" id="f-built-date">
+            </div>
+            <div class="form-group">
+              <label class="form-label">From Date <span class="req">*</span></label>
+              <input type="date" class="form-control" id="f-from-date">
+            </div>
+          </div>
+        </div>
+        <div class="form-section">
+          <span class="sec-label">Contact</span>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Tel No.</label>
+              <input type="text" class="form-control" id="f-tel" maxlength="25" placeholder="Telephone">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fax No.</label>
+              <input type="text" class="form-control" id="f-fax" maxlength="15" placeholder="Fax">
+            </div>
+          </div>
+          <div class="form-row single">
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" id="f-email" maxlength="50" placeholder="Rig email">
+            </div>
+          </div>
+        </div>
+        <div class="form-section">
+          <span class="sec-label">Organisation</span>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Personnel Area</label>
+              <input type="text" class="form-control" id="f-personnel-area" maxlength="10">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Unit Code</label>
+              <input type="text" class="form-control" id="f-unit-code" maxlength="10">
+            </div>
+          </div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Active</span>
+          <label class="tog"><input type="checkbox" id="f-active" checked><div class="tog-track"></div><div class="tog-thumb"></div></label>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-success" id="btn-save" onclick="saveRig()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD DIALOG (wide, 2-col) -->
+<div class="overlay" id="add-modal" onclick="bgClose(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">New Rig</div>
+        <div class="modal-head-sub">Fill in the details to register a rig</div>
+      </div>
+      <button class="modal-close" onclick="closeAddDialog()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <span class="sec-label">Basic Information</span>
+        <div class="modal-grid">
+          <div class="form-group">
+            <label class="form-label">Name <span class="req">*</span></label>
+            <input type="text" class="form-control" id="d-name" maxlength="40" placeholder="Full rig name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Short Name <span class="req">*</span></label>
+            <input type="text" class="form-control" id="d-short-name" maxlength="8" placeholder="e.g. EE01">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Old Rig Name</label>
+            <input type="text" class="form-control" id="d-old-name" maxlength="40" placeholder="Previous name if applicable">
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <span class="sec-label">Classification</span>
+        <div class="modal-grid">
+          <div class="form-group">
+            <label class="form-label">Rig Subtype <span class="req">*</span></label>
+            <select class="form-control" id="d-subtype" onchange="onSubChange('d')"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Rig Type</label>
+            <input type="text" class="form-control" id="d-type-name" readonly placeholder="Auto-filled">
+            <input type="hidden" id="d-type-id">
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <span class="sec-label">Dates</span>
+        <div class="modal-grid">
+          <div class="form-group">
+            <label class="form-label">Built Date <span class="req">*</span></label>
+            <input type="date" class="form-control" id="d-built-date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">From Date <span class="req">*</span></label>
+            <input type="date" class="form-control" id="d-from-date">
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <span class="sec-label">Contact &amp; Organisation</span>
+        <div class="modal-grid">
+          <div class="form-group">
+            <label class="form-label">Tel No.</label>
+            <input type="text" class="form-control" id="d-tel" maxlength="25">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fax No.</label>
+            <input type="text" class="form-control" id="d-fax" maxlength="15">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" id="d-email" maxlength="50">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Personnel Area</label>
+            <input type="text" class="form-control" id="d-personnel-area" maxlength="10">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Unit Code</label>
+            <input type="text" class="form-control" id="d-unit-code" maxlength="10">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeAddDialog()">Cancel</button>
+      <button class="btn btn-primary" id="btn-add-dialog" onclick="saveDialogRig()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Rig
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+/* ── SearchSelect ─────────────────────────────────────────────────────── */
+class SearchSelect {
+  constructor(selectId, opts = {}) {
+    this.el   = document.getElementById(selectId);
+    this.opts = opts;
+    this._timer = null; this._hi = -1;
+    this._lastQ = ''; this._offset = 0; this._hasMore = true; this._fetching = false;
+    this._build();
+  }
+  _build() {
+    this.el.style.display = 'none';
+    const w = document.createElement('div'); w.className = 'ss-wrap';
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'form-control ss-input';
+    inp.placeholder = this.opts.placeholder || 'Search…'; inp.autocomplete = 'off';
+    const chev = document.createElement('span'); chev.className = 'ss-chev';
+    chev.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>`;
+    chev.addEventListener('mousedown', e => { e.preventDefault(); if (this.drop.classList.contains('open')) this._close(); else inp.focus(); });
+    const drop = document.createElement('div'); drop.className = 'ss-drop';
+    if (this.opts.paginated) {
+      drop.addEventListener('scroll', () => {
+        if (drop.scrollTop + drop.clientHeight >= drop.scrollHeight - 40 && this._hasMore && !this._fetching)
+          this._load(true);
+      });
+    }
+    w.append(inp, chev, drop);
+    this.el.parentNode.insertBefore(w, this.el.nextSibling);
+    this.wrap = w; this.inp = inp; this.drop = drop;
+    inp.addEventListener('focus', () => this._open());
+    inp.addEventListener('input', () => this._onInput());
+    inp.addEventListener('keydown', e => this._onKey(e));
+    document.addEventListener('mousedown', e => { if (!w.contains(e.target)) this._close(); });
+  }
+  _open() {
+    this.wrap.classList.add('ss-open');
+    this._lastQ = this.inp.value;
+    if (this.opts.options) { this._render(this._filter(this.inp.value)); }
+    else { this._offset = 0; this._hasMore = true; this._load(false); }
+    this.drop.classList.add('open');
+  }
+  _close() { this.drop.classList.remove('open'); this.wrap.classList.remove('ss-open'); this._hi = -1; }
+  _onInput() {
+    const q = this.inp.value; this._lastQ = q;
+    if (!q) { this.el.value = ''; this.el.dispatchEvent(new Event('change')); }
+    if (this.opts.options) { this._render(this._filter(q)); this.drop.classList.add('open'); }
+    else {
+      clearTimeout(this._timer);
+      this._timer = setTimeout(() => { this._offset = 0; this._hasMore = true; this._load(false); }, 250);
+    }
+  }
+  _filter(q) {
+    const lo = q.toLowerCase();
+    return q ? this.opts.options.filter(i => i.l.toLowerCase().includes(lo)) : this.opts.options;
+  }
+  _load(append) {
+    if (this._fetching) return;
+    this._fetching = true;
+    const q = this._lastQ || '';
+    const {valueKey:vk, labelKey:lk, labelFn:fn, paginated, pageSize} = this.opts;
+    const limit = pageSize || 20;
+    let url = this.opts.url + encodeURIComponent(q);
+    if (paginated) url += `&offset=${this._offset}&limit=${limit}`;
+    if (!append) {
+      this.drop.innerHTML = '<div class="ss-loading">Loading…</div>'; this.drop.classList.add('open');
+    } else {
+      const s = document.createElement('div'); s.className = 'ss-sentinel ss-loading'; s.textContent = 'Loading more…';
+      this.drop.appendChild(s);
+    }
+    fetch(url).then(r => r.json()).then(data => {
+      const items = (data.results || data).map(d => ({ v: String(d[vk]), l: fn ? fn(d) : d[lk] }));
+      if (paginated) { this._hasMore = items.length >= limit; this._offset += items.length; }
+      if (append) { this.drop.querySelector('.ss-sentinel')?.remove(); items.forEach(i => this.drop.appendChild(this._mkLi(i))); }
+      else this._render(items);
+    }).catch(() => { this.drop.innerHTML = '<div class="ss-empty">Error loading</div>'; })
+      .finally(() => { this._fetching = false; });
+  }
+  _render(items) {
+    this._hi = -1; this.drop.innerHTML = '';
+    if (!items.length) { this.drop.innerHTML = '<div class="ss-empty">No results</div>'; return; }
+    const max = this.opts.paginated ? items.length : Math.min(items.length, this.opts.limit || 20);
+    for (let i = 0; i < max; i++) this.drop.appendChild(this._mkLi(items[i]));
+  }
+  _mkLi(item) {
+    const li = document.createElement('div'); li.className = 'ss-item'; li.textContent = item.l;
+    li.addEventListener('mousedown', e => { e.preventDefault(); this._pick(item); });
+    return li;
+  }
+  _pick(item) {
+    this.inp.value = item.l;
+    let opt = this.el.querySelector(`option[value="${item.v}"]`);
+    if (!opt) { opt = new Option(item.l, item.v); this.el.appendChild(opt); }
+    this.el.value = item.v; this.el.dispatchEvent(new Event('change')); this._close();
+  }
+  _onKey(e) {
+    const rows = this.drop.querySelectorAll('.ss-item');
+    if (e.key==='ArrowDown')  { this._hi=Math.min(this._hi+1,rows.length-1); this._hl(rows); e.preventDefault(); }
+    else if (e.key==='ArrowUp')   { this._hi=Math.max(this._hi-1,0); this._hl(rows); e.preventDefault(); }
+    else if (e.key==='Enter' && this._hi>=0) { rows[this._hi].dispatchEvent(new MouseEvent('mousedown')); e.preventDefault(); }
+    else if (e.key==='Escape')    { this._close(); this.inp.blur(); }
+  }
+  _hl(rows) { rows.forEach((r,i) => r.classList.toggle('ss-hi', i===this._hi)); if(rows[this._hi]) rows[this._hi].scrollIntoView({block:'nearest'}); }
+  setValue(v, l) {
+    if (!v && v!==0) { this.inp.value=''; this.el.value=''; return; }
+    v = String(v); this.inp.value = l||v;
+    let opt = this.el.querySelector(`option[value="${v}"]`);
+    if (!opt) { opt = new Option(l||v, v); this.el.appendChild(opt); }
+    this.el.value = v;
+  }
+  clear() { this.inp.value=''; this.el.value=''; }
+  get value() { return this.el.value; }
+}
+
+/* ── Page state ──────────────────────────────────────────────────────── */
+let allRigs = [], currentRigId = null;
+let subtypeMap = {}, subtypeOpts = [];
+let sortKey = 'name', sortDir = 1;
+let ssSubF, ssSubD;
+
+// Load meta (subtypes) and all rigs in parallel
+Promise.all([
+  fetch('/api/rigs/master/meta/').then(r => r.json()),
+  fetch('/api/rigs/master/search/?q=').then(r => r.json()),
+]).then(([meta, list]) => {
+  (meta.subtypes || []).forEach(s => {
+    subtypeMap[String(s.Rig_Subtype_Id)] = { id: s.Rig_Type_Id, name: s.Rig_Type_Name, label: s.Rig_Subtype_Name };
+    subtypeOpts.push({ v: String(s.Rig_Subtype_Id), l: s.Rig_Subtype_Name });
+  });
+  ssSubF = new SearchSelect('f-subtype', { placeholder: '— Select subtype —', options: subtypeOpts });
+  ssSubD = new SearchSelect('d-subtype', { placeholder: '— Select subtype —', options: subtypeOpts });
+  // Wire onchange for auto-fill after SearchSelect builds (it fires change on underlying select)
+  document.getElementById('f-subtype').addEventListener('change', () => syncTypeName('f'));
+  document.getElementById('d-subtype').addEventListener('change', () => syncTypeName('d'));
+  allRigs = list.results || [];
+  updateCounts(); renderList(sorted());
+}).catch(() => {
+  document.getElementById('records-list').innerHTML = '<div class="list-empty" style="color:var(--danger)">Failed to load</div>';
+});
+
+function syncTypeName(prefix) {
+  const id   = document.getElementById(prefix + '-subtype').value;
+  const info = subtypeMap[String(id)];
+  document.getElementById(prefix + '-type-name').value = info ? info.name : '';
+  document.getElementById(prefix + '-type-id').value   = info ? info.id   : '';
+}
+// Keep legacy attribute-based onchange working
+function onSubChange(prefix) { syncTypeName(prefix); }
+
+function updateCounts() {
+  const tot = allRigs.length, act = allRigs.filter(r => r.Rig_Active === 'Y').length;
+  ['stat-total','ph-total'].forEach(id => document.getElementById(id).textContent = tot);
+  ['stat-active','ph-active'].forEach(id => document.getElementById(id).textContent = act);
+}
+
+function sorted() {
+  const q = document.getElementById('filter-input').value.toLowerCase().trim();
+  let rows = q ? allRigs.filter(r =>
+    (r.Rig_Name         ||'').toLowerCase().includes(q) ||
+    (r.Rig_Short_Name   ||'').toLowerCase().includes(q) ||
+    (r.Rig_Subtype_Name ||'').toLowerCase().includes(q) ||
+    (r.Rig_Type_Name    ||'').toLowerCase().includes(q)
+  ) : allRigs.slice();
+  rows.sort((a,b) => {
+    if (sortKey==='name')    return (a.Rig_Name||'').localeCompare(b.Rig_Name||'') * sortDir;
+    if (sortKey==='subtype') return (a.Rig_Subtype_Name||'').localeCompare(b.Rig_Subtype_Name||'') * sortDir;
+    if (sortKey==='status')  return ((a.Rig_Active==='Y'?0:1)-(b.Rig_Active==='Y'?0:1)) * sortDir;
+    return 0;
+  });
+  return rows;
+}
+function applyFilter() { renderList(sorted()); }
+
+function setSort(key) {
+  if (sortKey===key) sortDir*=-1; else { sortKey=key; sortDir=1; }
+  document.querySelectorAll('.sort-btn').forEach(b => { b.classList.remove('active'); b.querySelector('.si').textContent=''; });
+  const btn = document.getElementById('sb-'+key);
+  if (btn) { btn.classList.add('active'); btn.querySelector('.si').textContent = sortDir===1?'↑':'↓'; }
+  renderList(sorted());
+}
+
+function renderList(rows) {
+  const c = document.getElementById('records-list');
+  if (!rows.length) { c.innerHTML = '<div class="list-empty">No rigs match</div>'; return; }
+  c.innerHTML = rows.map(r => {
+    const act = r.Rig_Active === 'Y';
+    return `<div class="record-row s-${act?'active':'inactive'} ${r.Rig_Id===currentRigId?'selected':''}"
+         id="row-${r.Rig_Id}" onclick="selectRig(${r.Rig_Id})">
+      <div class="row-content">
+        <div class="row-name">${r.Rig_Name}</div>
+        <div class="row-meta">
+          <span class="row-code">${r.Rig_Short_Name}</span>
+          ${r.Rig_Subtype_Name ? `<span class="row-tag">${r.Rig_Subtype_Name}</span>` : ''}
+          ${r.Rig_Type_Name    ? `<span style="opacity:.65">${r.Rig_Type_Name}</span>` : ''}
+        </div>
+      </div>
+      <div class="row-right">
+        <span class="sdot ${act?'a':'i'}"></span>
+        <span class="stext ${act?'a':'i'}">${act?'Active':'Inactive'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectRig(id) {
+  currentRigId = id;
+  document.querySelectorAll('.record-row').forEach(r => r.classList.remove('selected'));
+  const row = document.getElementById('row-'+id);
+  if (row) { row.classList.add('selected'); row.scrollIntoView({block:'nearest'}); }
+  fetch('/api/rigs/master/'+id+'/').then(r=>r.json()).then(d => {
+    document.getElementById('f-rig-id').value         = d.Rig_Id;
+    document.getElementById('f-name').value           = d.Rig_Name||'';
+    document.getElementById('f-short-name').value     = d.Rig_Short_Name||'';
+    document.getElementById('f-old-name').value       = d.Old_Rig_Name||'';
+    const subInfo = subtypeMap[String(d.Rig_Subtype_Id)];
+    ssSubF.setValue(d.Rig_Subtype_Id, subInfo ? subInfo.label : '');
+    document.getElementById('f-type-id').value        = d.Rig_Type_Id||'';
+    document.getElementById('f-type-name').value      = subInfo ? subInfo.name : '';
+    document.getElementById('f-built-date').value     = d.Rig_Built_Dt||'';
+    document.getElementById('f-from-date').value      = d.Rig_From||'';
+    document.getElementById('f-tel').value            = d.Rig_Tel_No||'';
+    document.getElementById('f-fax').value            = d.Rig_Fax_No||'';
+    document.getElementById('f-email').value          = d.Rig_Email_Id||'';
+    document.getElementById('f-personnel-area').value = d.Personnel_Area||'';
+    document.getElementById('f-unit-code').value      = d.Org_Unit_Code||'';
+    document.getElementById('f-active').checked       = d.Rig_Active === 'Y';
+    document.getElementById('rec-badge').textContent  = 'Rig ID '+d.Rig_Id;
+    document.getElementById('form-empty').style.display = 'none';
+    document.getElementById('form-card').classList.add('visible');
+  });
+}
+
+function saveRig() {
+  const name = document.getElementById('f-name').value.trim();
+  const short = document.getElementById('f-short-name').value.trim();
+  const sub = ssSubF.value;
+  const built = document.getElementById('f-built-date').value;
+  const from = document.getElementById('f-from-date').value;
+  if (!name||!short||!sub||!built||!from) { showToast('Name, Short Name, Subtype, Built & From Date required','error'); return; }
+  const payload = {
+    Rig_Id: currentRigId, Rig_Name: name, Rig_Short_Name: short,
+    Old_Rig_Name: document.getElementById('f-old-name').value.trim(),
+    Rig_Subtype_Id: sub, Rig_Type_Id: document.getElementById('f-type-id').value,
+    Rig_Built_Dt: built, Rig_From: from,
+    Rig_Tel_No: document.getElementById('f-tel').value.trim(),
+    Rig_Fax_No: document.getElementById('f-fax').value.trim(),
+    Rig_Email_Id: document.getElementById('f-email').value.trim(),
+    Personnel_Area: document.getElementById('f-personnel-area').value.trim(),
+    Org_Unit_Code: document.getElementById('f-unit-code').value.trim(),
+    Rig_Active: document.getElementById('f-active').checked ? 'Y' : 'N',
+  };
+  spinBtn('btn-save','Saving…', () =>
+    fetch('/api/rigs/master/save/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(r=>r.json()).then(d=>{ if(d.error){showToast(d.error,'error');return;} showToast('Changes saved','success'); refreshRigs(); })
+      .catch(()=>showToast('Network error','error'))
+  );
+}
+
+function openAddDialog() {
+  ['d-name','d-short-name','d-old-name','d-built-date','d-from-date',
+   'd-tel','d-fax','d-email','d-personnel-area','d-unit-code','d-type-name','d-type-id']
+    .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ssSubD.clear();
+  document.getElementById('add-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('d-name').focus(),80);
+}
+function closeAddDialog() { document.getElementById('add-modal').classList.remove('open'); }
+
+function saveDialogRig() {
+  const name=document.getElementById('d-name').value.trim();
+  const short=document.getElementById('d-short-name').value.trim();
+  const sub=ssSubD.value;
+  const built=document.getElementById('d-built-date').value;
+  const from=document.getElementById('d-from-date').value;
+  if (!name||!short||!sub||!built||!from) { showToast('Name, Short Name, Subtype, Built & From Date required','error'); return; }
+  const payload = {
+    Rig_Id: null, Rig_Name: name, Rig_Short_Name: short,
+    Old_Rig_Name: document.getElementById('d-old-name').value.trim(),
+    Rig_Subtype_Id: sub, Rig_Type_Id: document.getElementById('d-type-id').value,
+    Rig_Built_Dt: built, Rig_From: from,
+    Rig_Tel_No: document.getElementById('d-tel').value.trim(),
+    Rig_Fax_No: document.getElementById('d-fax').value.trim(),
+    Rig_Email_Id: document.getElementById('d-email').value.trim(),
+    Personnel_Area: document.getElementById('d-personnel-area').value.trim(),
+    Org_Unit_Code: document.getElementById('d-unit-code').value.trim(),
+  };
+  spinBtn('btn-add-dialog','Adding…', () =>
+    fetch('/api/rigs/master/save/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(r=>r.json()).then(d=>{
+        if(d.error){showToast(d.error,'error');return;}
+        showToast(`Rig added · ID ${d.Rig_Id}`,'success');
+        closeAddDialog();
+        refreshRigs().then(()=>selectRig(d.Rig_Id));
+      }).catch(()=>showToast('Network error','error'))
+  );
+}
+
+function refreshRigs() {
+  return fetch('/api/rigs/master/search/?q=').then(r=>r.json()).then(data=>{
+    allRigs=data.results||[]; updateCounts(); renderList(sorted());
+  });
+}
+
+
+function refreshRecords() {
+  return fetch('/api/rigs/master/search/?q=').then(r=>r.json()).then(data=>{
+    allRecords=data.results||[]; updateCounts(); renderList(sorted());
+  });
+}
+
+function bgClose(e) { if(e.target.id==='add-modal') closeAddDialog(); }
+
+function spinBtn(id,label,fn) {
+  const btn=document.getElementById(id),orig=btn.innerHTML; btn.disabled=true;
+  btn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> ${label}`;
+  fn().finally(()=>{btn.disabled=false;btn.innerHTML=orig;});
+}
+
+function showToast(msg,type) {
+  const el=document.createElement('div'); el.className='toast '+type;
+  el.innerHTML=(type==='success'
+    ?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
+    :'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+  )+msg;
+  document.getElementById('toast-wrap').appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),350);},3200);
+}
+</script>
+{% endblock %}

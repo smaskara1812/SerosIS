@@ -1,12 +1,17 @@
+{% extends 'chatbot/base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Seros Operations Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-  <style>
+
+{% block title %}Seros Operations Dashboard{% endblock %}
+
+{% block topbar %}{% endblock %}
+
+{% block head_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+{% endblock %}
+
+{% block styles %}
+<style>
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -16,35 +21,6 @@
     }
 
     /* ── Nav ── */
-    .nav {
-      background: #1a3f7a;
-      color: #fff;
-      padding: 0 28px;
-      height: 54px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 200;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-    }
-    .nav-brand {
-      font-size: 0.95rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .nav-brand span { opacity: 0.45; font-weight: 400; font-size: 0.8rem; }
-    .nav-links { display: flex; gap: 20px; align-items: center; }
-    .nav-links a {
-      color: rgba(255,255,255,0.55);
-      text-decoration: none;
-      font-size: 0.85rem;
-      transition: color 0.15s;
-    }
-    .nav-links a:hover, .nav-links a.active { color: #fff; }
 
     /* ── Filter bar ── */
     .filter-bar {
@@ -56,7 +32,7 @@
       gap: 12px;
       flex-wrap: wrap;
       position: sticky;
-      top: 54px;
+      top: 0;
       z-index: 100;
     }
     .filter-label {
@@ -459,7 +435,7 @@
       border-right: 1px solid #e9edf2;
       padding: 0 0 16px;
       position: sticky;
-      top: 54px;
+      top: 0;
       height: calc(100vh - 54px);
       overflow-y: auto;
       overflow-x: hidden;
@@ -469,34 +445,64 @@
       width: 56px;
     }
 
-    /* Toggle button */
-    .sidebar-toggle {
+    /* Sidebar header row — matches secondary sidebar style */
+    .sidebar-hdr {
+      height: 56px;
       display: flex;
       align-items: center;
-      justify-content: flex-end;
-      padding: 12px 12px 8px;
+      padding: 0 12px 0 16px;
+      border-bottom: 1px solid #e9edf2;
+      flex-shrink: 0;
+      gap: 8px;
+      overflow: hidden;
+      white-space: nowrap;
     }
-    .sidebar.collapsed .sidebar-toggle {
-      justify-content: center;
-      padding: 12px 0 8px;
+    .sidebar-hdr-label {
+      flex: 1;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #94a3b8;
+      overflow: hidden;
+      transition: opacity 0.2s ease;
     }
+    .sidebar.collapsed .sidebar-hdr-label { opacity: 0; }
     .sidebar-toggle-btn {
+      flex-shrink: 0;
       width: 26px;
       height: 26px;
       background: transparent;
       border: 1px solid #e2e8f0;
-      border-radius: 7px;
+      border-radius: 6px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
       transition: background 0.12s, border-color 0.12s, color 0.12s;
       color: #94a3b8;
+      line-height: 0;
     }
-    .sidebar-toggle-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #1a3f7a; }
-    #sidebar-toggle-icon { transition: transform 0.2s ease; }
-    .sidebar.collapsed #sidebar-toggle-icon { transform: rotate(180deg); }
+    .sidebar-toggle-btn:hover { background: #eef3fb; border-color: #c7d7f0; color: #1a3f7a; }
+
+    /* Expand button in filter bar (visible when sidebar is collapsed) */
+    #sidebar-expand-btn {
+      display: none;
+      flex-shrink: 0;
+      background: transparent;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #64748b;
+      width: 28px; height: 28px;
+      align-items: center; justify-content: center;
+      transition: color 0.15s, background 0.15s;
+      line-height: 0;
+    }
+    #sidebar-expand-btn:hover { color: #1a3f7a; background: #eef3fb; }
+    #sidebar-expand-btn.visible { display: flex; }
+    #sidebar-expand-sep { display: none; }
+    #sidebar-expand-sep.visible { display: block; }
 
     .sidebar-body {
       overflow: hidden;
@@ -586,36 +592,27 @@
       .chart-grid-2, .chart-grid-3 { grid-template-columns: 1fr; }
       .sidebar { display: none; }
     }
-  </style>
-</head>
-<body>
+  
+  
+</style>
+{% endblock %}
 
+{% block content %}
+<!-- Loading overlay -->
 <div id="loading-overlay">
   <div class="spinner"></div>
   <p>Loading dashboard…</p>
 </div>
-
-<!-- ── Nav ── -->
-<nav class="nav">
-  <div class="nav-brand"><img src="{% static 'chatbot/logos/seros_logo.png' %}" alt="Seros" style="height:28px;width:auto;object-fit:contain;filter:brightness(0) invert(1);">Seros AI <span>/ Operations Dashboard</span></div>
-  <div class="nav-links">
-    <a href="/">Chat</a>
-    <a href="/dashboard/" class="active">Dashboard</a>
-    <a href="/listings/">Listings</a>
-    <a href="/rigs/">Rigs</a>
-    <a href="/health/">Health</a>
-    <a href="/manuals/">Manuals</a>
-  </div>
-</nav>
 
 <!-- ── Dashboard layout ── -->
 <div class="dashboard-layout">
 
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-toggle">
-      <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="Collapse sidebar">
-        <svg id="sidebar-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    <div class="sidebar-hdr">
+      <span class="sidebar-hdr-label">Dashboard</span>
+      <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="Collapse panel">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
     </div>
     <div class="sidebar-body" id="sidebar-body">
@@ -669,6 +666,10 @@
 
     <!-- ── Filter bar ── -->
     <div class="filter-bar">
+      <button id="sidebar-expand-btn" title="Expand panel">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <div class="filter-sep" id="sidebar-expand-sep"></div>
       <span class="filter-label">Filters</span>
       <div class="filter-sep"></div>
 
@@ -2566,24 +2567,29 @@
   }
 
   /* ── Sidebar collapse/expand (persisted across reloads) ── */
-  const sidebar    = document.getElementById("sidebar");
-  const toggleBtn  = document.getElementById("sidebar-toggle-btn");
+  const sidebar     = document.getElementById("sidebar");
+  const toggleBtn   = document.getElementById("sidebar-toggle-btn");
+  const expandBtn   = document.getElementById("sidebar-expand-btn");
+  const expandSep   = document.getElementById("sidebar-expand-sep");
   let sidebarCollapsed = false;
   try { sidebarCollapsed = localStorage.getItem("sidebarCollapsed") === "1"; } catch(e) {}
 
   function applySidebarState() {
     sidebar.classList.toggle("collapsed", sidebarCollapsed);
-    toggleBtn.title = sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar";
+    expandBtn.classList.toggle("visible", sidebarCollapsed);
+    expandSep.classList.toggle("visible", sidebarCollapsed);
   }
   applySidebarState();
 
-  toggleBtn.addEventListener("click", () => {
-    sidebarCollapsed = !sidebarCollapsed;
+  function toggleSidebar(collapsed) {
+    sidebarCollapsed = collapsed;
     applySidebarState();
     try { localStorage.setItem("sidebarCollapsed", sidebarCollapsed ? "1" : "0"); } catch(e) {}
-    // realign charts after the width transition finishes
     setTimeout(resizeAllCharts, 240);
-  });
+  }
+
+  toggleBtn.addEventListener("click", () => toggleSidebar(!sidebarCollapsed));
+  expandBtn.addEventListener("click", () => toggleSidebar(false));
 
   /* ── Load dashboard data ── */
 
@@ -4341,6 +4347,4 @@
     } catch(e) {}
   })();
 </script>
-
-</body>
-</html>
+{% endblock %}

@@ -24,9 +24,26 @@ def _build_embeddings():
 def get_retriever() -> ParentDocumentRetriever:
     embeddings = _build_embeddings()
 
+    import chromadb, shutil
+    from chromadb.api.client import SharedSystemClient
+
+    VECTORSTORE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Clear stale in-process cache so a re-created directory gets a fresh client
+    # (ChromaDB 0.5.x caches clients by path; deleting the dir leaves a stale entry)
+    SharedSystemClient.clear_system_cache()
+
+    try:
+        client = chromadb.PersistentClient(path=str(VECTORSTORE_DIR))
+    except Exception:
+        # Incompatible vectorstore — wipe and start fresh
+        shutil.rmtree(VECTORSTORE_DIR)
+        VECTORSTORE_DIR.mkdir(parents=True, exist_ok=True)
+        SharedSystemClient.clear_system_cache()
+        client = chromadb.PersistentClient(path=str(VECTORSTORE_DIR))
     vectorstore = Chroma(
+        client=client,
         collection_name="child_chunks",
-        persist_directory=str(VECTORSTORE_DIR),
         embedding_function=embeddings,
     )
 

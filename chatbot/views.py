@@ -4,7 +4,8 @@ import uuid as _uuid_mod
 from datetime import datetime
 from pathlib import Path
 
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth import logout as auth_logout
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET, require_http_methods
@@ -16,6 +17,12 @@ from .health import run_all as run_health_checks
 from .analytics.router import route as analytics_route
 
 _chain = None
+
+
+def logout_view(request):
+    auth_logout(request)
+    return redirect("/login/")
+
 
 # ── Manual ingest background runner ───────────────────────────────────────────
 
@@ -304,6 +311,8 @@ def manual_upload(request):
     return JsonResponse({"saved": saved, "errors": errors}, status=status)
 
 
+@csrf_exempt
+@require_http_methods(["DELETE"])
 @csrf_exempt
 @require_http_methods(["DELETE"])
 def manual_delete(request, filename):
@@ -803,6 +812,647 @@ def rigs_page(request):
 
 def rig_detail_page(request, rig_id):
     return render(request, "chatbot/rigs/detail.html", {"rig_id": rig_id})
+
+
+# ── Masters ───────────────────────────────────────────────────────────────────
+
+def masters_page(request):
+    return render(request, "chatbot/masters/index.html")
+
+# ── Cost Centre Type Master ───────────────────────────────────────────────────
+
+def cost_centre_type_page(request):
+    return render(request, "chatbot/masters/cost_centre_type.html")
+
+@require_GET
+def cost_centre_type_list_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Cost_Centre_Type_Id, Cost_Centre_Type_Name,
+                   Cost_Centre_Type_Shortname, Cost_Centre_Type_Active
+            FROM eos_Mst_Cost_Centre_Type
+            ORDER BY Cost_Centre_Type_Name
+        """)
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+@require_GET
+def cost_centre_type_get_api(request, type_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Cost_Centre_Type_Id, Cost_Centre_Type_Name,
+                   Cost_Centre_Type_Shortname, Cost_Centre_Type_Active
+            FROM eos_Mst_Cost_Centre_Type
+            WHERE Cost_Centre_Type_Id = %s
+        """, [type_id])
+        cols = [c[0] for c in cursor.description]
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+@csrf_exempt
+def cost_centre_type_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    body = json.loads(request.body)
+    type_id  = body.get("Cost_Centre_Type_Id") or None
+    name     = (body.get("Cost_Centre_Type_Name") or "").strip()
+    short    = (body.get("Cost_Centre_Type_Shortname") or "").strip()
+    active   = body.get("Cost_Centre_Type_Active", "Y")
+    if not name or not short:
+        return JsonResponse({"error": "Type Name and Short Name are required"}, status=400)
+    now = datetime.now()
+    cr_user_id = 1
+    with connections["default"].cursor() as cursor:
+        if type_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Cost_Centre_Type
+                SET Cost_Centre_Type_Name=%s, Cost_Centre_Type_Shortname=%s,
+                    Cost_Centre_Type_Active=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Cost_Centre_Type_Id=%s
+            """, [name, short, active, cr_user_id, now, type_id])
+            return JsonResponse({"success": True, "Cost_Centre_Type_Id": type_id, "action": "updated"})
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Cost_Centre_Type_Id), 0) + 1 FROM eos_Mst_Cost_Centre_Type")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Cost_Centre_Type
+                    (Cost_Centre_Type_Id, Cost_Centre_Type_Name, Cost_Centre_Type_Shortname,
+                     Cost_Centre_Type_Active, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, [new_id, name, short, "Y", cr_user_id, now])
+            return JsonResponse({"success": True, "Cost_Centre_Type_Id": new_id, "action": "inserted"})
+
+@csrf_exempt
+def cost_centre_type_deactivate_api(request, type_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            UPDATE eos_Mst_Cost_Centre_Type
+            SET Cost_Centre_Type_Active='N', Mod_User_Id=%s, Mod_Dt=%s
+            WHERE Cost_Centre_Type_Id=%s
+        """, [1, datetime.now(), type_id])
+    return JsonResponse({"success": True})
+
+# ── Cost Centre Master ────────────────────────────────────────────────────────
+
+def cost_centre_page(request):
+    return render(request, "chatbot/masters/cost_centre.html")
+
+@require_GET
+def cost_centre_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Cost_Centre_Type_Id, Cost_Centre_Type_Name
+            FROM eos_Mst_Cost_Centre_Type
+            WHERE Cost_Centre_Type_Active = 'Y'
+            ORDER BY Cost_Centre_Type_Name
+        """)
+        cols = [c[0] for c in cursor.description]
+        types = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"types": types})
+
+@require_GET
+def cost_centre_locations_search_api(request):
+    from django.db import connections
+    q          = request.GET.get("q", "").strip()
+    offset     = max(0, int(request.GET.get("offset", 0)))
+    limit      = min(50, max(1, int(request.GET.get("limit", 20))))
+    country_id = request.GET.get("country_id") or None
+    with connections["default"].cursor() as cursor:
+        params = [f"%{q}%"]
+        sql = "SELECT Location_Id, Location_Name FROM Mst_Location WHERE location_active = 'Y' AND Location_Name LIKE %s"
+        if country_id:
+            sql += " AND Country_Id = %s"
+            params.append(country_id)
+        sql += " ORDER BY Location_Name LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+        cursor.execute(sql, params)
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+@require_GET
+def cost_centre_list_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT cc.Cost_Centre_Id, cc.Cost_Centre_Name, cc.Old_Cost_Centre_Name,
+                   cc.Cost_Centre_Type_Id, cct.Cost_Centre_Type_Name,
+                   cc.Rig_Id, r.Rig_Name,
+                   cc.Location_Id, l.Location_Name,
+                   cc.Cost_Centre_Active
+            FROM eos_Mst_Cost_Centre cc
+            LEFT JOIN eos_Mst_Cost_Centre_Type cct ON cc.Cost_Centre_Type_Id = cct.Cost_Centre_Type_Id
+            LEFT JOIN eos_Mst_Rig r ON cc.Rig_Id = r.Rig_Id
+            LEFT JOIN Mst_Location l ON cc.Location_Id = l.Location_Id
+            ORDER BY cc.Cost_Centre_Name
+        """)
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+@require_GET
+def cost_centre_get_api(request, cc_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT cc.Cost_Centre_Id, cc.Cost_Centre_Name, cc.Old_Cost_Centre_Name,
+                   cc.Cost_Centre_Type_Id, cct.Cost_Centre_Type_Name,
+                   cc.Rig_Id, r.Rig_Name,
+                   cc.Location_Id, l.Location_Name,
+                   cc.Cost_Centre_Active
+            FROM eos_Mst_Cost_Centre cc
+            LEFT JOIN eos_Mst_Cost_Centre_Type cct ON cc.Cost_Centre_Type_Id = cct.Cost_Centre_Type_Id
+            LEFT JOIN eos_Mst_Rig r ON cc.Rig_Id = r.Rig_Id
+            LEFT JOIN Mst_Location l ON cc.Location_Id = l.Location_Id
+            WHERE cc.Cost_Centre_Id = %s
+        """, [cc_id])
+        cols = [c[0] for c in cursor.description]
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+@csrf_exempt
+def cost_centre_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    body = json.loads(request.body)
+    cc_id    = body.get("Cost_Centre_Id") or None
+    name     = (body.get("Cost_Centre_Name") or "").strip()
+    old_name = (body.get("Old_Cost_Centre_Name") or "").strip()
+    type_id  = body.get("Cost_Centre_Type_Id") or None
+    rig_id   = body.get("Rig_Id") or None
+    loc_id   = body.get("Location_Id") or None
+    active   = body.get("Cost_Centre_Active", "Y")
+    if not name or not old_name or not type_id:
+        return JsonResponse({"error": "Name, Old Name and Type are required"}, status=400)
+    now = datetime.now()
+    cr_user_id = 1
+    with connections["default"].cursor() as cursor:
+        if cc_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Cost_Centre
+                SET Cost_Centre_Name=%s, Old_Cost_Centre_Name=%s, Cost_Centre_Type_Id=%s,
+                    Rig_Id=%s, Location_Id=%s, Cost_Centre_Active=%s,
+                    Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Cost_Centre_Id=%s
+            """, [name, old_name, type_id, rig_id, loc_id, active, cr_user_id, now, cc_id])
+            return JsonResponse({"success": True, "Cost_Centre_Id": cc_id, "action": "updated"})
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Cost_Centre_Id), 0) + 1 FROM eos_Mst_Cost_Centre")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Cost_Centre
+                    (Cost_Centre_Id, Cost_Centre_Name, Old_Cost_Centre_Name,
+                     Cost_Centre_Type_Id, Rig_Id, Location_Id,
+                     Cost_Centre_Active, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, [new_id, name, old_name, type_id, rig_id, loc_id, "Y", cr_user_id, now])
+            return JsonResponse({"success": True, "Cost_Centre_Id": new_id, "action": "inserted"})
+
+@csrf_exempt
+def cost_centre_deactivate_api(request, cc_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            UPDATE eos_Mst_Cost_Centre
+            SET Cost_Centre_Active='N', Mod_User_Id=%s, Mod_Dt=%s
+            WHERE Cost_Centre_Id=%s
+        """, [1, datetime.now(), cc_id])
+    return JsonResponse({"success": True})
+
+# ── Operator Master Form ──────────────────────────────────────────────────────
+
+def operator_master_page(request):
+    return render(request, "chatbot/masters/operator.html")
+
+@require_GET
+def operator_list_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT o.Operator_Id, o.Operator_Name, o.Operator_Short_Name,
+                   o.Operator_SAP_Code, o.WBS_Client_Code,
+                   o.Country_Id, c.country_name,
+                   o.Location_Id, l.Location_Name,
+                   o.Contact_Person, o.Tel_No, o.Email_Id,
+                   o.Operator_Active
+            FROM eos_Mst_Operator o
+            LEFT JOIN Mst_Country c ON o.Country_Id = c.country_id
+            LEFT JOIN Mst_Location l ON o.Location_Id = l.Location_Id
+            ORDER BY o.Operator_Name
+        """)
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+@require_GET
+def operator_get_api(request, op_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT o.Operator_Id, o.Operator_Name, o.Operator_Short_Name,
+                   o.Operator_SAP_Code, o.WBS_Client_Code,
+                   o.Country_Id, c.country_name,
+                   o.Location_Id, l.Location_Name,
+                   o.Contact_Person, o.Tel_No, o.Email_Id,
+                   o.Operator_Active
+            FROM eos_Mst_Operator o
+            LEFT JOIN Mst_Country c ON o.Country_Id = c.country_id
+            LEFT JOIN Mst_Location l ON o.Location_Id = l.Location_Id
+            WHERE o.Operator_Id = %s
+        """, [op_id])
+        cols = [c[0] for c in cursor.description]
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+@csrf_exempt
+def operator_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    body       = json.loads(request.body)
+    op_id      = body.get("Operator_Id") or None
+    name       = (body.get("Operator_Name") or "").strip()
+    short_name = (body.get("Operator_Short_Name") or "").strip()
+    sap_code   = (body.get("Operator_SAP_Code") or "").strip() or None
+    wbs_code   = (body.get("WBS_Client_Code") or "").strip() or None
+    country_id = body.get("Country_Id") or None
+    loc_id     = body.get("Location_Id") or None
+    contact    = (body.get("Contact_Person") or "").strip() or None
+    tel        = (body.get("Tel_No") or "").strip() or None
+    email      = (body.get("Email_Id") or "").strip() or None
+    active     = body.get("Operator_Active", "Y")
+    if not name or not short_name:
+        return JsonResponse({"error": "Operator name and short name are required"}, status=400)
+    now = datetime.now()
+    cr_user_id = 1
+    with connections["default"].cursor() as cursor:
+        if op_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Operator
+                SET Operator_Name=%s, Operator_Short_Name=%s, Operator_SAP_Code=%s,
+                    WBS_Client_Code=%s, Country_Id=%s, Location_Id=%s,
+                    Contact_Person=%s, Tel_No=%s, Email_Id=%s,
+                    Operator_Active=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Operator_Id=%s
+            """, [name, short_name, sap_code, wbs_code, country_id, loc_id,
+                  contact, tel, email, active, cr_user_id, now, op_id])
+            return JsonResponse({"success": True, "Operator_Id": op_id, "action": "updated"})
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Operator_Id), 0) + 1 FROM eos_Mst_Operator")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Operator
+                    (Operator_Id, Operator_Name, Operator_Short_Name, Operator_SAP_Code,
+                     WBS_Client_Code, Country_Id, Location_Id, Contact_Person,
+                     Tel_No, Email_Id, Operator_Active, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, [new_id, name, short_name, sap_code, wbs_code, country_id, loc_id,
+                  contact, tel, email, "Y", cr_user_id, now])
+            return JsonResponse({"success": True, "Operator_Id": new_id, "action": "inserted"})
+
+@csrf_exempt
+def operator_deactivate_api(request, op_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            UPDATE eos_Mst_Operator
+            SET Operator_Active='N', Mod_User_Id=%s, Mod_Dt=%s
+            WHERE Operator_Id=%s
+        """, [1, datetime.now(), op_id])
+    return JsonResponse({"success": True})
+
+@require_GET
+def operator_countries_search_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(50, max(1, int(request.GET.get("limit", 20))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT country_id, country_name FROM Mst_Country
+            WHERE country_active = 'Y' AND country_name LIKE %s
+            ORDER BY country_name LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+# ── Cost Centre Type — check/delete ──────────────────────────────────────────
+
+@require_GET
+def cost_centre_type_check_delete_api(request, type_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        refs = []
+        for table, col, label in [
+            ("eos_Mst_Cost_Centre", "Cost_Centre_Type_Id", "Cost Centres"),
+            ("eos_Mst_HSE_Manhours_Party", "Cost_Centre_Type_Id", "HSE Manhours Parties"),
+        ]:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [type_id])
+            count = cursor.fetchone()[0]
+            if count > 0:
+                refs.append({"label": label, "count": count})
+    return JsonResponse({"can_delete": len(refs) == 0, "references": refs})
+
+
+@csrf_exempt
+def cost_centre_type_delete_api(request, type_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        for table, col in [
+            ("eos_Mst_Cost_Centre", "Cost_Centre_Type_Id"),
+            ("eos_Mst_HSE_Manhours_Party", "Cost_Centre_Type_Id"),
+        ]:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [type_id])
+            if cursor.fetchone()[0] > 0:
+                return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
+        cursor.execute("DELETE FROM eos_Mst_Cost_Centre_Type WHERE Cost_Centre_Type_Id=%s", [type_id])
+    return JsonResponse({"success": True})
+
+
+# ── Cost Centre — check/delete ────────────────────────────────────────────────
+
+@require_GET
+def cost_centre_check_delete_api(request, cc_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        refs = []
+        for table, col, label in [
+            ("eos_Invoice_Hdr", "Cost_Centre_Id", "Invoices"),
+            ("eos_Actual_Crew_Expense", "Cost_Centre_Id", "Crew Expenses"),
+            ("eos_Budgeted_Crew_Expense", "Cost_Centre_Id", "Budgeted Crew Expenses"),
+            ("eos_Cost_Centre_To_Company_Mapping", "Cost_Centre_Id", "Company Mappings"),
+            ("eos_Fs_Emp_To_CC_Mapping", "Cost_Centre_Id", "Employee Mappings"),
+            ("eos_Proj_To_Cost_Centre_Mapping", "Cost_Centre_Id", "Project Mappings"),
+        ]:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [cc_id])
+            count = cursor.fetchone()[0]
+            if count > 0:
+                refs.append({"label": label, "count": count})
+    return JsonResponse({"can_delete": len(refs) == 0, "references": refs})
+
+
+@csrf_exempt
+def cost_centre_delete_api(request, cc_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        for table, col in [
+            ("eos_Invoice_Hdr", "Cost_Centre_Id"),
+            ("eos_Actual_Crew_Expense", "Cost_Centre_Id"),
+            ("eos_Budgeted_Crew_Expense", "Cost_Centre_Id"),
+            ("eos_Cost_Centre_To_Company_Mapping", "Cost_Centre_Id"),
+            ("eos_Fs_Emp_To_CC_Mapping", "Cost_Centre_Id"),
+            ("eos_Proj_To_Cost_Centre_Mapping", "Cost_Centre_Id"),
+        ]:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [cc_id])
+            if cursor.fetchone()[0] > 0:
+                return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
+        cursor.execute("DELETE FROM eos_Mst_Cost_Centre WHERE Cost_Centre_Id=%s", [cc_id])
+    return JsonResponse({"success": True})
+
+
+# ── Operator — check/delete ───────────────────────────────────────────────────
+
+@require_GET
+def operator_check_delete_api(request, op_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        refs = []
+        for table, col, label in [
+            ("eos_Mst_Project", "Operator_Id", "Projects"),
+            ("eos_Mst_Project_Contract", "Operator_Id", "Project Contracts"),
+            ("eos_Tender_Dtl", "Operator_Id", "Tenders"),
+            ("eos_Competitor_Contract_Dtl", "Operator_Id", "Competitor Contracts"),
+        ]:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [op_id])
+            count = cursor.fetchone()[0]
+            if count > 0:
+                refs.append({"label": label, "count": count})
+    return JsonResponse({"can_delete": len(refs) == 0, "references": refs})
+
+
+@csrf_exempt
+def operator_delete_api(request, op_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        for table, col in [
+            ("eos_Mst_Project", "Operator_Id"),
+            ("eos_Mst_Project_Contract", "Operator_Id"),
+            ("eos_Tender_Dtl", "Operator_Id"),
+            ("eos_Competitor_Contract_Dtl", "Operator_Id"),
+        ]:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [op_id])
+            if cursor.fetchone()[0] > 0:
+                return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
+        cursor.execute("DELETE FROM eos_Mst_Operator WHERE Operator_Id=%s", [op_id])
+    return JsonResponse({"success": True})
+
+
+# ── Rig Master — check/delete ─────────────────────────────────────────────────
+
+@require_GET
+def rig_master_check_delete_api(request, rig_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        refs = []
+        for table, col, label in [
+            ("eos_Mst_Cost_Centre", "Rig_Id", "Cost Centres"),
+            ("eos_Incident_Details", "Rig_Id", "Incidents"),
+            ("eos_Hazard_ID_Card", "Rig_Id", "Hazard Cards"),
+            ("eos_Drilling_Hdr", "Rig_Id", "Drilling Records"),
+            ("eos_Crew_Grp_Dtl", "Rig_Id", "Crew Group Records"),
+            ("eos_Mst_Crew_Grp", "Rig_Id", "Crew Groups"),
+        ]:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [rig_id])
+            count = cursor.fetchone()[0]
+            if count > 0:
+                refs.append({"label": label, "count": count})
+    return JsonResponse({"can_delete": len(refs) == 0, "references": refs})
+
+
+@csrf_exempt
+def rig_master_delete_api(request, rig_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        for table, col in [
+            ("eos_Mst_Cost_Centre", "Rig_Id"),
+            ("eos_Incident_Details", "Rig_Id"),
+            ("eos_Hazard_ID_Card", "Rig_Id"),
+            ("eos_Drilling_Hdr", "Rig_Id"),
+            ("eos_Crew_Grp_Dtl", "Rig_Id"),
+            ("eos_Mst_Crew_Grp", "Rig_Id"),
+        ]:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [rig_id])
+            if cursor.fetchone()[0] > 0:
+                return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
+        cursor.execute("DELETE FROM eos_Mst_Rig WHERE Rig_Id=%s", [rig_id])
+    return JsonResponse({"success": True})
+
+
+# ── Rig Master Form ───────────────────────────────────────────────────────────
+
+def rig_master_page(request):
+    return render(request, "chatbot/rigs/master.html")
+
+
+@require_GET
+def rig_master_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT rs.Rig_Subtype_Id, rs.Rig_Subtype_Name, rs.Rig_Type_Id, rt.Rig_Type_Name
+            FROM Mst_Rig_Subtype rs
+            JOIN Mst_Rig_Type rt ON rs.Rig_Type_Id = rt.Rig_Type_Id
+            ORDER BY rs.Rig_Subtype_Name
+        """)
+        cols = [c[0] for c in cursor.description]
+        subtypes = [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+        cursor.execute("SELECT Rig_Type_Id, Rig_Type_Name FROM Mst_Rig_Type ORDER BY Rig_Type_Name")
+        cols = [c[0] for c in cursor.description]
+        types = [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+    return JsonResponse({"subtypes": subtypes, "types": types})
+
+
+@require_GET
+def rig_master_search_api(request):
+    from django.db import connections
+    q = request.GET.get("q", "").strip()
+    with connections["default"].cursor() as cursor:
+        if q:
+            cursor.execute("""
+                SELECT r.Rig_Id, r.Rig_Name, r.Rig_Short_Name,
+                       rs.Rig_Subtype_Name, rt.Rig_Type_Name, r.Rig_Active
+                FROM eos_Mst_Rig r
+                JOIN Mst_Rig_Subtype rs ON r.Rig_Subtype_Id = rs.Rig_Subtype_Id
+                JOIN Mst_Rig_Type rt ON r.Rig_Type_Id = rt.Rig_Type_Id
+                WHERE r.Rig_Name LIKE %s OR r.Rig_Short_Name LIKE %s
+                ORDER BY r.Rig_Name
+                LIMIT 20
+            """, [f"%{q}%", f"%{q}%"])
+        else:
+            cursor.execute("""
+                SELECT r.Rig_Id, r.Rig_Name, r.Rig_Short_Name,
+                       rs.Rig_Subtype_Name, rt.Rig_Type_Name, r.Rig_Active
+                FROM eos_Mst_Rig r
+                JOIN Mst_Rig_Subtype rs ON r.Rig_Subtype_Id = rs.Rig_Subtype_Id
+                JOIN Mst_Rig_Type rt ON r.Rig_Type_Id = rt.Rig_Type_Id
+                ORDER BY r.Rig_Name
+            """)
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def rig_master_get_api(request, rig_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Rig_Id, Rig_Name, Rig_Short_Name, Old_Rig_Name,
+                   Rig_Subtype_Id, Rig_Type_Id, Rig_Built_Dt,
+                   Rig_Tel_No, Rig_Fax_No, Rig_Email_Id,
+                   Personnel_Area, Org_Unit_Code, Rig_From, Rig_Active
+            FROM eos_Mst_Rig WHERE Rig_Id = %s
+        """, [rig_id])
+        cols = [c[0] for c in cursor.description]
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    data = dict(zip(cols, row))
+    for k in ["Rig_Built_Dt", "Rig_From"]:
+        if data[k]:
+            data[k] = data[k].isoformat()
+    return JsonResponse(data)
+
+
+@csrf_exempt
+def rig_master_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    from django.db import connections
+    body = json.loads(request.body)
+    rig_id = body.get("Rig_Id") or None
+
+    required = ["Rig_Name", "Rig_Short_Name", "Rig_Subtype_Id", "Rig_Type_Id", "Rig_Built_Dt", "Rig_From"]
+    for field in required:
+        if not body.get(field):
+            return JsonResponse({"error": f"{field} is required"}, status=400)
+
+    now = datetime.now()
+    cr_user_id = 1  # placeholder until auth
+
+    with connections["default"].cursor() as cursor:
+        if rig_id:
+            rig_active = body.get("Rig_Active", "Y")
+            if rig_active not in ("Y", "N"):
+                rig_active = "Y"
+            cursor.execute("""
+                UPDATE eos_Mst_Rig SET
+                    Rig_Name=%s, Rig_Short_Name=%s, Old_Rig_Name=%s,
+                    Rig_Subtype_Id=%s, Rig_Type_Id=%s, Rig_Built_Dt=%s,
+                    Rig_Tel_No=%s, Rig_Fax_No=%s, Rig_Email_Id=%s,
+                    Personnel_Area=%s, Org_Unit_Code=%s, Rig_From=%s,
+                    Rig_Active=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Rig_Id=%s
+            """, [
+                body["Rig_Name"], body["Rig_Short_Name"], body.get("Old_Rig_Name") or None,
+                body["Rig_Subtype_Id"], body["Rig_Type_Id"], body["Rig_Built_Dt"],
+                body.get("Rig_Tel_No") or None, body.get("Rig_Fax_No") or None,
+                body.get("Rig_Email_Id") or None, body.get("Personnel_Area") or None,
+                body.get("Org_Unit_Code") or None, body["Rig_From"],
+                rig_active, cr_user_id, now, rig_id,
+            ])
+            return JsonResponse({"success": True, "Rig_Id": rig_id, "action": "updated"})
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Rig_Id), 0) + 1 FROM eos_Mst_Rig")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Rig (
+                    Rig_Id, Rig_Name, Rig_Short_Name, Old_Rig_Name,
+                    Rig_Subtype_Id, Rig_Type_Id, Rig_Built_Dt,
+                    Rig_Tel_No, Rig_Fax_No, Rig_Email_Id,
+                    Personnel_Area, Org_Unit_Code, Rig_From, Rig_Active,
+                    Cr_User_Id, Cr_Dt
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'Y',%s,%s)
+            """, [
+                new_id, body["Rig_Name"], body["Rig_Short_Name"], body.get("Old_Rig_Name") or None,
+                body["Rig_Subtype_Id"], body["Rig_Type_Id"], body["Rig_Built_Dt"],
+                body.get("Rig_Tel_No") or None, body.get("Rig_Fax_No") or None,
+                body.get("Rig_Email_Id") or None, body.get("Personnel_Area") or None,
+                body.get("Org_Unit_Code") or None, body["Rig_From"],
+                cr_user_id, now,
+            ])
+            return JsonResponse({"success": True, "Rig_Id": new_id, "action": "inserted"})
 
 
 @require_GET
@@ -1387,6 +2037,95 @@ def chat_api(request, conversation_id):
         "sources": sources,
         "title": convo.title,
     })
+
+
+# ── Contractor Master ─────────────────────────────────────────────────────────
+
+
+
+def contractor_master_page(request):
+    return render(request, "chatbot/masters/contractor.html")
+
+
+@require_GET
+def contractor_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Contractor_Id, Contractor_Name
+            FROM eos_Mst_Contractor
+            WHERE Contractor_Name LIKE %s
+            ORDER BY Contractor_Name
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def contractor_get_api(request, contractor_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Contractor_Id, Contractor_Name
+            FROM eos_Mst_Contractor
+            WHERE Contractor_Id=%s
+        """, [contractor_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def contractor_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    import json
+    body            = json.loads(request.body)
+    contractor_id   = body.get("contractor_id")
+    contractor_name = (body.get("contractor_name") or "").strip()
+    if not contractor_name:
+        return JsonResponse({"error": "Contractor name is required"}, status=400)
+    now = datetime.now()
+    with connections["default"].cursor() as cursor:
+        if contractor_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Contractor
+                SET Contractor_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Contractor_Id=%s
+            """, [contractor_name, 1, now, contractor_id])
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Contractor_Id),0)+1 FROM eos_Mst_Contractor")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Contractor
+                    (Contractor_Id, Contractor_Name, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s)
+            """, [new_id, contractor_name, 1, now])
+            contractor_id = new_id
+    return JsonResponse({"success": True, "contractor_id": contractor_id})
+
+
+@require_GET
+def contractor_check_delete_api(request, contractor_id):
+    return JsonResponse({"can_delete": True, "references": []})
+
+
+@csrf_exempt
+def contractor_delete_api(request, contractor_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("DELETE FROM eos_Mst_Contractor WHERE Contractor_Id=%s", [contractor_id])
+    return JsonResponse({"success": True})
 
 
 # ── JSON encoder that handles UUID and datetime ────────────────────────────────

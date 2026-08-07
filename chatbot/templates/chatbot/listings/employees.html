@@ -1,27 +1,17 @@
+{% extends 'chatbot/base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Employees — Seros Listings</title>
-  <style>
+
+{% block title %}Employees — Seros Listings{% endblock %}
+
+{% block styles %}
+<style>
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #f0f2f5;
       min-height: 100vh;
     }
-    .nav {
-      background: #1a3f7a; color: #fff; padding: 0 28px; height: 54px;
-      display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-    }
-    .nav-brand { font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-    .nav-brand span { opacity: 0.45; font-weight: 400; font-size: 0.8rem; }
-    .nav-links { display: flex; gap: 20px; align-items: center; }
-    .nav-links a { color: rgba(255,255,255,0.55); text-decoration: none; font-size: 0.85rem; transition: color 0.15s; }
-    .nav-links a:hover, .nav-links a.active { color: #fff; }
 
     .page-body { padding: 24px 28px 48px; max-width: 1500px; margin: 0 auto; }
     .page-title { font-size: 1.25rem; font-weight: 700; color: #1a3f7a; margin-bottom: 16px; }
@@ -110,21 +100,15 @@
     .page-btn:disabled { color: #cbd5e1; cursor: default; }
     .page-btn.active { background: #1a3f7a; color: #fff; border-color: #1a3f7a; }
     .page-info { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
-  </style>
-</head>
-<body>
+  
+  
+</style>
+{% endblock %}
 
-<nav class="nav">
-  <div class="nav-brand"><img src="{% static 'chatbot/logos/seros_logo.png' %}" alt="Seros" style="height:28px;width:auto;object-fit:contain;filter:brightness(0) invert(1);">Seros AI <span>/ Listings / Employees</span></div>
-  <div class="nav-links">
-    <a href="/">Chat</a>
-    <a href="/dashboard/">Dashboard</a>
-    <a href="/listings/" class="active">Listings</a>
-    <a href="/rigs/">Rigs</a>
-    <a href="/health/">Health</a>
-    <a href="/manuals/">Manuals</a>
-  </div>
-</nav>
+{% block content %}
+<script>
+(function(){const p=location.pathname;document.querySelectorAll('[data-nav]').forEach(function(a){const k=a.dataset.nav;if((k==='dashboard'&&(p==='/'||p==='/dashboard/'))||(k!=='dashboard'&&p.startsWith('/'+k+'/'))){a.classList.add('active');}});})();
+</script>
 
 <div class="page-body">
   <div class="page-title">Employees</div>
@@ -371,5 +355,4 @@
     await loadData();
   })();
 </script>
-</body>
-</html>
+{% endblock %}

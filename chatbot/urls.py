@@ -1,12 +1,59 @@
 from django.urls import path
+from django.contrib.auth import views as auth_views
 from . import views
 
 urlpatterns = [
+    # ── Auth ───────────────────────────────────────────────────────────────
+    path("login/", auth_views.LoginView.as_view(template_name="chatbot/login.html"), name="login"),
+    path("logout/", views.logout_view, name="logout"),
+
     # ── Pages ──────────────────────────────────────────────────────────────
-    path("", views.chat_page, name="chat"),
+    path("", views.dashboard_page, name="home"),
+    path("chat/", views.chat_page, name="chat"),
     path("health/", views.health_page, name="health"),
     path("manuals/", views.manuals_page, name="manuals"),
     path("dashboard/", views.dashboard_page, name="dashboard"),
+
+    path("masters/", views.masters_page, name="masters"),
+    path("masters/rigs/", views.rig_master_page, name="rig_master"),
+    path("masters/cost-centre-type/", views.cost_centre_type_page, name="cost_centre_type"),
+    path("masters/cost-centre/", views.cost_centre_page, name="cost_centre"),
+    path("masters/operator/", views.operator_master_page, name="operator_master"),
+    path("masters/contractor/", views.contractor_master_page, name="contractor_master"),
+
+    # ── Contractor Master API ──────────────────────────────────────────────────
+    path("api/masters/contractor/", views.contractor_list_api, name="contractor_list"),
+    path("api/masters/contractor/save/", views.contractor_save_api, name="contractor_save"),
+    path("api/masters/contractor/<int:contractor_id>/", views.contractor_get_api, name="contractor_get"),
+    path("api/masters/contractor/<int:contractor_id>/check-delete/", views.contractor_check_delete_api, name="contractor_check_delete"),
+    path("api/masters/contractor/<int:contractor_id>/delete/", views.contractor_delete_api, name="contractor_delete"),
+
+    # ── Operator Master API ────────────────────────────────────────────────────
+    path("api/masters/operator/", views.operator_list_api, name="operator_list"),
+    path("api/masters/operator/save/", views.operator_save_api, name="operator_save"),
+    path("api/masters/operator/countries/", views.operator_countries_search_api, name="operator_countries"),
+    path("api/masters/operator/<int:op_id>/", views.operator_get_api, name="operator_get"),
+    path("api/masters/operator/<int:op_id>/deactivate/", views.operator_deactivate_api, name="operator_deactivate"),
+    path("api/masters/operator/<int:op_id>/check-delete/", views.operator_check_delete_api, name="operator_check_delete"),
+    path("api/masters/operator/<int:op_id>/delete/", views.operator_delete_api, name="operator_delete"),
+
+    # ── Cost Centre API ────────────────────────────────────────────────────────
+    path("api/masters/cost-centre/meta/", views.cost_centre_meta_api, name="cost_centre_meta"),
+    path("api/masters/cost-centre/locations/", views.cost_centre_locations_search_api, name="cost_centre_locations"),
+    path("api/masters/cost-centre/", views.cost_centre_list_api, name="cost_centre_list"),
+    path("api/masters/cost-centre/save/", views.cost_centre_save_api, name="cost_centre_save"),
+    path("api/masters/cost-centre/<int:cc_id>/", views.cost_centre_get_api, name="cost_centre_get"),
+    path("api/masters/cost-centre/<int:cc_id>/deactivate/", views.cost_centre_deactivate_api, name="cost_centre_deactivate"),
+    path("api/masters/cost-centre/<int:cc_id>/check-delete/", views.cost_centre_check_delete_api, name="cost_centre_check_delete"),
+    path("api/masters/cost-centre/<int:cc_id>/delete/", views.cost_centre_delete_api, name="cost_centre_delete"),
+
+    # ── Cost Centre Type API ───────────────────────────────────────────────────
+    path("api/masters/cost-centre-type/", views.cost_centre_type_list_api, name="cost_centre_type_list"),
+    path("api/masters/cost-centre-type/save/", views.cost_centre_type_save_api, name="cost_centre_type_save"),
+    path("api/masters/cost-centre-type/<int:type_id>/", views.cost_centre_type_get_api, name="cost_centre_type_get"),
+    path("api/masters/cost-centre-type/<int:type_id>/deactivate/", views.cost_centre_type_deactivate_api, name="cost_centre_type_deactivate"),
+    path("api/masters/cost-centre-type/<int:type_id>/check-delete/", views.cost_centre_type_check_delete_api, name="cost_centre_type_check_delete"),
+    path("api/masters/cost-centre-type/<int:type_id>/delete/", views.cost_centre_type_delete_api, name="cost_centre_type_delete"),
 
     path("rigs/", views.rigs_page, name="rigs"),
     path("rigs/<int:rig_id>/", views.rig_detail_page, name="rig_detail"),
@@ -22,6 +69,14 @@ urlpatterns = [
     path("listings/crew-rotations/", views.listings_crew_rotations_page, name="listings_crew_rotations"),
     path("listings/invoices/", views.listings_invoices_page, name="listings_invoices"),
     path("listings/certificates/", views.listings_certificates_page, name="listings_certificates"),
+
+    # ── Rig Master API ─────────────────────────────────────────────────────────
+    path("api/rigs/master/meta/", views.rig_master_meta_api, name="rig_master_meta"),
+    path("api/rigs/master/search/", views.rig_master_search_api, name="rig_master_search"),
+    path("api/rigs/master/<int:rig_id>/", views.rig_master_get_api, name="rig_master_get"),
+    path("api/rigs/master/save/", views.rig_master_save_api, name="rig_master_save"),
+    path("api/rigs/master/<int:rig_id>/check-delete/", views.rig_master_check_delete_api, name="rig_master_check_delete"),
+    path("api/rigs/master/<int:rig_id>/delete/", views.rig_master_delete_api, name="rig_master_delete"),
 
     # ── Rigs 360 API ───────────────────────────────────────────────────────
     path("api/rigs/", views.rigs_list_api, name="rigs_list_api"),
