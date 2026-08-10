@@ -59,6 +59,7 @@
   <div class="page-subtitle">Searchable, paginated record listings — each one its own dedicated page.</div>
 
   <div class="listing-grid">
+    {% if listing_perms.incidents %}
     <a class="listing-card" href="/listings/incidents/">
       <div class="listing-card-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
@@ -66,7 +67,9 @@
       <div class="listing-card-title">Incidents</div>
       <div class="listing-card-desc">Safety incidents with causes, corrective and preventive actions. Search, filter, and sort across the full record.</div>
     </a>
+    {% endif %}
 
+    {% if listing_perms.hazard_cards %}
     <a class="listing-card" href="/listings/hazard-cards/">
       <div class="listing-card-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
@@ -74,7 +77,9 @@
       <div class="listing-card-title">Hazard Cards</div>
       <div class="listing-card-desc">Hazard ID cards with action taken, responsible party, and close-out status. Search, filter, and sort across the full record.</div>
     </a>
+    {% endif %}
 
+    {% if listing_perms.employees %}
     <a class="listing-card" href="/listings/employees/">
       <div class="listing-card-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><path d="M3 20c0-3.5 2.5-6 6-6s6 2.5 6 6"></path><circle cx="17" cy="9" r="2.4"></circle><path d="M15.5 14.2c2.3.4 3.7 2.3 4 4.8"></path></svg>
@@ -82,7 +87,9 @@
       <div class="listing-card-title">Employees</div>
       <div class="listing-card-desc">Field-service crew master — rank, rig, category, contact details, and full personnel record. Search, filter, and sort across the full record.</div>
     </a>
+    {% endif %}
 
+    {% if listing_perms.staff %}
     <a class="listing-card" href="/listings/staff/">
       <div class="listing-card-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
@@ -90,7 +97,9 @@
       <div class="listing-card-title">Company Staff</div>
       <div class="listing-card-desc">Company-wide HR master across every Seros business unit — distinct from the rig-crew Employees listing. Search, filter, and sort across the full record.</div>
     </a>
+    {% endif %}
 
+    {% if listing_perms.crew_rotations %}
     <a class="listing-card" href="/listings/crew-rotations/">
       <div class="listing-card-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 16 14"></polyline></svg>
@@ -98,7 +107,9 @@
       <div class="listing-card-title">Crew Rotations</div>
       <div class="listing-card-desc">Crew currently on board across the fleet with planned end dates, days overdue, and status. Search, filter, and sort.</div>
     </a>
+    {% endif %}
 
+    {% if listing_perms.invoices %}
     <a class="listing-card" href="/listings/invoices/">
       <div class="listing-card-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
@@ -106,14 +117,27 @@
       <div class="listing-card-title">Invoices</div>
       <div class="listing-card-desc">Full invoice register with vendor, amount, PO number, payment status, and L1/L2/L3 approval chain. Filter, search, and export to CSV.</div>
     </a>
+    {% endif %}
 
+    {% if listing_perms.certificates %}
     <a class="listing-card" href="/listings/certificates/">
       <div class="listing-card-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
       </div>
       <div class="listing-card-title">Certificates</div>
       <div class="listing-card-desc">Crew certificate records with expiry status and days remaining. Filter by status, certificate type, or search by employee name.</div>
     </a>
+    {% endif %}
+
+    {% if listing_perms.users %}
+    <a class="listing-card" href="/listings/users/">
+      <div class="listing-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><circle cx="19" cy="8" r="2.5"/><path d="M22 13c-1-.5-2-.7-3-.7"/></svg>
+      </div>
+      <div class="listing-card-title">System Users</div>
+      <div class="listing-card-desc">All Mst_user accounts with login ID, department, active status, and user type. Search and filter across the full user directory.</div>
+    </a>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

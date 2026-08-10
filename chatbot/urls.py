@@ -1,5 +1,6 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
+from django.views.generic import RedirectView
 from . import views
 
 urlpatterns = [
@@ -20,6 +21,8 @@ urlpatterns = [
     path("masters/cost-centre/", views.cost_centre_page, name="cost_centre"),
     path("masters/operator/", views.operator_master_page, name="operator_master"),
     path("masters/contractor/", views.contractor_master_page, name="contractor_master"),
+    path("masters/email-notification-types/", views.email_notification_type_page, name="email_notification_type"),
+    path("masters/cert-institutes/", views.cert_institute_page, name="cert_institute"),
 
     # ── Contractor Master API ──────────────────────────────────────────────────
     path("api/masters/contractor/", views.contractor_list_api, name="contractor_list"),
@@ -55,6 +58,17 @@ urlpatterns = [
     path("api/masters/cost-centre-type/<int:type_id>/check-delete/", views.cost_centre_type_check_delete_api, name="cost_centre_type_check_delete"),
     path("api/masters/cost-centre-type/<int:type_id>/delete/", views.cost_centre_type_delete_api, name="cost_centre_type_delete"),
 
+    path("api/masters/cert-institute/", views.cert_institute_list_api, name="cert_institute_list"),
+    path("api/masters/cert-institute/save/", views.cert_institute_save_api, name="cert_institute_save"),
+    path("api/masters/cert-institute/<int:inst_id>/", views.cert_institute_get_api, name="cert_institute_get"),
+    path("api/masters/cert-institute/<int:inst_id>/check-delete/", views.cert_institute_check_delete_api, name="cert_institute_check_delete"),
+    path("api/masters/cert-institute/<int:inst_id>/delete/", views.cert_institute_delete_api, name="cert_institute_delete"),
+
+    path("api/masters/email-notification-type/", views.email_notification_type_list_api, name="email_notification_type_list"),
+    path("api/masters/email-notification-type/save/", views.email_notification_type_save_api, name="email_notification_type_save"),
+    path("api/masters/email-notification-type/<int:type_id>/", views.email_notification_type_get_api, name="email_notification_type_get"),
+    path("api/masters/email-notification-type/<int:type_id>/deactivate/", views.email_notification_type_deactivate_api, name="email_notification_type_deactivate"),
+
     path("rigs/", views.rigs_page, name="rigs"),
     path("rigs/<int:rig_id>/", views.rig_detail_page, name="rig_detail"),
 
@@ -69,6 +83,7 @@ urlpatterns = [
     path("listings/crew-rotations/", views.listings_crew_rotations_page, name="listings_crew_rotations"),
     path("listings/invoices/", views.listings_invoices_page, name="listings_invoices"),
     path("listings/certificates/", views.listings_certificates_page, name="listings_certificates"),
+    path("listings/users/", views.listings_users_page, name="listings_users"),
 
     # ── Rig Master API ─────────────────────────────────────────────────────────
     path("api/rigs/master/meta/", views.rig_master_meta_api, name="rig_master_meta"),
@@ -113,9 +128,18 @@ urlpatterns = [
     path("api/listings/invoices/", views.listings_invoices_api, name="listings_invoices_api"),
     path("api/listings/certificates/meta/", views.listings_certificates_meta_api, name="listings_certificates_meta_api"),
     path("api/listings/certificates/", views.listings_certificates_api, name="listings_certificates_api"),
+    path("api/listings/users/", views.listings_users_api, name="listings_users_api"),
 
     # ── Health API ──────────────────────────────────────────────────────────
     path("api/health/", views.health_api, name="health_api"),
+
+    # ── Admin panel ─────────────────────────────────────────────────────────
+    path("admin-panel/", RedirectView.as_view(url="/admin-panel/user-rights/", permanent=False)),
+    path("admin-panel/user-rights/", views.admin_user_rights_page, name="admin_user_rights"),
+    path("api/admin/users/", views.admin_users_api, name="admin_users_api"),
+    path("api/admin/users/<str:login_id>/permissions/", views.admin_user_perms_api, name="admin_user_perms_api"),
+    path("api/admin/users/<str:login_id>/permissions/save/", views.admin_user_perms_save_api, name="admin_user_perms_save_api"),
+    path("api/admin/users/<str:login_id>/toggle-admin/", views.admin_user_admin_toggle_api, name="admin_user_admin_toggle_api"),
 
     # ── Conversation search ─────────────────────────────────────────────────
     path("api/conversations/search/", views.conversation_search, name="conversation_search"),

@@ -10,12 +10,13 @@ _ICONS = {
     "masters":   '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
     "manuals":   '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
     "health":    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+    "admin":     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
 }
 
 # ── Nav definition ─────────────────────────────────────────────────────────────
-# Each item: id, label, url, icon, exact (bool), children (list, optional)
-# Children: id, label, url
-# Future RBAC: add perm field to each item/child, filter by request.user's roles here.
+# Each item's "id" matches its cb_menu key exactly.
+# Parent items (listings, masters) have no cb_menu key — their visibility is
+# derived from whichever children are accessible.
 
 _NAV_ITEMS = [
     {
@@ -25,12 +26,6 @@ _NAV_ITEMS = [
         "exact": True,
         "icon": _ICONS["dashboard"],
     },
-    # {
-    #     "id": "chat",
-    #     "label": "AI Chat",
-    #     "url": "/chat/",
-    #     "icon": _ICONS["chat"],
-    # },
     {
         "id": "rigs",
         "label": "Rigs 360",
@@ -43,13 +38,14 @@ _NAV_ITEMS = [
         "url": "/listings/",
         "icon": _ICONS["listings"],
         "children": [
-            {"id": "incidents",      "label": "Incidents",      "url": "/listings/incidents/"},
-            {"id": "hazard_cards",   "label": "Hazard Cards",   "url": "/listings/hazard-cards/"},
-            {"id": "employees",      "label": "Employees",      "url": "/listings/employees/"},
-            {"id": "staff",          "label": "Staff",          "url": "/listings/staff/"},
-            {"id": "crew_rotations", "label": "Crew Rotations", "url": "/listings/crew-rotations/"},
-            {"id": "invoices",       "label": "Invoices",       "url": "/listings/invoices/"},
-            {"id": "certificates",   "label": "Certificates",   "url": "/listings/certificates/"},
+            {"id": "listings.incidents",      "label": "Incidents",      "url": "/listings/incidents/"},
+            {"id": "listings.hazard_cards",   "label": "Hazard Cards",   "url": "/listings/hazard-cards/"},
+            {"id": "listings.employees",      "label": "Employees",      "url": "/listings/employees/"},
+            {"id": "listings.staff",          "label": "Staff",          "url": "/listings/staff/"},
+            {"id": "listings.crew_rotations", "label": "Crew Rotations", "url": "/listings/crew-rotations/"},
+            {"id": "listings.invoices",       "label": "Invoices",       "url": "/listings/invoices/"},
+            {"id": "listings.certificates",   "label": "Certificates",   "url": "/listings/certificates/"},
+            {"id": "listings.users",          "label": "System Users",   "url": "/listings/users/"},
         ],
     },
     {
@@ -58,11 +54,13 @@ _NAV_ITEMS = [
         "url": "/masters/",
         "icon": _ICONS["masters"],
         "children": [
-            {"id": "rig_master",        "label": "Rigs",               "url": "/masters/rigs/"},
-            {"id": "operator_master",   "label": "Operators",          "url": "/masters/operator/"},
-            {"id": "contractor_master", "label": "Contractors",        "url": "/masters/contractor/"},
-            {"id": "cost_centre",       "label": "Cost Centres",       "url": "/masters/cost-centre/"},
-            {"id": "cost_centre_type",  "label": "Cost Centre Types",  "url": "/masters/cost-centre-type/"},
+            {"id": "masters.rigs",              "label": "Rigs",              "url": "/masters/rigs/"},
+            {"id": "masters.operators",         "label": "Operators",         "url": "/masters/operator/"},
+            {"id": "masters.contractors",       "label": "Contractors",       "url": "/masters/contractor/"},
+            {"id": "masters.cost_centres",      "label": "Cost Centres",      "url": "/masters/cost-centre/"},
+            {"id": "masters.cost_centre_types",          "label": "Cost Centre Types",          "url": "/masters/cost-centre-type/"},
+            {"id": "masters.email_notification_types",   "label": "Email Notification Types",   "url": "/masters/email-notification-types/"},
+            {"id": "masters.cert_institutes",            "label": "Cert Institutes",             "url": "/masters/cert-institutes/"},
         ],
     },
     {
@@ -71,7 +69,7 @@ _NAV_ITEMS = [
         "url": "/manuals/",
         "icon": _ICONS["manuals"],
     },
-       {
+    {
         "id": "chat",
         "label": "AI Chat",
         "url": "/chat/",
@@ -85,28 +83,55 @@ _NAV_ITEMS = [
     },
 ]
 
+_ADMIN_NAV_ITEM = {
+    "id": "admin",
+    "label": "Admin",
+    "url": "/admin-panel/",
+    "icon": _ICONS["admin"],
+    "children": [
+        {"id": "admin.user_rights", "label": "User Rights", "url": "/admin-panel/user-rights/"},
+    ],
+}
+
 
 def seros_nav(request):
     if not request.user.is_authenticated:
         return {}
 
+    from .permissions import get_user_access, can_view
+
+    access = get_user_access(request)
     path = request.path
-    items = copy.deepcopy(_NAV_ITEMS)
-    active_section = None
 
-    for item in items:
-        if item.get("exact"):
-            item["is_active"] = (path == item["url"])
+    base_items = copy.deepcopy(_NAV_ITEMS)
+    if access["is_admin"]:
+        base_items.append(copy.deepcopy(_ADMIN_NAV_ITEM))
+
+    items = []
+    for item in base_items:
+        if item.get("children"):
+            # Parent nav item (listings / masters / admin): show only accessible children.
+            # Admins see everything; for others, child id == cb_menu key.
+            visible_children = [
+                {**child, "is_active": path.startswith(child["url"])}
+                for child in item["children"]
+                if access["is_admin"] or can_view(access, child["id"])
+            ]
+            if not visible_children:
+                continue
+            item = {**item, "children": visible_children}
         else:
-            item["is_active"] = path.startswith(item["url"])
+            # Leaf nav item: id is the cb_menu key — check directly.
+            if not access["is_admin"] and not can_view(access, item["id"]):
+                continue
 
-        if item["is_active"]:
-            active_section = item
+        item["is_active"] = (path == item["url"]) if item.get("exact") else path.startswith(item["url"])
+        items.append(item)
 
-        for child in item.get("children", []):
-            child["is_active"] = path.startswith(child["url"])
+    active_section = next((i for i in items if i.get("is_active")), None)
 
     return {
-        "nav_items": items,
+        "nav_items":      items,
         "active_section": active_section,
+        "user_access":    access,
     }

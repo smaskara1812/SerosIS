@@ -1,0 +1,82 @@
+{% extends 'chatbot/base.html' %}
+
+{% block title %}Access Denied — Seros{% endblock %}
+
+{% block styles %}
+<style>
+.err-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 56px);
+  background: #f1f4f9;
+  gap: 16px;
+  text-align: center;
+  padding: 40px 20px;
+}
+.err-icon {
+  width: 64px; height: 64px;
+  background: #fff;
+  border: 1.5px solid #dde3ee;
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  margin-bottom: 4px;
+}
+.err-code {
+  font-family: 'DM Mono', 'Courier New', monospace;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 3px 10px; border-radius: 20px;
+  border: 1px solid #fecaca;
+  display: inline-block;
+}
+.err-title {
+  font-size: 22px; font-weight: 700;
+  color: #0f172a; margin: 0;
+}
+.err-sub {
+  font-size: 14px; color: #64748b;
+  max-width: 380px; line-height: 1.6; margin: 0;
+}
+.err-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 8px;
+  padding: 9px 20px;
+  background: #1a3f7a; color: #fff;
+  border-radius: 8px; text-decoration: none;
+  font-size: 13px; font-weight: 600;
+  transition: background .15s;
+}
+.err-back:hover { background: #2563eb; }
+.err-contact {
+  font-size: 12px; color: #94a3b8; margin-top: 4px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="err-wrap">
+  <div class="err-icon">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <line x1="12" y1="8" x2="12" y2="12"/>
+      <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+  </div>
+  <span class="err-code">403 — Access Denied</span>
+  <p class="err-title">You don't have permission to view this page</p>
+  <p class="err-sub">
+    Your account hasn't been granted access to this section.
+    Contact your system administrator to request access.
+  </p>
+  <a class="err-back" href="/">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    Back to Dashboard
+  </a>
+  <p class="err-contact">Need access? Ask your admin to update your permissions in Admin → User Rights.</p>
+</div>
+{% endblock %}

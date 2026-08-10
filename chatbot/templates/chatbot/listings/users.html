@@ -1,0 +1,291 @@
+{% extends 'chatbot/base.html' %}
+{% load static %}
+
+{% block title %}System Users — Seros Listings{% endblock %}
+
+{% block styles %}
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+  .page-body { padding: 24px 28px 48px; max-width: 1400px; margin: 0 auto; }
+  .page-title { font-size: 1.25rem; font-weight: 700; color: #1a3f7a; margin-bottom: 16px; }
+
+  .filter-bar {
+    background: #fff; border-radius: 10px; padding: 14px 18px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07); margin-bottom: 16px;
+  }
+  .filter-bar label { font-size: 0.7rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+  .filter-bar select, .filter-bar input[type="text"] {
+    border: 1px solid #e2e8f0; border-radius: 7px; padding: 6px 10px;
+    font-size: 0.83rem; color: #1a3f7a; font-family: inherit; outline: none;
+    transition: border-color 0.15s;
+  }
+  .filter-bar select:focus, .filter-bar input:focus { border-color: #1a3f7a; }
+  #search-input { width: 220px; }
+  .filter-spacer { flex: 1; }
+  .results-count { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+
+  .listing-table-wrap {
+    background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    overflow: hidden;
+  }
+  table.listing-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+  .listing-table th {
+    text-align: left; font-size: 0.7rem; font-weight: 700; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.5px; padding: 12px 14px;
+    border-bottom: 2px solid #f1f5f9; white-space: nowrap; user-select: none;
+  }
+  .listing-table th.sortable { cursor: pointer; }
+  .listing-table th.sortable:hover { color: #1a3f7a; }
+  .listing-table th .sort-arrow { font-size: 0.65rem; margin-left: 3px; opacity: 0.4; }
+  .listing-table th.sorted .sort-arrow { opacity: 1; color: #1a3f7a; }
+  .listing-table td { padding: 11px 14px; border-bottom: 1px solid #f1f5f9; color: #1e293b; vertical-align: middle; }
+  .listing-table tr:last-child td { border-bottom: none; }
+  .listing-table tr:hover td { background: #f8faff; }
+  .col-id    { width: 64px; font-family: monospace; color: #64748b; font-size: 0.78rem; }
+  .col-login { font-family: monospace; font-size: 0.8rem; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+  .badge-active   { background: #dcfce7; color: #15803d; }
+  .badge-inactive { background: #f1f5f9; color: #64748b; }
+  .badge-emp      { background: #eff6ff; color: #1d4ed8; }
+  .badge-other    { background: #faf5ff; color: #7c3aed; }
+
+  .empty-state { text-align: center; padding: 56px 20px; color: #94a3b8; font-size: 0.9rem; display: none; }
+
+  /* Pagination */
+  .pagination-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; gap: 12px; flex-wrap: wrap;
+    border-top: 1px solid #f1f5f9;
+  }
+  .page-size-select { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #64748b; }
+  .page-size-select select {
+    border: 1px solid #e2e8f0; border-radius: 7px; padding: 4px 8px;
+    font-size: 0.82rem; color: #1a3f7a; font-family: inherit;
+  }
+  .page-controls { display: flex; align-items: center; gap: 6px; }
+  .page-btn {
+    border: 1px solid #e2e8f0; background: #fff; border-radius: 7px;
+    padding: 5px 11px; font-size: 0.8rem; color: #1a3f7a; cursor: pointer;
+    transition: background 0.12s;
+  }
+  .page-btn:hover:not(:disabled) { background: #f1f5f9; }
+  .page-btn:disabled { color: #cbd5e1; cursor: default; }
+  .page-btn.active { background: #1a3f7a; color: #fff; border-color: #1a3f7a; }
+  .page-info { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+
+  .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid #dde3ee; border-top-color: #1a3f7a; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<script>
+(function(){const p=location.pathname;document.querySelectorAll('[data-nav]').forEach(function(a){const k=a.dataset.nav;if(k==='listings'&&p.startsWith('/listings/')){a.classList.add('active');}});})();
+</script>
+
+<div class="page-body">
+  <div class="page-title">System Users</div>
+
+  <div class="filter-bar">
+    <label>Search</label>
+    <input type="text" id="search-input" placeholder="Name or login ID…" autocomplete="off">
+
+    <label>Status</label>
+    <select id="filter-active">
+      <option value="">All</option>
+      <option value="Y">Active</option>
+      <option value="N">Inactive</option>
+    </select>
+
+    <label>Type</label>
+    <select id="filter-type">
+      <option value="">All</option>
+      <option value="E">Employee</option>
+      <option value="N">Non-Employee</option>
+    </select>
+
+    <div class="filter-spacer"></div>
+    <span class="results-count" id="results-count"></span>
+  </div>
+
+  <div class="listing-table-wrap">
+    <table class="listing-table">
+      <thead>
+        <tr>
+          <th class="sortable col-id"   data-sort="user_id">  ID        <span class="sort-arrow">▾</span></th>
+          <th class="sortable"          data-sort="name">      Name      <span class="sort-arrow">▾</span></th>
+          <th class="sortable col-login"data-sort="login_id">  Login ID  <span class="sort-arrow">▾</span></th>
+          <th class="sortable"          data-sort="email">     Email     <span class="sort-arrow">▾</span></th>
+          <th class="sortable"          data-sort="dept_name"> Department <span class="sort-arrow">▾</span></th>
+          <th class="sortable"          data-sort="user_type"> Type      <span class="sort-arrow">▾</span></th>
+          <th class="sortable"          data-sort="active">    Status    <span class="sort-arrow">▾</span></th>
+        </tr>
+      </thead>
+      <tbody id="table-body">
+        <tr><td colspan="7" style="text-align:center;padding:48px"><span class="spin"></span></td></tr>
+      </tbody>
+    </table>
+    <div class="empty-state" id="empty-state">No users match the current filters.</div>
+
+    <div class="pagination-bar">
+      <div class="page-size-select">
+        Rows per page
+        <select id="page-size-select">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="75">75</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+      <div class="page-info" id="page-info"></div>
+      <div class="page-controls" id="page-controls"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const state = {
+    page: 1, page_size: 50,
+    q: "", active: "", type: "",
+    sort: "name", sort_dir: "asc",
+  };
+  let debounceTimer = null;
+
+  const tbody      = document.getElementById("table-body");
+  const emptyState = document.getElementById("empty-state");
+  const countEl    = document.getElementById("results-count");
+  const pageInfo   = document.getElementById("page-info");
+  const pageCtrl   = document.getElementById("page-controls");
+
+  function _esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+      ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  async function load() {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:48px"><span class="spin"></span></td></tr>`;
+    emptyState.style.display = "none";
+
+    const params = new URLSearchParams({
+      page:      state.page,
+      page_size: state.page_size,
+      q:         state.q,
+      active:    state.active,
+      type:      state.type,
+      sort:      state.sort,
+      sort_dir:  state.sort_dir,
+    });
+
+    const data = await fetch(`/api/listings/users/?${params}`).then(r => r.json());
+
+    const total = data.total;
+    countEl.textContent = `${total.toLocaleString()} result${total !== 1 ? "s" : ""}`;
+
+    if (!data.rows.length) {
+      tbody.innerHTML = "";
+      emptyState.style.display = "block";
+      pageInfo.textContent = "";
+      pageCtrl.innerHTML = "";
+      return;
+    }
+
+    tbody.innerHTML = data.rows.map(r => {
+      const active  = r.active === "Y";
+      const isEmp   = r.user_type === "E";
+      const typeLabel = isEmp ? "Employee" : (r.user_type || "—");
+      return `<tr>
+        <td class="col-id">${r.user_id}</td>
+        <td>${_esc(r.name) || "—"}</td>
+        <td class="col-login">${_esc(r.login_id) || "—"}</td>
+        <td>${_esc(r.email) || "—"}</td>
+        <td>${_esc(r.dept_name) || "—"}</td>
+        <td><span class="badge ${isEmp ? "badge-emp" : "badge-other"}">${_esc(typeLabel)}</span></td>
+        <td><span class="badge ${active ? "badge-active" : "badge-inactive"}">${active ? "Active" : "Inactive"}</span></td>
+      </tr>`;
+    }).join("");
+
+    const start = (data.page - 1) * data.page_size + 1;
+    const end   = Math.min(data.page * data.page_size, total);
+    pageInfo.textContent = `${start}–${end} of ${total.toLocaleString()}`;
+
+    renderPagination(data.total_pages);
+    updateSortHeaders();
+  }
+
+  function renderPagination(totalPages) {
+    const p = state.page;
+    const pages = new Set([1, totalPages]);
+    for (let i = Math.max(1, p - 2); i <= Math.min(totalPages, p + 2); i++) pages.add(i);
+    const sorted = [...pages].sort((a, b) => a - b);
+
+    let html = `<button class="page-btn" id="pg-prev" ${p <= 1 ? "disabled" : ""}>← Prev</button>`;
+    let prev = 0;
+    for (const n of sorted) {
+      if (n - prev > 1) html += `<span style="color:#cbd5e1;padding:0 4px">…</span>`;
+      html += `<button class="page-btn ${n === p ? "active" : ""}" data-page="${n}">${n}</button>`;
+      prev = n;
+    }
+    html += `<button class="page-btn" id="pg-next" ${p >= totalPages ? "disabled" : ""}>Next →</button>`;
+    pageCtrl.innerHTML = html;
+
+    document.getElementById("pg-prev").addEventListener("click", () => { state.page--; load(); });
+    document.getElementById("pg-next").addEventListener("click", () => { state.page++; load(); });
+    pageCtrl.querySelectorAll("[data-page]").forEach(btn =>
+      btn.addEventListener("click", () => { state.page = Number(btn.dataset.page); load(); })
+    );
+  }
+
+  function updateSortHeaders() {
+    document.querySelectorAll(".listing-table th.sortable").forEach(th => {
+      const isActive = th.dataset.sort === state.sort;
+      th.classList.toggle("sorted", isActive);
+      const arrow = th.querySelector(".sort-arrow");
+      if (isActive) arrow.textContent = state.sort_dir === "asc" ? "▴" : "▾";
+      else arrow.textContent = "▾";
+    });
+  }
+
+  // Sort click
+  document.querySelectorAll(".listing-table th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      if (state.sort === th.dataset.sort) {
+        state.sort_dir = state.sort_dir === "asc" ? "desc" : "asc";
+      } else {
+        state.sort     = th.dataset.sort;
+        state.sort_dir = "asc";
+      }
+      state.page = 1;
+      load();
+    });
+  });
+
+  // Page size
+  document.getElementById("page-size-select").addEventListener("change", function () {
+    state.page_size = Number(this.value);
+    state.page = 1;
+    load();
+  });
+
+  // Filters
+  document.getElementById("search-input").addEventListener("input", function () {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => { state.q = this.value.trim(); state.page = 1; load(); }, 300);
+  });
+  document.getElementById("filter-active").addEventListener("change", function () {
+    state.active = this.value; state.page = 1; load();
+  });
+  document.getElementById("filter-type").addEventListener("change", function () {
+    state.type = this.value; state.page = 1; load();
+  });
+
+  load();
+})();
+</script>
+{% endblock %}

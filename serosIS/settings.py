@@ -42,7 +42,8 @@ MIDDLEWARE = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    "chatbot.auth_backend.SerosAuthBackend",
+    "chatbot.auth_backend.SerosAuthBackend",    # Mst_user + seros2026
+    "django.contrib.auth.backends.ModelBackend", # fallback for Django superuser
 ]
 
 ROOT_URLCONF = "serosIS.urls"

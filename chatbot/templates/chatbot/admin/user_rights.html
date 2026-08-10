@@ -1,0 +1,906 @@
+{% extends 'chatbot/base.html' %}
+{% load static %}
+
+{% block title %}User Rights — Seros{% endblock %}
+
+{% block head_scripts %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% block styles %}
+<style>
+:root {
+  --c-view:    #2563eb;
+  --c-add:     #16a34a;
+  --c-edit:    #d97706;
+  --c-delete:  #dc2626;
+  --c-export:  #7c3aed;
+  --c-accent:  #2563eb;
+  --c-bg:      #f1f4f9;
+  --c-surface: #ffffff;
+  --c-border:  #dde3ee;
+  --c-text:    #0f172a;
+  --c-muted:   #64748b;
+  --c-hover:   #f0f4ff;
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+.ur-shell {
+  display: flex;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+  background: var(--c-bg);
+}
+
+/* ─── LEFT PANEL ─────────────────────────────── */
+.ur-left {
+  width: 272px; min-width: 272px;
+  display: flex; flex-direction: column;
+  background: var(--c-surface);
+  border-right: 1px solid var(--c-border);
+}
+.ur-left-hdr { padding: 14px 14px 0; }
+.ur-panel-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--c-muted); margin: 0 0 8px;
+  display: flex; align-items: center; gap: 7px;
+}
+.ur-count-pill {
+  background: var(--c-bg); color: var(--c-muted);
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  padding: 1px 6px; border-radius: 20px; font-weight: 500;
+}
+.ur-search-wrap { position: relative; margin-bottom: 8px; }
+.ur-search-wrap svg {
+  position: absolute; left: 9px; top: 50%;
+  transform: translateY(-50%); color: var(--c-muted); pointer-events: none;
+}
+.ur-search {
+  width: 100%; padding: 7px 9px 7px 30px;
+  border: 1px solid var(--c-border); border-radius: 7px;
+  font-size: 13px; font-family: 'DM Sans', sans-serif;
+  background: var(--c-bg); color: var(--c-text); outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.ur-search:focus {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+  background: #fff;
+}
+.ur-filters {
+  display: flex; gap: 4px;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid var(--c-border);
+}
+.ur-filter-btn {
+  flex: 1; padding: 5px 4px;
+  border: 1px solid var(--c-border); border-radius: 6px;
+  background: transparent; cursor: pointer;
+  font-size: 11px; font-weight: 600; color: var(--c-muted);
+  font-family: 'DM Sans', sans-serif; transition: all .15s;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.ur-filter-btn:hover { background: var(--c-hover); color: var(--c-text); }
+.ur-filter-btn.active { background: var(--c-accent); border-color: var(--c-accent); color: #fff; }
+.ur-filter-count {
+  background: rgba(255,255,255,.25); border-radius: 10px;
+  padding: 0 5px; font-family: 'DM Mono', monospace; font-size: 10px;
+}
+.ur-filter-btn:not(.active) .ur-filter-count { background: var(--c-bg); color: var(--c-muted); }
+
+.ur-user-list { overflow-y: auto; flex: 1; padding: 5px 6px; }
+.ur-user-list::-webkit-scrollbar { width: 4px; }
+.ur-user-list::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 4px; }
+
+.ur-user-card {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 9px; border-radius: 7px; cursor: pointer;
+  margin-bottom: 2px; transition: background .12s;
+  border-left: 2px solid transparent;
+}
+.ur-user-card:hover { background: var(--c-hover); }
+.ur-user-card.active { background: #eff6ff; border-left-color: var(--c-accent); }
+
+.ur-avatar {
+  width: 32px; height: 32px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+  color: #fff; flex-shrink: 0;
+}
+.ur-user-body { flex: 1; min-width: 0; }
+.ur-user-name {
+  font-size: 13px; font-weight: 600; color: var(--c-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ur-user-meta { display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+.ur-login-chip {
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  color: var(--c-muted); background: var(--c-bg);
+  padding: 1px 5px; border-radius: 4px; border: 1px solid var(--c-border);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;
+}
+.ur-status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.ur-status-dot.active   { background: #16a34a; }
+.ur-status-dot.inactive { background: #94a3b8; }
+.ur-admin-star { color: #f59e0b; font-size: 11px; flex-shrink: 0; }
+
+.ur-list-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 140px; color: var(--c-muted);
+  font-size: 13px; gap: 8px; text-align: center; padding: 16px;
+}
+.ur-list-loading {
+  display: flex; align-items: center; justify-content: center;
+  padding: 14px; gap: 8px; color: var(--c-muted); font-size: 12px;
+}
+.ur-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--c-border); border-top-color: var(--c-accent);
+  border-radius: 50%; animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── RIGHT PANEL ────────────────────────────── */
+.ur-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+.ur-placeholder {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px; color: var(--c-muted); background: var(--c-bg);
+}
+.ur-placeholder-icon {
+  width: 52px; height: 52px; background: var(--c-surface);
+  border: 1.5px solid var(--c-border); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.ur-ph-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: var(--c-text); margin: 0; }
+.ur-ph-sub   { font-size: 13px; margin: 0; }
+
+/* User header */
+.ur-user-hdr {
+  background: var(--c-surface); border-bottom: 1px solid var(--c-border);
+  padding: 12px 18px; display: flex; align-items: center; gap: 12px;
+}
+.ur-hdr-avatar {
+  width: 42px; height: 42px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: #fff;
+}
+.ur-hdr-info { flex: 1; min-width: 0; }
+.ur-hdr-name {
+  font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
+  color: var(--c-text); display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.ur-hdr-id {
+  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--c-muted);
+  background: var(--c-bg); padding: 2px 7px; border-radius: 5px;
+  border: 1px solid var(--c-border); font-weight: 400;
+}
+.ur-admin-toggle {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 10px 4px 6px; border-radius: 20px;
+  border: 1.5px solid var(--c-border); background: var(--c-bg);
+  color: var(--c-muted); font-family: 'DM Sans', sans-serif;
+  font-size: 11px; font-weight: 600; cursor: pointer; transition: all .2s;
+}
+.ur-admin-toggle:hover { border-color: #f59e0b; color: #92400e; }
+.ur-admin-toggle.on {
+  border-color: #f59e0b; background: #fffbeb; color: #92400e;
+  box-shadow: 0 0 0 3px rgba(245,158,11,.12);
+}
+.ur-admin-track {
+  width: 28px; height: 16px; border-radius: 8px; background: #c8d3e8;
+  position: relative; flex-shrink: 0; transition: background .2s;
+}
+.ur-admin-thumb {
+  width: 12px; height: 12px; border-radius: 50%; background: #fff;
+  position: absolute; top: 2px; left: 2px;
+  transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,.25);
+}
+.ur-admin-toggle.on .ur-admin-track { background: #f59e0b; }
+.ur-admin-toggle.on .ur-admin-thumb { transform: translateX(12px); }
+.ur-hdr-email { font-size: 12px; color: var(--c-muted); margin-top: 3px; }
+
+.ur-hdr-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.ur-cancel-btn {
+  padding: 7px 14px; border-radius: 7px;
+  border: 1px solid var(--c-border); background: transparent;
+  font-size: 13px; font-weight: 500; color: var(--c-muted);
+  font-family: 'DM Sans', sans-serif; cursor: pointer;
+  transition: all .15s; display: none;
+}
+.ur-cancel-btn:hover { background: var(--c-bg); color: var(--c-text); }
+.ur-cancel-btn.visible { display: block; }
+
+.ur-save-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 16px; background: var(--c-accent); color: #fff;
+  border: none; border-radius: 7px; font-size: 13px; font-weight: 600;
+  font-family: 'DM Sans', sans-serif; cursor: pointer;
+  transition: background .2s, box-shadow .2s;
+  box-shadow: 0 1px 3px rgba(37,99,235,.3);
+}
+.ur-save-btn:hover:not(:disabled) { background: #1d4ed8; }
+.ur-save-btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.ur-save-btn.dirty {
+  background: #d97706;
+  box-shadow: 0 0 0 3px rgba(217,119,6,.18), 0 1px 3px rgba(217,119,6,.3);
+  animation: pulse-amber 2s ease infinite;
+}
+@keyframes pulse-amber {
+  0%,100% { box-shadow: 0 0 0 3px rgba(217,119,6,.18), 0 1px 3px rgba(217,119,6,.3); }
+  50%      { box-shadow: 0 0 0 5px rgba(217,119,6,.1),  0 1px 3px rgba(217,119,6,.3); }
+}
+.ur-save-btn.dirty:hover:not(:disabled) { background: #b45309; animation: none; }
+.ur-dirty-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(255,255,255,.85); display: none;
+}
+.ur-save-btn.dirty .ur-dirty-dot { display: block; }
+
+/* Grid */
+.ur-grid-wrap {
+  flex: 1; overflow: auto; background: var(--c-bg); padding: 14px 18px;
+}
+.ur-grid-wrap::-webkit-scrollbar { width: 5px; height: 5px; }
+.ur-grid-wrap::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 4px; }
+
+.ur-table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  background: var(--c-surface); border-radius: 10px;
+  border: 1px solid var(--c-border); overflow: hidden;
+  font-size: 13px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  table-layout: fixed;
+}
+.ur-table col:first-child { width: auto; }
+.ur-table col:not(:first-child) { width: 92px; }
+
+.ur-table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: #f5f7ff;
+  border-bottom: 2px solid var(--c-border);
+  padding: 0;
+}
+.ur-table thead th:first-child {
+  text-align: left; padding: 10px 16px;
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .1em; color: var(--c-muted);
+}
+.ur-table thead th:not(:first-child) {
+  text-align: center; vertical-align: top; padding: 8px 4px 0;
+}
+
+.col-hdr-cell {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 6px; padding-bottom: 8px;
+}
+.col-hdr-label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+}
+.col-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.col-dot.view   { background: var(--c-view); }
+.col-dot.add    { background: var(--c-add); }
+.col-dot.edit   { background: var(--c-edit); }
+.col-dot.delete { background: var(--c-delete); }
+.col-dot.export { background: var(--c-export); }
+.col-hdr-label.view   { color: var(--c-view); }
+.col-hdr-label.add    { color: var(--c-add); }
+.col-hdr-label.edit   { color: var(--c-edit); }
+.col-hdr-label.delete { color: var(--c-delete); }
+.col-hdr-label.export { color: var(--c-export); }
+
+/* Select-all button in header */
+.col-select-all {
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--c-border); border-radius: 4px;
+  background: var(--c-surface); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s; flex-shrink: 0;
+  title: attr(title);
+}
+.col-select-all:hover { opacity: .8; }
+
+/* Table body */
+.ur-table tbody tr:nth-child(even) td { background: #fafbff; }
+.ur-table tbody tr:hover td { background: var(--c-hover); }
+.ur-table tbody tr.group-row:hover td,
+.ur-table tbody tr.group-row:nth-child(even) td { background: #eef2ff !important; }
+
+.ur-table tbody td {
+  padding: 9px 16px; border-bottom: 1px solid var(--c-border);
+  color: var(--c-text); vertical-align: middle;
+}
+.ur-table tbody tr:last-child td { border-bottom: none; }
+.ur-table tbody td:not(:first-child) { text-align: center; padding: 9px 4px; }
+
+/* Group separator */
+.group-row td {
+  background: #eef2ff !important;
+  padding: 6px 16px 6px !important;
+  border-top: 1px solid #d8e0f9 !important;
+  border-bottom: 1px solid #d8e0f9 !important;
+}
+.group-row-inner {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.group-label {
+  font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .12em; color: var(--c-accent);
+}
+.group-row-actions { display: flex; gap: 3px; align-items: center; }
+.group-action-btn {
+  font-size: 10px; font-weight: 600; font-family: 'DM Mono', monospace;
+  padding: 2px 7px; border-radius: 4px;
+  border: 1px solid #c7d2f5; background: var(--c-surface);
+  color: var(--c-accent); cursor: pointer; transition: all .15s;
+}
+.group-action-btn:hover { background: var(--c-accent); color: #fff; border-color: var(--c-accent); }
+
+.row-label { font-weight: 500; color: var(--c-text); }
+
+/* N/A cell — dashed outline box, not interactive */
+.na-cell {
+  width: 18px; height: 18px;
+  border: 1.5px dashed #c8d3e8; border-radius: 4px;
+  display: inline-block; background: transparent;
+  vertical-align: middle;
+}
+
+/* Checkboxes */
+.perm-cb-wrap { display: inline-flex; align-items: center; justify-content: center; }
+.perm-cb { display: none; }
+.perm-cb-label {
+  width: 18px; height: 18px;
+  border: 1.5px solid #c8d3e8; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .15s; background: var(--c-surface);
+}
+.perm-cb-label:hover { border-color: currentColor; background: var(--c-hover); }
+.perm-cb-label svg { display: none; }
+.perm-cb:checked + .perm-cb-label svg { display: block; }
+.perm-cb:checked + .perm-cb-label { border-color: transparent; }
+
+.action-view   .perm-cb-label { color: var(--c-view); }
+.action-add    .perm-cb-label { color: var(--c-add); }
+.action-edit   .perm-cb-label { color: var(--c-edit); }
+.action-delete .perm-cb-label { color: var(--c-delete); }
+.action-export .perm-cb-label { color: var(--c-export); }
+.action-view   .perm-cb:checked + .perm-cb-label { background: #eff6ff; }
+.action-add    .perm-cb:checked + .perm-cb-label { background: #f0fdf4; }
+.action-edit   .perm-cb:checked + .perm-cb-label { background: #fffbeb; }
+.action-delete .perm-cb:checked + .perm-cb-label { background: #fef2f2; }
+.action-export .perm-cb:checked + .perm-cb-label { background: #faf5ff; }
+
+/* Admin mode: dim the checkbox columns */
+.ur-table.admin-mode tbody td:not(:first-child) { opacity: .3; pointer-events: none; }
+.ur-table.admin-mode .group-row td { opacity: 1; pointer-events: auto; }
+
+/* Toast */
+.ur-toast {
+  position: fixed; bottom: 22px; right: 22px;
+  padding: 9px 16px; border-radius: 9px;
+  font-size: 13px; font-weight: 600; color: #fff;
+  display: flex; align-items: center; gap: 8px;
+  opacity: 0; transform: translateY(8px);
+  transition: all .25s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none; z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0,0,0,.15);
+}
+.ur-toast.show { opacity: 1; transform: translateY(0); }
+.ur-toast.success { background: #16a34a; }
+.ur-toast.error   { background: #dc2626; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ur-shell">
+
+  <!-- ── LEFT: user list ── -->
+  <aside class="ur-left">
+    <div class="ur-left-hdr">
+      <div class="ur-panel-title">
+        Users <span class="ur-count-pill" id="user-count">—</span>
+      </div>
+      <div class="ur-search-wrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="ur-search" id="user-search" type="search" placeholder="Search name or login ID…" autocomplete="off">
+      </div>
+    </div>
+    <div class="ur-filters" id="filter-tabs">
+      <button class="ur-filter-btn active" data-filter="all">All <span class="ur-filter-count" id="cnt-all">0</span></button>
+      <button class="ur-filter-btn" data-filter="active">Active <span class="ur-filter-count" id="cnt-active">0</span></button>
+      <button class="ur-filter-btn" data-filter="inactive">Inactive <span class="ur-filter-count" id="cnt-inactive">0</span></button>
+    </div>
+    <div class="ur-user-list" id="user-list">
+      <div class="ur-list-loading"><div class="ur-spinner"></div> Loading…</div>
+    </div>
+  </aside>
+
+  <!-- ── RIGHT: permissions ── -->
+  <section class="ur-right">
+
+    <div class="ur-placeholder" id="placeholder">
+      <div class="ur-placeholder-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <p class="ur-ph-title">Select a user</p>
+      <p class="ur-ph-sub">Choose a user from the left to manage their permissions</p>
+    </div>
+
+    <div class="ur-user-hdr" id="user-hdr" style="display:none">
+      <div class="ur-hdr-avatar" id="hdr-avatar"></div>
+      <div class="ur-hdr-info">
+        <div class="ur-hdr-name">
+          <span id="hdr-name"></span>
+          <span class="ur-hdr-id" id="hdr-id"></span>
+          <button class="ur-admin-toggle" id="admin-badge">
+            <div class="ur-admin-track"><div class="ur-admin-thumb"></div></div>
+            <span id="admin-badge-label">Grant Admin</span>
+          </button>
+        </div>
+        <div class="ur-hdr-email" id="hdr-email"></div>
+      </div>
+      <div class="ur-hdr-actions">
+        <button class="ur-cancel-btn" id="cancel-btn">Cancel</button>
+        <button class="ur-save-btn" id="save-btn" disabled>
+          <span class="ur-dirty-dot"></span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Save Changes
+        </button>
+      </div>
+    </div>
+
+    <div class="ur-grid-wrap" id="grid-wrap" style="display:none">
+      <div class="ur-list-loading" id="grid-loading"><div class="ur-spinner"></div> Loading permissions…</div>
+    </div>
+
+  </section>
+</div>
+
+<div class="ur-toast" id="ur-toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "";
+
+  const ACTIONS = ["view", "add", "edit", "delete", "export"];
+  const ACTION_LABELS = { view:"VIEW", add:"ADD", edit:"EDIT", delete:"DELETE", export:"EXPORT" };
+
+  const AVATAR_PALETTE = ["#1a3f7a","#2563eb","#16a34a","#d97706","#7c3aed","#db2777","#0891b2","#0f766e"];
+  function avatarColor(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
+  }
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let allUsers = [], filteredUsers = [];
+  let currentFilter = "all", loadingUsers = false, hasMore = true;
+  let currentPage = 1, currentQ = "", searchTimer = null;
+  let serverTotal = 0, serverActiveCount = 0, serverInactiveCount = 0;
+  const userCache = {};   // keyed by user_id (number)
+
+  let currentUserId = null, currentLoginId = null, currentMenuData = [], isAdmin = false;
+  let isDirty = false, savedSnapshot = null;
+
+  // ── DOM ───────────────────────────────────────────────────────────────────
+  const listEl      = document.getElementById("user-list");
+  const placeholder = document.getElementById("placeholder");
+  const userHdr     = document.getElementById("user-hdr");
+  const gridWrap    = document.getElementById("grid-wrap");
+  const gridLoading = document.getElementById("grid-loading");
+  const saveBtn     = document.getElementById("save-btn");
+  const cancelBtn   = document.getElementById("cancel-btn");
+  const adminBadge  = document.getElementById("admin-badge");
+  const countEl     = document.getElementById("user-count");
+
+  // ── Avatar helpers ────────────────────────────────────────────────────────
+  function makeAvatarEl(u, size, radius) {
+    const col  = avatarColor(u.login_id);
+    const init = (u.name || u.login_id).replace(/^\s+/, '').charAt(0).toUpperCase();
+    return `<div style="width:${size}px;height:${size}px;border-radius:${radius}px;background:${col};
+      display:flex;align-items:center;justify-content:center;
+      font-family:'Syne',sans-serif;font-size:${Math.round(size*.4)}px;font-weight:700;color:#fff;flex-shrink:0">${init}</div>`;
+  }
+
+  // ── User card ─────────────────────────────────────────────────────────────
+  function userCardHTML(u) {
+    return `<div class="ur-user-card${u.user_id === currentUserId ? ' active' : ''}"
+        data-uid="${u.user_id}" onclick="selectUser(${u.user_id})">
+      ${makeAvatarEl(u, 32, 7)}
+      <div class="ur-user-body">
+        <div class="ur-user-name">${u.name || u.login_id}</div>
+        <div class="ur-user-meta">
+          <div class="ur-status-dot ${u.active ? 'active' : 'inactive'}"></div>
+          <span class="ur-login-chip">${u.login_id}</span>
+          ${u.is_app_admin ? '<span class="ur-admin-star" title="App Admin">★</span>' : ''}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function renderList() {
+    if (!filteredUsers.length) {
+      listEl.innerHTML = `<div class="ur-list-empty">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        No users found</div>`;
+      return;
+    }
+    listEl.innerHTML = filteredUsers.map(userCardHTML).join("") +
+      (hasMore ? `<div class="ur-list-loading"><div class="ur-spinner"></div></div>` : "");
+  }
+
+  function applyFilter() {
+    const q = currentQ.toLowerCase();
+    filteredUsers = allUsers.filter(u => {
+      const matchQ = !q || (u.name||"").toLowerCase().includes(q) || u.login_id.toLowerCase().includes(q);
+      const matchF = currentFilter === "all"
+        || (currentFilter === "active"   &&  u.active)
+        || (currentFilter === "inactive" && !u.active);
+      return matchQ && matchF;
+    });
+    renderList();
+  }
+
+  function updateCounts() {
+    countEl.textContent = serverTotal;
+    document.getElementById("cnt-all").textContent      = serverTotal;
+    document.getElementById("cnt-active").textContent   = serverActiveCount;
+    document.getElementById("cnt-inactive").textContent = serverInactiveCount;
+  }
+
+  // Lazy load on scroll
+  listEl.addEventListener("scroll", () => {
+    if (loadingUsers || !hasMore) return;
+    if (listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 150) {
+      loadPage(currentPage + 1, currentQ, true);
+    }
+  });
+
+  async function loadPage(page, q, append) {
+    if (loadingUsers) return;
+    loadingUsers = true;
+    if (!append) {
+      allUsers = [];
+      listEl.innerHTML = `<div class="ur-list-loading"><div class="ur-spinner"></div> Loading…</div>`;
+    }
+    try {
+      const data = await fetch(`/api/admin/users/?${new URLSearchParams({page, q})}`).then(r => r.json());
+      data.users.forEach(u => { userCache[u.user_id] = u; });
+      allUsers = append ? [...allUsers, ...data.users] : data.users;
+      currentPage = data.page;
+      hasMore = data.has_more;
+      if (!append) {
+        serverTotal        = data.total        || 0;
+        serverActiveCount  = data.active_count  || 0;
+        serverInactiveCount= data.inactive_count|| 0;
+      }
+      updateCounts();
+      applyFilter();
+    } catch {
+      if (!append) listEl.innerHTML = `<div class="ur-list-empty">Failed to load users</div>`;
+    } finally { loadingUsers = false; }
+  }
+
+  // Filter tabs
+  document.getElementById("filter-tabs").addEventListener("click", e => {
+    const btn = e.target.closest(".ur-filter-btn");
+    if (!btn) return;
+    document.querySelectorAll(".ur-filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentFilter = btn.dataset.filter;
+    applyFilter();
+  });
+
+  // Debounced search
+  document.getElementById("user-search").addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      currentQ = this.value.trim();
+      if (currentQ) {
+        loadPage(1, currentQ, false);
+      } else {
+        // Search cleared — always reload full list from server
+        loadPage(1, "", false);
+      }
+    }, 280);
+  });
+
+  // ── Select user ───────────────────────────────────────────────────────────
+  window.selectUser = async function (userId) {
+    if (isDirty && currentUserId && !confirm("You have unsaved changes. Discard them?")) return;
+
+    currentUserId = userId;
+    document.querySelectorAll(".ur-user-card")
+      .forEach(el => el.classList.toggle("active", Number(el.dataset.uid) === userId));
+
+    const u = userCache[userId] || {};
+    currentLoginId = u.login_id || "";
+
+    placeholder.style.display = "none";
+    userHdr.style.display = "flex";
+    gridWrap.style.display = "block";
+    gridLoading.style.display = "flex";
+    gridLoading.innerHTML = `<div class="ur-spinner"></div> Loading permissions…`;
+
+    document.getElementById("hdr-avatar").innerHTML = makeAvatarEl(u, 42, 9);
+    document.getElementById("hdr-name").textContent  = u.name || currentLoginId;
+    document.getElementById("hdr-id").textContent    = currentLoginId;
+    document.getElementById("hdr-email").textContent = u.email || "";
+    saveBtn.disabled = false;
+    setDirty(false);
+
+    try {
+      const data = await fetch(`/api/admin/users/${encodeURIComponent(currentLoginId)}/permissions/`).then(r => r.json());
+      currentMenuData = data.menus;
+      isAdmin = data.is_app_admin;
+      setAdminBadge(isAdmin);
+      renderGrid(data.menus, isAdmin);
+      savedSnapshot = getSnapshot();
+    } catch {
+      gridLoading.innerHTML = `<span style="color:#dc2626">Failed to load permissions</span>`;
+    }
+  };
+
+  // ── Dirty tracking ────────────────────────────────────────────────────────
+  function setDirty(d) {
+    isDirty = d;
+    saveBtn.classList.toggle("dirty", d);
+    cancelBtn.classList.toggle("visible", d);
+  }
+
+  function getSnapshot() {
+    const snap = { isAdmin };
+    document.querySelectorAll(".perm-cb").forEach(cb => {
+      snap[`${cb.dataset.key}__${cb.dataset.action}`] = cb.checked;
+    });
+    return JSON.stringify(snap);
+  }
+
+  function checkDirty() { setDirty(getSnapshot() !== savedSnapshot); }
+
+  // Cancel: restore snapshot
+  cancelBtn.addEventListener("click", () => {
+    if (!savedSnapshot) return;
+    const snap = JSON.parse(savedSnapshot);
+    isAdmin = snap.isAdmin;
+    setAdminBadge(isAdmin);
+    const table = gridWrap.querySelector(".ur-table");
+    if (table) table.classList.toggle("admin-mode", isAdmin);
+    document.querySelectorAll(".perm-cb").forEach(cb => {
+      cb.checked = snap[`${cb.dataset.key}__${cb.dataset.action}`] || false;
+    });
+    setDirty(false);
+    updateColSelectAlls();
+  });
+
+  // ── Admin toggle ──────────────────────────────────────────────────────────
+  function setAdminBadge(on) {
+    adminBadge.classList.toggle("on", on);
+    document.getElementById("admin-badge-label").textContent = on ? "Revoke Admin" : "Grant Admin";
+  }
+  adminBadge.addEventListener("click", () => {
+    isAdmin = !isAdmin;
+    setAdminBadge(isAdmin);
+    const table = gridWrap.querySelector(".ur-table");
+    if (table) table.classList.toggle("admin-mode", isAdmin);
+    checkDirty();
+  });
+
+  // ── Render permission grid ────────────────────────────────────────────────
+  function renderGrid(menus, adminMode) {
+    const usedActions = ACTIONS.filter(a => menus.some(m => m.actions.includes(a)));
+    const actionColor = {view:"#2563eb",add:"#16a34a",edit:"#d97706",delete:"#dc2626",export:"#7c3aed"};
+
+    // Build column header with select-all toggle
+    function colHdrHTML(a) {
+      return `<th>
+        <div class="col-hdr-cell">
+          <div class="col-hdr-label ${a}">
+            <span class="col-dot ${a}"></span>${ACTION_LABELS[a]}
+          </div>
+          <div class="col-select-all" data-action="${a}" title="Toggle all ${ACTION_LABELS[a]}"
+            style="color:${actionColor[a]}">
+            <svg width="10" height="10" viewBox="0 0 12 12">
+              <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.8"
+                fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </th>`;
+    }
+
+    let html = `<table class="ur-table${adminMode ? ' admin-mode' : ''}">
+      <colgroup><col>${usedActions.map(() => '<col>').join('')}</colgroup>
+      <thead><tr>
+        <th>Menu Item</th>${usedActions.map(colHdrHTML).join('')}
+      </tr></thead><tbody>`;
+
+    let lastGroup = null;
+    for (const menu of menus) {
+      if (menu.group !== lastGroup) {
+        if (menu.group) {
+          const groupMenus   = menus.filter(m => m.group === menu.group);
+          const groupActions = usedActions.filter(a => groupMenus.some(m => m.actions.includes(a)));
+          html += `<tr class="group-row" data-group="${menu.group}">
+            <td colspan="${1 + usedActions.length}">
+              <div class="group-row-inner">
+                <span class="group-label">${menu.group}</span>
+                <div class="group-row-actions">
+                  ${groupActions.map(a =>
+                    `<button class="group-action-btn" data-group="${menu.group}" data-action="${a}">${ACTION_LABELS[a]}</button>`
+                  ).join('')}
+                  <button class="group-action-btn" data-group="${menu.group}" data-action="__all__">ALL</button>
+                </div>
+              </div>
+            </td>
+          </tr>`;
+        }
+        lastGroup = menu.group;
+      }
+
+      html += `<tr><td class="row-label">${menu.label}</td>`;
+      for (const a of usedActions) {
+        if (!menu.actions.includes(a)) {
+          html += `<td style="text-align:center"><div class="na-cell"></div></td>`;
+        } else {
+          const id  = `cb_${menu.key}_${a}`;
+          const chk = menu.perms[a] ? "checked" : "";
+          html += `<td class="action-${a}">
+            <div class="perm-cb-wrap">
+              <input type="checkbox" class="perm-cb" id="${id}"
+                data-key="${menu.key}" data-action="${a}" ${chk}>
+              <label class="perm-cb-label" for="${id}">
+                <svg width="10" height="10" viewBox="0 0 12 12">
+                  <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.8"
+                    fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </label>
+            </div>
+          </td>`;
+        }
+      }
+      html += `</tr>`;
+    }
+    html += `</tbody></table>`;
+
+    gridLoading.style.display = "none";
+    const existing = gridWrap.querySelector(".ur-table");
+    if (existing) existing.remove();
+    gridWrap.insertAdjacentHTML("beforeend", html);
+
+    // Wire column select-all toggles
+    gridWrap.querySelectorAll(".col-select-all").forEach(el => {
+      updateColSelectAll(el);
+      el.addEventListener("click", () => {
+        const action = el.dataset.action;
+        const cbs = [...gridWrap.querySelectorAll(`.perm-cb[data-action="${action}"]`)];
+        const allChecked = cbs.every(cb => cb.checked);
+        cbs.forEach(cb => { cb.checked = !allChecked; });
+        updateColSelectAll(el);
+        checkDirty();
+      });
+    });
+
+    // Wire group action buttons
+    gridWrap.querySelectorAll(".group-action-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const group  = btn.dataset.group;
+        const action = btn.dataset.action;
+        let cbs;
+        if (action === "__all__") {
+          cbs = [...gridWrap.querySelectorAll(".perm-cb")].filter(cb => {
+            const m = currentMenuData.find(x => x.key === cb.dataset.key);
+            return m && m.group === group;
+          });
+        } else {
+          cbs = [...gridWrap.querySelectorAll(`.perm-cb[data-action="${action}"]`)].filter(cb => {
+            const m = currentMenuData.find(x => x.key === cb.dataset.key);
+            return m && m.group === group;
+          });
+        }
+        const allChecked = cbs.every(cb => cb.checked);
+        cbs.forEach(cb => { cb.checked = !allChecked; });
+        updateColSelectAlls();
+        checkDirty();
+      });
+    });
+
+    // Track dirty on any checkbox change
+    gridWrap.addEventListener("change", e => {
+      if (e.target.classList.contains("perm-cb")) {
+        updateColSelectAlls();
+        checkDirty();
+      }
+    });
+  }
+
+  // ── Column select-all state rendering ────────────────────────────────────
+  const actionColor = {view:"#2563eb",add:"#16a34a",edit:"#d97706",delete:"#dc2626",export:"#7c3aed"};
+
+  function updateColSelectAll(el) {
+    const action = el.dataset.action;
+    const cbs    = [...gridWrap.querySelectorAll(`.perm-cb[data-action="${action}"]`)];
+    if (!cbs.length) return;
+    const col   = actionColor[action] || "#64748b";
+    const n     = cbs.filter(cb => cb.checked).length;
+    const svg   = el.querySelector("svg");
+    if (n === cbs.length) {
+      el.style.background    = col;
+      el.style.borderColor   = "transparent";
+      if (svg) { svg.style.display = "block"; svg.style.color = "#fff"; }
+    } else if (n > 0) {
+      el.style.background    = col + "22";
+      el.style.borderColor   = col;
+      if (svg) svg.style.display = "none";
+    } else {
+      el.style.background    = "";
+      el.style.borderColor   = "";
+      el.style.color         = col;
+      if (svg) { svg.style.display = "block"; svg.style.color = ""; }
+    }
+  }
+
+  function updateColSelectAlls() {
+    gridWrap.querySelectorAll(".col-select-all").forEach(el => updateColSelectAll(el));
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+  saveBtn.addEventListener("click", async () => {
+    if (!currentLoginId || saveBtn.disabled) return;
+    saveBtn.disabled = true;
+
+    const menus = {};
+    document.querySelectorAll(".perm-cb").forEach(cb => {
+      if (!menus[cb.dataset.key]) menus[cb.dataset.key] = {};
+      menus[cb.dataset.key][cb.dataset.action] = cb.checked;
+    });
+
+    try {
+      const data = await fetch(
+        `/api/admin/users/${encodeURIComponent(currentLoginId)}/permissions/save/`,
+        { method: "POST",
+          headers: {"Content-Type":"application/json","X-CSRFToken":CSRF},
+          body: JSON.stringify({ is_app_admin: isAdmin, menus }) }
+      ).then(r => r.json());
+
+      if (data.success) {
+        showToast("Permissions saved", "success");
+        savedSnapshot = getSnapshot();
+        setDirty(false);
+        if (userCache[currentUserId]) {
+          userCache[currentUserId].is_app_admin = isAdmin;
+          allUsers = allUsers.map(u => u.user_id === currentUserId ? {...u, is_app_admin: isAdmin} : u);
+          const card = document.querySelector(`.ur-user-card[data-uid="${currentUserId}"]`);
+          if (card) {
+            const t = document.createElement("div");
+            t.innerHTML = userCardHTML(userCache[currentUserId]);
+            const nc = t.firstChild; nc.classList.add("active"); card.replaceWith(nc);
+          }
+        }
+      } else { showToast("Save failed", "error"); }
+    } catch { showToast("Network error", "error"); }
+    finally  { saveBtn.disabled = false; }
+  });
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  function showToast(msg, type) {
+    const t = document.getElementById("ur-toast");
+    t.textContent = msg;
+    t.className = `ur-toast ${type} show`;
+    setTimeout(() => t.className = "ur-toast", 3000);
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  loadPage(1, "", false);
+})();
+</script>
+{% endblock %}

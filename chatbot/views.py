@@ -15,6 +15,7 @@ from .models import Conversation, Message
 from .rag.chain import get_rag_chain
 from .health import run_all as run_health_checks
 from .analytics.router import route as analytics_route
+from .permissions import require_permission
 
 _chain = None
 
@@ -22,6 +23,10 @@ _chain = None
 def logout_view(request):
     auth_logout(request)
     return redirect("/login/")
+
+
+def forbidden_view(request, exception=None):
+    return render(request, "chatbot/403.html", status=403)
 
 
 # ── Manual ingest background runner ───────────────────────────────────────────
@@ -85,10 +90,12 @@ def _auto_title(text: str, max_len: int = 45) -> str:
 
 # ── Pages ──────────────────────────────────────────────────────────────────────
 
+@require_permission("chat", "view")
 def chat_page(request):
     return render(request, "chatbot/chat.html")
 
 
+@require_permission("health", "view")
 def health_page(request):
     # Render the shell instantly — checks are fetched client-side via /api/health/
     return render(request, "chatbot/health.html")
@@ -259,6 +266,7 @@ def _make_snippet(text: str, query: str, context: int = 60) -> str:
 
 # ── Manual Management ─────────────────────────────────────────────────────────
 
+@require_permission("manuals", "view")
 def manuals_page(request):
     return render(request, "chatbot/manuals.html")
 
@@ -429,6 +437,7 @@ def _extract_analytics_context(messages) -> dict:
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
+@require_permission("dashboard", "view")
 def dashboard_page(request):
     return render(request, "chatbot/dashboard.html")
 
@@ -806,10 +815,12 @@ def dashboard_finance_api(request):
 
 # ── Rigs 360 ─────────────────────────────────────────────────────────────────
 
+@require_permission("rigs", "view")
 def rigs_page(request):
     return render(request, "chatbot/rigs/index.html")
 
 
+@require_permission("rigs", "view")
 def rig_detail_page(request, rig_id):
     return render(request, "chatbot/rigs/detail.html", {"rig_id": rig_id})
 
@@ -821,6 +832,7 @@ def masters_page(request):
 
 # ── Cost Centre Type Master ───────────────────────────────────────────────────
 
+@require_permission("masters.cost_centre_types", "view")
 def cost_centre_type_page(request):
     return render(request, "chatbot/masters/cost_centre_type.html")
 
@@ -903,6 +915,7 @@ def cost_centre_type_deactivate_api(request, type_id):
 
 # ── Cost Centre Master ────────────────────────────────────────────────────────
 
+@require_permission("masters.cost_centres", "view")
 def cost_centre_page(request):
     return render(request, "chatbot/masters/cost_centre.html")
 
@@ -1036,6 +1049,7 @@ def cost_centre_deactivate_api(request, cc_id):
 
 # ── Operator Master Form ──────────────────────────────────────────────────────
 
+@require_permission("masters.operators", "view")
 def operator_master_page(request):
     return render(request, "chatbot/masters/operator.html")
 
@@ -1318,6 +1332,7 @@ def rig_master_delete_api(request, rig_id):
 
 # ── Rig Master Form ───────────────────────────────────────────────────────────
 
+@require_permission("masters.rigs", "view")
 def rig_master_page(request):
     return render(request, "chatbot/rigs/master.html")
 
@@ -1522,13 +1537,27 @@ def rig_operations_api(request, rig_id):
 # ── Listings ─────────────────────────────────────────────────────────────────
 
 def listings_page(request):
-    return render(request, "chatbot/listings/index.html")
+    from .permissions import get_user_access, can_view as _can
+    access = get_user_access(request)
+    listing_perms = {
+        "incidents":      _can(access, "listings.incidents"),
+        "hazard_cards":   _can(access, "listings.hazard_cards"),
+        "employees":      _can(access, "listings.employees"),
+        "staff":          _can(access, "listings.staff"),
+        "crew_rotations": _can(access, "listings.crew_rotations"),
+        "invoices":       _can(access, "listings.invoices"),
+        "certificates":   _can(access, "listings.certificates"),
+        "users":          _can(access, "listings.users"),
+    }
+    return render(request, "chatbot/listings/index.html", {"listing_perms": listing_perms})
 
 
+@require_permission("listings.incidents", "view")
 def listings_incidents_page(request):
     return render(request, "chatbot/listings/incidents.html")
 
 
+@require_permission("listings.hazard_cards", "view")
 def listings_hazard_cards_page(request):
     return render(request, "chatbot/listings/hazard_cards.html")
 
@@ -1634,6 +1663,7 @@ def listings_hazard_cards_pdf(request):
     return response
 
 
+@require_permission("listings.employees", "view")
 def listings_employees_page(request):
     return render(request, "chatbot/listings/employees.html")
 
@@ -1679,6 +1709,7 @@ def listings_employees_api(request):
     return JsonResponse(data)
 
 
+@require_permission("listings.crew_rotations", "view")
 def listings_crew_rotations_page(request):
     return render(request, "chatbot/listings/crew_rotations.html")
 
@@ -1723,6 +1754,7 @@ def listings_crew_rotations_api(request):
     return JsonResponse(data)
 
 
+@require_permission("listings.staff", "view")
 def listings_staff_page(request):
     return render(request, "chatbot/listings/staff.html")
 
@@ -1759,6 +1791,7 @@ def listings_staff_api(request):
     return JsonResponse(data)
 
 
+@require_permission("listings.invoices", "view")
 def listings_invoices_page(request):
     return render(request, "chatbot/listings/invoices.html")
 
@@ -1887,9 +1920,94 @@ def reportbro_preview(request):
     return _cors(HttpResponse("method not allowed", status=405))
 
 
-@require_GET
+@require_permission("listings.certificates", "view")
 def listings_certificates_page(request):
     return render(request, "chatbot/listings/certificates.html")
+
+
+@require_permission("listings.users", "view")
+def listings_users_page(request):
+    return render(request, "chatbot/listings/users.html")
+
+
+@require_GET
+def listings_users_api(request):
+    g           = request.GET
+    q           = g.get("q", "").strip()
+    active_fil  = g.get("active", "")
+    type_fil    = g.get("type", "")
+    page        = max(1, int(g.get("page", 1) or 1))
+    per_page    = min(max(1, int(g.get("page_size", 50) or 50)), 200)
+    offset      = (page - 1) * per_page
+
+    # Whitelist of sortable columns
+    SORT_COLS = {
+        "user_id":   "u.USER_ID",
+        "name":      "u.USER_NAME",
+        "login_id":  "u.USER_LOGIN_ID",
+        "email":     "u.USER_EMAIL",
+        "dept_name": "d.Dept_Dispname",
+        "user_type": "u.USER_TYPE_ID",
+        "active":    "u.USER_ACTIVE",
+    }
+    sort_key = g.get("sort", "name")
+    sort_col = SORT_COLS.get(sort_key, "u.USER_NAME")
+    sort_dir = "DESC" if g.get("sort_dir", "asc").lower() == "desc" else "ASC"
+
+    where_parts = []
+    params      = []
+
+    if q:
+        where_parts.append("(u.USER_NAME LIKE %s OR u.USER_LOGIN_ID LIKE %s)")
+        like = f"%{q}%"
+        params += [like, like]
+    if active_fil == "Y":
+        where_parts.append("u.USER_ACTIVE = 'Y'")
+    elif active_fil == "N":
+        where_parts.append("(u.USER_ACTIVE != 'Y' OR u.USER_ACTIVE IS NULL)")
+    if type_fil:
+        where_parts.append("u.USER_TYPE_ID = %s")
+        params.append(type_fil)
+
+    where = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+
+    sql_count = f"SELECT COUNT(*) FROM Mst_user u {where}"
+    sql_rows  = f"""
+        SELECT u.USER_ID, u.USER_NAME, u.USER_LOGIN_ID, u.USER_EMAIL,
+               u.USER_ACTIVE, u.USER_TYPE_ID, d.Dept_Dispname
+        FROM Mst_user u
+        LEFT JOIN Mst_Department d ON d.Dept_Id = u.DEPT_ID
+        {where}
+        ORDER BY {sort_col} {sort_dir}
+        LIMIT %s OFFSET %s
+    """
+
+    from django.db import connections
+    import math
+    with connections["default"].cursor() as cursor:
+        cursor.execute(sql_count, params)
+        total = cursor.fetchone()[0]
+        cursor.execute(sql_rows, params + [per_page, offset])
+        rows = cursor.fetchall()
+
+    return JsonResponse({
+        "total":       total,
+        "total_pages": max(1, math.ceil(total / per_page)),
+        "page":        page,
+        "page_size":   per_page,
+        "rows": [
+            {
+                "user_id":   r[0],
+                "name":      r[1] or "",
+                "login_id":  r[2] or "",
+                "email":     r[3] or "",
+                "active":    r[4] or "",
+                "user_type": r[5] or "",
+                "dept_name": r[6] or "",
+            }
+            for r in rows
+        ],
+    })
 
 
 @require_GET
@@ -2043,6 +2161,7 @@ def chat_api(request, conversation_id):
 
 
 
+@require_permission("masters.contractors", "view")
 def contractor_master_page(request):
     return render(request, "chatbot/masters/contractor.html")
 
@@ -2128,6 +2247,191 @@ def contractor_delete_api(request, contractor_id):
     return JsonResponse({"success": True})
 
 
+# ── Cert Institute Master ─────────────────────────────────────────────────────
+
+@require_permission("masters.cert_institutes", "view")
+def cert_institute_page(request):
+    return render(request, "chatbot/masters/cert_institute.html")
+
+@require_GET
+def cert_institute_list_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT ci.Cert_Institute_Id, ci.Cert_Institute_Name, ci.Cert_Institute_Shortname,
+                   ci.Cert_Institute_Address, ci.Location_Id, l.Location_Name, ci.Tel_No
+            FROM eos_Mst_Cert_Institute ci
+            LEFT JOIN Mst_Location l ON ci.Location_Id = l.Location_Id
+            ORDER BY ci.Cert_Institute_Name
+        """)
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+@require_GET
+def cert_institute_get_api(request, inst_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT ci.Cert_Institute_Id, ci.Cert_Institute_Name, ci.Cert_Institute_Shortname,
+                   ci.Cert_Institute_Address, ci.Location_Id, l.Location_Name, ci.Tel_No
+            FROM eos_Mst_Cert_Institute ci
+            LEFT JOIN Mst_Location l ON ci.Location_Id = l.Location_Id
+            WHERE ci.Cert_Institute_Id = %s
+        """, [inst_id])
+        cols = [c[0] for c in cursor.description]
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+@csrf_exempt
+def cert_institute_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    body     = json.loads(request.body)
+    inst_id  = body.get("Cert_Institute_Id") or None
+    name     = (body.get("Cert_Institute_Name") or "").strip()
+    short    = (body.get("Cert_Institute_Shortname") or "").strip()
+    address  = (body.get("Cert_Institute_Address") or "").strip() or None
+    loc_id   = body.get("Location_Id") or None
+    tel      = (body.get("Tel_No") or "").strip() or None
+    if not name or not short or not loc_id:
+        return JsonResponse({"error": "Institute Name, Short Name and Location are required"}, status=400)
+    now = datetime.now()
+    cr_user_id = 1
+    with connections["default"].cursor() as cursor:
+        if inst_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Cert_Institute
+                SET Cert_Institute_Name=%s, Cert_Institute_Shortname=%s,
+                    Cert_Institute_Address=%s, Location_Id=%s, Tel_No=%s,
+                    Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Cert_Institute_Id=%s
+            """, [name, short, address, loc_id, tel, cr_user_id, now, inst_id])
+            return JsonResponse({"success": True, "Cert_Institute_Id": inst_id, "action": "updated"})
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Cert_Institute_Id), 0) + 1 FROM eos_Mst_Cert_Institute")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Cert_Institute
+                    (Cert_Institute_Id, Cert_Institute_Name, Cert_Institute_Shortname,
+                     Cert_Institute_Address, Location_Id, Tel_No, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, [new_id, name, short, address, loc_id, tel, cr_user_id, now])
+            return JsonResponse({"success": True, "Cert_Institute_Id": new_id, "action": "inserted"})
+
+@require_GET
+def cert_institute_check_delete_api(request, inst_id):
+    from django.db import connections
+    refs = []
+    with connections["default"].cursor() as cursor:
+        for table, col, label in [
+            ("eos_Emp_Certificate", "Cert_Institute_Id", "Employee Certificates"),
+        ]:
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [inst_id])
+                count = cursor.fetchone()[0]
+                if count > 0:
+                    refs.append({"label": label, "count": count})
+            except Exception:
+                pass
+    return JsonResponse({"can_delete": len(refs) == 0, "references": refs})
+
+@csrf_exempt
+def cert_institute_delete_api(request, inst_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("DELETE FROM eos_Mst_Cert_Institute WHERE Cert_Institute_Id=%s", [inst_id])
+    return JsonResponse({"success": True})
+
+
+# ── Email Notification Type Master ───────────────────────────────────────────
+
+@require_permission("masters.email_notification_types", "view")
+def email_notification_type_page(request):
+    return render(request, "chatbot/masters/email_notification_type.html")
+
+@require_GET
+def email_notification_type_list_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT EN_Type_Id, EN_Type_Name, EN_Type_Subject, EN_Type_Active
+            FROM eos_Email_Notification_Type
+            ORDER BY EN_Type_Name
+        """)
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+@require_GET
+def email_notification_type_get_api(request, type_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT EN_Type_Id, EN_Type_Name, EN_Type_Subject, EN_Description, EN_Type_Active
+            FROM eos_Email_Notification_Type
+            WHERE EN_Type_Id = %s
+        """, [type_id])
+        cols = [c[0] for c in cursor.description]
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+@csrf_exempt
+def email_notification_type_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    body    = json.loads(request.body)
+    type_id = body.get("EN_Type_Id") or None
+    name    = (body.get("EN_Type_Name") or "").strip()
+    subject = (body.get("EN_Type_Subject") or "").strip()
+    desc    = (body.get("EN_Description") or "").strip()
+    active  = body.get("EN_Type_Active", "Y")
+    if not name or not subject:
+        return JsonResponse({"error": "Type Name and Subject are required"}, status=400)
+    now = datetime.now()
+    cr_user_id = 1
+    with connections["default"].cursor() as cursor:
+        if type_id:
+            cursor.execute("""
+                UPDATE eos_Email_Notification_Type
+                SET EN_Type_Name=%s, EN_Type_Subject=%s, EN_Description=%s,
+                    EN_Type_Active=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE EN_Type_Id=%s
+            """, [name, subject, desc, active, cr_user_id, now, type_id])
+            return JsonResponse({"success": True, "EN_Type_Id": type_id, "action": "updated"})
+        else:
+            cursor.execute("SELECT COALESCE(MAX(EN_Type_Id), 0) + 1 FROM eos_Email_Notification_Type")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Email_Notification_Type
+                    (EN_Type_Id, EN_Type_Name, EN_Type_Subject, EN_Description,
+                     EN_Type_Active, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, [new_id, name, subject, desc, "Y", cr_user_id, now])
+            return JsonResponse({"success": True, "EN_Type_Id": new_id, "action": "inserted"})
+
+@csrf_exempt
+def email_notification_type_deactivate_api(request, type_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            UPDATE eos_Email_Notification_Type
+            SET EN_Type_Active='N', Mod_User_Id=%s, Mod_Dt=%s
+            WHERE EN_Type_Id=%s
+        """, [1, datetime.now(), type_id])
+    return JsonResponse({"success": True})
+
+
 # ── JSON encoder that handles UUID and datetime ────────────────────────────────
 
 import uuid
@@ -2142,3 +2446,185 @@ class _UUIDDateEncoder(DjangoJSONEncoder):
         if isinstance(obj, datetime):
             return obj.isoformat()
         return super().default(obj)
+
+
+# ── Admin: User Rights ─────────────────────────────────────────────────────────
+
+def _require_app_admin(view_fn):
+    """Decorator: only app admins (or Django superusers) may access this view."""
+    from functools import wraps
+    from .permissions import get_user_access
+
+    @wraps(view_fn)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("/login/")
+        access = get_user_access(request)
+        if not access["is_admin"]:
+            return HttpResponse("Forbidden", status=403)
+        return view_fn(request, *args, **kwargs)
+
+    return wrapper
+
+
+@_require_app_admin
+def admin_user_rights_page(request):
+    return render(request, "chatbot/admin/user_rights.html")
+
+
+@_require_app_admin
+@require_GET
+def admin_users_api(request):
+    """Paginated, searchable list of Mst_user rows for the user picker."""
+    from django.db import connections as _conn
+
+    q     = request.GET.get("q", "").strip()
+    page  = max(int(request.GET.get("page", 1)), 1)
+    limit = 50
+    offset = (page - 1) * limit
+
+    if q:
+        like = f"%{q}%"
+        where = "WHERE USER_NAME LIKE %s OR USER_LOGIN_ID LIKE %s"
+        sql_counts = (f"SELECT COUNT(*), "
+                      f"SUM(CASE WHEN USER_ACTIVE='Y' THEN 1 ELSE 0 END), "
+                      f"SUM(CASE WHEN USER_ACTIVE!='Y' OR USER_ACTIVE IS NULL THEN 1 ELSE 0 END) "
+                      f"FROM Mst_user {where}")
+        sql_rows   = (f"SELECT USER_ID, USER_LOGIN_ID, USER_NAME, USER_EMAIL, USER_ACTIVE "
+                      f"FROM Mst_user {where} ORDER BY USER_NAME LIMIT %s OFFSET %s")
+        params_counts = [like, like]
+        params_rows   = [like, like, limit, offset]
+    else:
+        sql_counts = ("SELECT COUNT(*), "
+                      "SUM(CASE WHEN USER_ACTIVE='Y' THEN 1 ELSE 0 END), "
+                      "SUM(CASE WHEN USER_ACTIVE!='Y' OR USER_ACTIVE IS NULL THEN 1 ELSE 0 END) "
+                      "FROM Mst_user")
+        sql_rows   = ("SELECT USER_ID, USER_LOGIN_ID, USER_NAME, USER_EMAIL, USER_ACTIVE "
+                      "FROM Mst_user ORDER BY USER_NAME LIMIT %s OFFSET %s")
+        params_counts = []
+        params_rows   = [limit, offset]
+
+    with _conn["default"].cursor() as cursor:
+        cursor.execute(sql_counts, params_counts)
+        counts_row = cursor.fetchone()
+        total        = counts_row[0]
+        active_count = int(counts_row[1] or 0)
+        inactive_count = int(counts_row[2] or 0)
+        cursor.execute(sql_rows, params_rows)
+        rows = cursor.fetchall()
+
+    from .models import UserProfile
+    admin_ids = set(
+        UserProfile.objects.filter(is_app_admin=True).values_list("user_login_id", flat=True)
+    )
+
+    users = [
+        {
+            "user_id":      r[0],
+            "login_id":     r[1],
+            "name":         r[2] or r[1],
+            "email":        r[3] or "",
+            "active":       r[4] == "Y",
+            "is_app_admin": r[1] in admin_ids,
+        }
+        for r in rows
+    ]
+    return JsonResponse({
+        "users": users, "page": page, "total": total,
+        "active_count": active_count, "inactive_count": inactive_count,
+        "has_more": offset + limit < total,
+    })
+
+
+@_require_app_admin
+@require_GET
+def admin_user_perms_api(request, login_id):
+    """Return current permissions for one user."""
+    from .models import UserPermission, UserProfile
+    from .permissions import get_menu_registry
+
+    try:
+        profile = UserProfile.objects.get(user_login_id=login_id)
+        is_admin = profile.is_app_admin
+    except UserProfile.DoesNotExist:
+        is_admin = False
+
+    perm_rows = {
+        p.menu_key: p
+        for p in UserPermission.objects.filter(user_login_id=login_id)
+    }
+
+    menus = []
+    for key, meta in get_menu_registry().items():
+        row = perm_rows.get(key)
+        menus.append({
+            "key":     key,
+            "label":   meta["label"],
+            "group":   meta["group"],
+            "actions": meta["actions"],
+            "perms": {
+                "view":   row.can_view   if row else False,
+                "add":    row.can_add    if row else False,
+                "edit":   row.can_edit   if row else False,
+                "delete": row.can_delete if row else False,
+                "export": row.can_export if row else False,
+            },
+        })
+
+    return JsonResponse({"is_app_admin": is_admin, "menus": menus})
+
+
+@_require_app_admin
+@csrf_exempt
+def admin_user_perms_save_api(request, login_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    from .models import UserPermission, UserProfile
+    from .permissions import get_menu_registry
+
+    is_admin = bool(data.get("is_app_admin", False))
+    profile, _ = UserProfile.objects.get_or_create(user_login_id=login_id)
+    profile.is_app_admin = is_admin
+    profile.save()
+
+    menus = data.get("menus", {})
+    granted_by = request.user.username
+    valid_keys = set(get_menu_registry().keys())
+
+    for key in valid_keys:
+        if key not in menus:
+            continue
+        p = menus[key]
+        UserPermission.objects.update_or_create(
+            user_login_id=login_id,
+            menu_key=key,
+            defaults={
+                "can_view":   bool(p.get("view")),
+                "can_add":    bool(p.get("add")),
+                "can_edit":   bool(p.get("edit")),
+                "can_delete": bool(p.get("delete")),
+                "can_export": bool(p.get("export")),
+                "granted_by": granted_by,
+            },
+        )
+
+    return JsonResponse({"success": True})
+
+
+@_require_app_admin
+@csrf_exempt
+def admin_user_admin_toggle_api(request, login_id):
+    """Toggle is_app_admin for a user."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from .models import UserProfile
+    profile, _ = UserProfile.objects.get_or_create(user_login_id=login_id)
+    profile.is_app_admin = not profile.is_app_admin
+    profile.save()
+    return JsonResponse({"is_app_admin": profile.is_app_admin})
