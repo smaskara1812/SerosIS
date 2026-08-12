@@ -9,6 +9,7 @@ from .tools import _query, _rig_id
 
 PAGE_SIZE_CHOICES = (25, 50, 75, 100)
 DEFAULT_PAGE_SIZE = 50
+EXPORT_PAGE_SIZE  = 50_000   # sentinel: return everything for CSV export
 
 
 def _clean_page(page: int | None) -> int:
@@ -16,6 +17,8 @@ def _clean_page(page: int | None) -> int:
 
 
 def _clean_page_size(page_size: int | None) -> int:
+    if page_size == EXPORT_PAGE_SIZE:
+        return EXPORT_PAGE_SIZE
     if page_size in PAGE_SIZE_CHOICES:
         return page_size
     return DEFAULT_PAGE_SIZE

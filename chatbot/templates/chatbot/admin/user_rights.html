@@ -71,7 +71,7 @@
   background: #fff;
 }
 .ur-filters {
-  display: flex; gap: 4px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
   padding: 0 14px 10px;
   border-bottom: 1px solid var(--c-border);
 }
@@ -416,6 +416,7 @@
       <button class="ur-filter-btn active" data-filter="all">All <span class="ur-filter-count" id="cnt-all">0</span></button>
       <button class="ur-filter-btn" data-filter="active">Active <span class="ur-filter-count" id="cnt-active">0</span></button>
       <button class="ur-filter-btn" data-filter="inactive">Inactive <span class="ur-filter-count" id="cnt-inactive">0</span></button>
+      <button class="ur-filter-btn" data-filter="admin">Admins <span class="ur-filter-count" id="cnt-admin">0</span></button>
     </div>
     <div class="ur-user-list" id="user-list">
       <div class="ur-list-loading"><div class="ur-spinner"></div> Loading…</div>
@@ -485,7 +486,7 @@
   let allUsers = [], filteredUsers = [];
   let currentFilter = "all", loadingUsers = false, hasMore = true;
   let currentPage = 1, currentQ = "", searchTimer = null;
-  let serverTotal = 0, serverActiveCount = 0, serverInactiveCount = 0;
+  let serverTotal = 0, serverActiveCount = 0, serverInactiveCount = 0, serverAdminCount = 0;
   const userCache = {};   // keyed by user_id (number)
 
   let currentUserId = null, currentLoginId = null, currentMenuData = [], isAdmin = false;
@@ -544,7 +545,8 @@
       const matchQ = !q || (u.name||"").toLowerCase().includes(q) || u.login_id.toLowerCase().includes(q);
       const matchF = currentFilter === "all"
         || (currentFilter === "active"   &&  u.active)
-        || (currentFilter === "inactive" && !u.active);
+        || (currentFilter === "inactive" && !u.active)
+        || (currentFilter === "admin"    &&  u.is_app_admin);
       return matchQ && matchF;
     });
     renderList();
@@ -555,6 +557,7 @@
     document.getElementById("cnt-all").textContent      = serverTotal;
     document.getElementById("cnt-active").textContent   = serverActiveCount;
     document.getElementById("cnt-inactive").textContent = serverInactiveCount;
+    document.getElementById("cnt-admin").textContent    = serverAdminCount;
   }
 
   // Lazy load on scroll
@@ -573,7 +576,9 @@
       listEl.innerHTML = `<div class="ur-list-loading"><div class="ur-spinner"></div> Loading…</div>`;
     }
     try {
-      const data = await fetch(`/api/admin/users/?${new URLSearchParams({page, q})}`).then(r => r.json());
+      const apiParams = {page, q};
+      if (currentFilter === "admin") apiParams.admin_only = "1";
+      const data = await fetch(`/api/admin/users/?${new URLSearchParams(apiParams)}`).then(r => r.json());
       data.users.forEach(u => { userCache[u.user_id] = u; });
       allUsers = append ? [...allUsers, ...data.users] : data.users;
       currentPage = data.page;
@@ -582,6 +587,7 @@
         serverTotal        = data.total        || 0;
         serverActiveCount  = data.active_count  || 0;
         serverInactiveCount= data.inactive_count|| 0;
+        serverAdminCount   = data.admin_count   || 0;
       }
       updateCounts();
       applyFilter();
@@ -596,8 +602,14 @@
     if (!btn) return;
     document.querySelectorAll(".ur-filter-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
+    const prev = currentFilter;
     currentFilter = btn.dataset.filter;
-    applyFilter();
+    // Admin filter is server-side; reload when entering or leaving admin mode
+    if (currentFilter === "admin" || prev === "admin") {
+      loadPage(1, currentQ, false);
+    } else {
+      applyFilter();
+    }
   });
 
   // Debounced search
@@ -639,7 +651,7 @@
     setDirty(false);
 
     try {
-      const data = await fetch(`/api/admin/users/${encodeURIComponent(currentLoginId)}/permissions/`).then(r => r.json());
+      const data = await fetch(`/api/admin/users/${currentUserId}/permissions/`).then(r => r.json());
       currentMenuData = data.menus;
       isAdmin = data.is_app_admin;
       setAdminBadge(isAdmin);
@@ -855,7 +867,7 @@
 
   // ── Save ──────────────────────────────────────────────────────────────────
   saveBtn.addEventListener("click", async () => {
-    if (!currentLoginId || saveBtn.disabled) return;
+    if (!currentUserId || saveBtn.disabled) return;
     saveBtn.disabled = true;
 
     const menus = {};
@@ -866,10 +878,10 @@
 
     try {
       const data = await fetch(
-        `/api/admin/users/${encodeURIComponent(currentLoginId)}/permissions/save/`,
+        `/api/admin/users/${currentUserId}/permissions/save/`,
         { method: "POST",
           headers: {"Content-Type":"application/json","X-CSRFToken":CSRF},
-          body: JSON.stringify({ is_app_admin: isAdmin, menus }) }
+          body: JSON.stringify({ is_app_admin: isAdmin, login_id: currentLoginId, menus }) }
       ).then(r => r.json());
 
       if (data.success) {

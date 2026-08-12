@@ -89,7 +89,8 @@ _ADMIN_NAV_ITEM = {
     "url": "/admin-panel/",
     "icon": _ICONS["admin"],
     "children": [
-        {"id": "admin.user_rights", "label": "User Rights", "url": "/admin-panel/user-rights/"},
+        {"id": "admin.user_rights",     "label": "User Rights",     "url": "/admin-panel/user-rights/"},
+        {"id": "admin.user_management", "label": "User Management", "url": "/admin-panel/user-management/"},
     ],
 }
 

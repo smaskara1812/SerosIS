@@ -45,12 +45,14 @@ def get_user_access(request):
     try:
         profile = UserProfile.objects.get(user_login_id=login_id)
         is_admin = profile.is_app_admin
+        user_id  = profile.user_id
     except UserProfile.DoesNotExist:
         is_admin = False
+        user_id  = None
 
     perms = {}
-    if not is_admin:
-        for p in UserPermission.objects.filter(user_login_id=login_id):
+    if not is_admin and user_id is not None:
+        for p in UserPermission.objects.filter(user_id=user_id):
             perms[p.menu_key] = {
                 "view":   p.can_view,
                 "add":    p.can_add,

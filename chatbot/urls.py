@@ -115,6 +115,13 @@ urlpatterns = [
 
     # ── Listings API ────────────────────────────────────────────────────────
     path("api/listings/meta/", views.listings_meta_api, name="listings_meta_api"),
+    path("api/listings/incidents/export/", views.listings_incidents_export, name="listings_incidents_export"),
+    path("api/listings/hazard-cards/export/", views.listings_hazard_cards_export, name="listings_hazard_cards_export"),
+    path("api/listings/employees/export/", views.listings_employees_export, name="listings_employees_export"),
+    path("api/listings/staff/export/", views.listings_staff_export, name="listings_staff_export"),
+    path("api/listings/crew-rotations/export/", views.listings_crew_rotations_export, name="listings_crew_rotations_export"),
+    path("api/listings/invoices/export/", views.listings_invoices_export, name="listings_invoices_export"),
+    path("api/listings/certificates/export/", views.listings_certificates_export, name="listings_certificates_export"),
     path("api/listings/incidents/", views.listings_incidents_api, name="listings_incidents_api"),
     path("api/listings/hazard-cards/", views.listings_hazard_cards_api, name="listings_hazard_cards_api"),
     path("api/listings/hazard-cards/pdf/", views.listings_hazard_cards_pdf, name="listings_hazard_cards_pdf"),
@@ -128,6 +135,7 @@ urlpatterns = [
     path("api/listings/invoices/", views.listings_invoices_api, name="listings_invoices_api"),
     path("api/listings/certificates/meta/", views.listings_certificates_meta_api, name="listings_certificates_meta_api"),
     path("api/listings/certificates/", views.listings_certificates_api, name="listings_certificates_api"),
+    path("api/listings/users/export/", views.listings_users_export, name="listings_users_export"),
     path("api/listings/users/", views.listings_users_api, name="listings_users_api"),
 
     # ── Health API ──────────────────────────────────────────────────────────
@@ -137,9 +145,19 @@ urlpatterns = [
     path("admin-panel/", RedirectView.as_view(url="/admin-panel/user-rights/", permanent=False)),
     path("admin-panel/user-rights/", views.admin_user_rights_page, name="admin_user_rights"),
     path("api/admin/users/", views.admin_users_api, name="admin_users_api"),
-    path("api/admin/users/<str:login_id>/permissions/", views.admin_user_perms_api, name="admin_user_perms_api"),
-    path("api/admin/users/<str:login_id>/permissions/save/", views.admin_user_perms_save_api, name="admin_user_perms_save_api"),
-    path("api/admin/users/<str:login_id>/toggle-admin/", views.admin_user_admin_toggle_api, name="admin_user_admin_toggle_api"),
+    path("api/admin/users/<int:user_id>/permissions/", views.admin_user_perms_api, name="admin_user_perms_api"),
+    path("api/admin/users/<int:user_id>/permissions/save/", views.admin_user_perms_save_api, name="admin_user_perms_save_api"),
+    path("api/admin/users/<int:user_id>/toggle-admin/", views.admin_user_admin_toggle_api, name="admin_user_admin_toggle_api"),
+
+    path("admin-panel/user-management/", views.admin_user_management_page, name="admin_user_management"),
+    path("api/admin/manage/meta/", views.admin_user_management_meta_api, name="admin_manage_meta"),
+    path("api/admin/manage/users/", views.admin_user_management_list_api, name="admin_manage_users_list"),
+    path("api/admin/manage/users/create/", views.admin_user_management_create_api, name="admin_manage_users_create"),
+    path("api/admin/manage/users/<int:user_id>/", views.admin_user_management_get_api, name="admin_manage_users_get"),
+    path("api/admin/manage/users/<int:user_id>/update/", views.admin_user_management_update_api, name="admin_manage_users_update"),
+    path("api/admin/manage/users/<int:user_id>/set-password/", views.admin_user_management_set_password_api, name="admin_manage_users_set_password"),
+    path("api/admin/manage/users/<int:user_id>/remove-password/", views.admin_user_management_remove_password_api, name="admin_manage_users_remove_password"),
+    path("api/admin/manage/users/<int:user_id>/toggle-active/", views.admin_user_management_toggle_active_api, name="admin_manage_users_toggle_active"),
 
     # ── Conversation search ─────────────────────────────────────────────────
     path("api/conversations/search/", views.conversation_search, name="conversation_search"),

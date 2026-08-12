@@ -116,7 +116,12 @@
 
     <div class="filter-spacer"></div>
     <span class="results-count" id="results-count"></span>
-    <button class="export-btn" id="export-btn">Export CSV</button>
+    {% if can_export %}
+    <button class="export-btn" onclick="doExport()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </button>
+    {% endif %}
   </div>
 
   <div class="listing-table-wrap">
@@ -357,34 +362,13 @@
     _state.pageSize = +e.target.value; _state.page = 1; load();
   });
 
-  // CSV export
-  document.getElementById("export-btn").addEventListener("click", async () => {
-    const params = new URLSearchParams({
-      page: 1, page_size: 2000,
-      sort: _state.sort, sort_dir: _state.sortDir,
-    });
-    if (_state.year)   params.set("year", _state.year);
-    if (_state.vendor) params.set("vendor", _state.vendor);
-    if (_state.search) params.set("search", _state.search);
-    const res  = await fetch("/api/listings/invoices/?" + params.toString());
-    const data = await res.json();
-    const headers = ["Date","Invoice No","Vendor","Amount","PO No","IMS No","L1","L2","L3","SAP Doc","SAP Posted","Remarks"];
-    const csvRows = [headers.join(",")];
-    for (const r of data.rows || []) {
-      csvRows.push([
-        r.date, r.invoice_no, `"${r.vendor}"`, r.amount,
-        r.po_no, r.ims_no,
-        r.l1_label, r.l2_label, r.l3_label,
-        r.sap_doc_no, r.sap_posting_dt,
-        `"${(r.remarks || "").replace(/"/g, '""')}"`
-      ].join(","));
-    }
-    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-    const a    = document.createElement("a");
-    a.href     = URL.createObjectURL(blob);
-    a.download = `invoices_${_state.year || "all"}.csv`;
-    a.click();
-  });
+  function doExport() {
+    const params = new URLSearchParams();
+    if (_state.year)   params.set('year', _state.year);
+    if (_state.vendor) params.set('vendor', _state.vendor);
+    if (_state.search) params.set('search', _state.search);
+    window.location.href = '/api/listings/invoices/export/?' + params.toString();
+  }
 
   // Check if opened with a pre-set vendor (from dashboard drill-through)
   (async () => {

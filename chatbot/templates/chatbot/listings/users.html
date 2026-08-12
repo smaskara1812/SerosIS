@@ -26,6 +26,13 @@
   #search-input { width: 220px; }
   .filter-spacer { flex: 1; }
   .results-count { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+  .export-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: #1a3f7a; color: #fff; border: none; border-radius: 7px;
+    padding: 6px 13px; font-size: 0.82rem; font-family: inherit; cursor: pointer;
+    white-space: nowrap; transition: background 0.12s;
+  }
+  .export-btn:hover { background: #0f2a6a; }
 
   .listing-table-wrap {
     background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07);
@@ -110,6 +117,12 @@
 
     <div class="filter-spacer"></div>
     <span class="results-count" id="results-count"></span>
+    {% if can_export %}
+    <button class="export-btn" onclick="doExport()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </button>
+    {% endif %}
   </div>
 
   <div class="listing-table-wrap">
@@ -286,6 +299,16 @@
   });
 
   load();
+
+  window.doExport = function () {
+    const params = new URLSearchParams();
+    if (state.q)        params.set('q', state.q);
+    if (state.active)   params.set('active', state.active);
+    if (state.type)     params.set('type', state.type);
+    if (state.sort)     params.set('sort', state.sort);
+    if (state.sort_dir) params.set('sort_dir', state.sort_dir);
+    window.location.href = '/api/listings/users/export/?' + params.toString();
+  };
 })();
 </script>
 {% endblock %}

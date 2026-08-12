@@ -3,7 +3,8 @@ from django.db import models
 
 
 class UserProfile(models.Model):
-    user_login_id = models.CharField(max_length=20, primary_key=True)
+    user_id       = models.IntegerField(primary_key=True)   # USER_ID from Mst_user
+    user_login_id = models.CharField(max_length=20, db_index=True)  # for session lookup
     is_app_admin  = models.BooleanField(default=False)
     created_at    = models.DateTimeField(auto_now_add=True)
     updated_at    = models.DateTimeField(auto_now=True)
@@ -16,23 +17,23 @@ class UserProfile(models.Model):
 
 
 class UserPermission(models.Model):
-    user_login_id = models.CharField(max_length=20, db_index=True)
-    menu_key      = models.CharField(max_length=60)
-    can_view      = models.BooleanField(default=False)
-    can_add       = models.BooleanField(default=False)
-    can_edit      = models.BooleanField(default=False)
-    can_delete    = models.BooleanField(default=False)
-    can_export    = models.BooleanField(default=False)
-    granted_by    = models.CharField(max_length=20, blank=True)
-    granted_at    = models.DateTimeField(auto_now_add=True)
-    updated_at    = models.DateTimeField(auto_now=True)
+    user_id    = models.IntegerField(db_index=True)   # USER_ID from Mst_user
+    menu_key   = models.CharField(max_length=60)
+    can_view   = models.BooleanField(default=False)
+    can_add    = models.BooleanField(default=False)
+    can_edit   = models.BooleanField(default=False)
+    can_delete = models.BooleanField(default=False)
+    can_export = models.BooleanField(default=False)
+    granted_by = models.CharField(max_length=20, blank=True)
+    granted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "cb_user_permissions"
-        unique_together = [("user_login_id", "menu_key")]
+        unique_together = [("user_id", "menu_key")]
 
     def __str__(self):
-        return f"{self.user_login_id}:{self.menu_key}"
+        return f"{self.user_id}:{self.menu_key}"
 
 
 class CbMenu(models.Model):
@@ -67,6 +68,18 @@ class CbMenu(models.Model):
         if self.export_available: actions.append("export")
         if self.upload_available: actions.append("upload")
         return actions
+
+
+class CbMstUserPassword(models.Model):
+    user_id       = models.IntegerField(primary_key=True)
+    password_hash = models.CharField(max_length=64)  # SHA-256 hex
+    set_at        = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "cb_mst_user_password"
+
+    def __str__(self):
+        return f"LocalPwd(user_id={self.user_id})"
 
 
 class Conversation(models.Model):

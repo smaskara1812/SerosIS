@@ -35,6 +35,13 @@
     #search-input { width: 220px; }
     .filter-spacer { flex: 1; }
     .results-count { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+    .export-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: #1a3f7a; color: #fff; border: none; border-radius: 7px;
+      padding: 6px 13px; font-size: 0.82rem; font-family: inherit; cursor: pointer;
+      white-space: nowrap; transition: background 0.12s;
+    }
+    .export-btn:hover { background: #0f2a6a; }
 
     /* ── Table ── */
     .listing-table-wrap {
@@ -144,6 +151,12 @@
 
     <div class="filter-spacer"></div>
     <div class="results-count" id="results-count"></div>
+    {% if can_export %}
+    <button class="export-btn" onclick="doExport()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </button>
+    {% endif %}
   </div>
 
   <div class="listing-table-wrap">
@@ -354,5 +367,17 @@
     await loadMeta();
     await loadData();
   })();
+
+  function doExport() {
+    const params = new URLSearchParams();
+    if (state.rig)      params.set('rig', state.rig);
+    if (state.rank)     params.set('rank', state.rank);
+    if (state.category) params.set('category', state.category);
+    if (state.emp_type) params.set('emp_type', state.emp_type);
+    if (state.status)   params.set('status', state.status);
+    if (state.gender)   params.set('gender', state.gender);
+    if (state.search)   params.set('search', state.search);
+    window.location.href = '/api/listings/employees/export/?' + params.toString();
+  }
 </script>
 {% endblock %}

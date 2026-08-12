@@ -1552,14 +1552,38 @@ def listings_page(request):
     return render(request, "chatbot/listings/index.html", {"listing_perms": listing_perms})
 
 
+def _listing_context(request, menu_key):
+    """Return template context with can_export flag for a listing page."""
+    from .permissions import get_user_access
+    access = get_user_access(request)
+    can_export = access["is_admin"] or access["perms"].get(menu_key, {}).get("export", False)
+    return {"can_export": can_export}
+
+
+def _csv_response(rows: list, filename: str):
+    """Return an HttpResponse with CSV content from a list of dicts."""
+    import csv as _csv
+    from django.http import HttpResponse
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    if not rows:
+        return response
+    writer = _csv.DictWriter(response, fieldnames=rows[0].keys())
+    writer.writeheader()
+    writer.writerows(rows)
+    return response
+
+
 @require_permission("listings.incidents", "view")
 def listings_incidents_page(request):
-    return render(request, "chatbot/listings/incidents.html")
+    return render(request, "chatbot/listings/incidents.html",
+                  _listing_context(request, "listings.incidents"))
 
 
 @require_permission("listings.hazard_cards", "view")
 def listings_hazard_cards_page(request):
-    return render(request, "chatbot/listings/hazard_cards.html")
+    return render(request, "chatbot/listings/hazard_cards.html",
+                  _listing_context(request, "listings.hazard_cards"))
 
 
 @require_GET
@@ -1637,13 +1661,13 @@ def listings_hazard_cards_api(request):
 
 @require_GET
 def listings_hazard_cards_pdf(request):
-    from .analytics.listings import get_hazard_card_listing
+    from .analytics.listings import get_hazard_card_listing, EXPORT_PAGE_SIZE
     from .pdf_reports import generate_hazard_cards_pdf
     g = request.GET
     year = g.get("year")
     rig  = g.get("rig") or None
     result = get_hazard_card_listing(
-        page=1, page_size=2000,
+        page=1, page_size=EXPORT_PAGE_SIZE,
         rig=rig,
         year=int(year) if year and year.isdigit() else None,
         hazard_type=g.get("hazard_type") or None,
@@ -1665,7 +1689,8 @@ def listings_hazard_cards_pdf(request):
 
 @require_permission("listings.employees", "view")
 def listings_employees_page(request):
-    return render(request, "chatbot/listings/employees.html")
+    return render(request, "chatbot/listings/employees.html",
+                  _listing_context(request, "listings.employees"))
 
 
 @require_GET
@@ -1711,7 +1736,8 @@ def listings_employees_api(request):
 
 @require_permission("listings.crew_rotations", "view")
 def listings_crew_rotations_page(request):
-    return render(request, "chatbot/listings/crew_rotations.html")
+    return render(request, "chatbot/listings/crew_rotations.html",
+                  _listing_context(request, "listings.crew_rotations"))
 
 
 @require_GET
@@ -1756,7 +1782,8 @@ def listings_crew_rotations_api(request):
 
 @require_permission("listings.staff", "view")
 def listings_staff_page(request):
-    return render(request, "chatbot/listings/staff.html")
+    return render(request, "chatbot/listings/staff.html",
+                  _listing_context(request, "listings.staff"))
 
 
 @require_GET
@@ -1793,7 +1820,8 @@ def listings_staff_api(request):
 
 @require_permission("listings.invoices", "view")
 def listings_invoices_page(request):
-    return render(request, "chatbot/listings/invoices.html")
+    return render(request, "chatbot/listings/invoices.html",
+                  _listing_context(request, "listings.invoices"))
 
 
 @require_GET
@@ -1922,12 +1950,14 @@ def reportbro_preview(request):
 
 @require_permission("listings.certificates", "view")
 def listings_certificates_page(request):
-    return render(request, "chatbot/listings/certificates.html")
+    return render(request, "chatbot/listings/certificates.html",
+                  _listing_context(request, "listings.certificates"))
 
 
 @require_permission("listings.users", "view")
 def listings_users_page(request):
-    return render(request, "chatbot/listings/users.html")
+    return render(request, "chatbot/listings/users.html",
+                  _listing_context(request, "listings.users"))
 
 
 @require_GET
@@ -2011,6 +2041,61 @@ def listings_users_api(request):
 
 
 @require_GET
+@require_permission("listings.users", "export")
+def listings_users_export(request):
+    from django.db import connections
+    g = request.GET
+    q           = g.get("q", "").strip()
+    active_fil  = g.get("active", "")
+    type_fil    = g.get("type", "")
+    sort_key    = g.get("sort", "name")
+    sort_dir_raw = g.get("sort_dir", "asc")
+    SORT_COLS = {
+        "user_id":   "u.USER_ID",
+        "name":      "u.USER_NAME",
+        "login_id":  "u.USER_LOGIN_ID",
+        "email":     "u.USER_EMAIL",
+        "dept_name": "d.Dept_Dispname",
+        "user_type": "u.USER_TYPE_ID",
+        "active":    "u.USER_ACTIVE",
+    }
+    sort_col = SORT_COLS.get(sort_key, "u.USER_NAME")
+    sort_dir = "DESC" if sort_dir_raw.lower() == "desc" else "ASC"
+    where_parts, params = [], []
+    if q:
+        where_parts.append("(u.USER_NAME LIKE %s OR u.USER_LOGIN_ID LIKE %s)")
+        like = f"%{q}%"
+        params += [like, like]
+    if active_fil == "Y":
+        where_parts.append("u.USER_ACTIVE = 'Y'")
+    elif active_fil == "N":
+        where_parts.append("(u.USER_ACTIVE != 'Y' OR u.USER_ACTIVE IS NULL)")
+    if type_fil:
+        where_parts.append("u.USER_TYPE_ID = %s")
+        params.append(type_fil)
+    where = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    sql = f"""
+        SELECT u.USER_ID, u.USER_NAME, u.USER_LOGIN_ID, u.USER_EMAIL,
+               u.USER_ACTIVE, u.USER_TYPE_ID, d.Dept_Dispname
+        FROM Mst_user u
+        LEFT JOIN Mst_Department d ON d.Dept_Id = u.DEPT_ID
+        {where}
+        ORDER BY {sort_col} {sort_dir}
+    """
+    with connections["default"].cursor() as cursor:
+        cursor.execute(sql, params)
+        rows = [
+            {
+                "user_id": r[0], "name": r[1] or "", "login_id": r[2] or "",
+                "email": r[3] or "", "active": "Yes" if r[4] == "Y" else "No",
+                "user_type": r[5] or "", "department": r[6] or "",
+            }
+            for r in cursor.fetchall()
+        ]
+    return _csv_response(rows, "users.csv")
+
+
+@require_GET
 def listings_certificates_meta_api(request):
     from .analytics.tools import _query
     cert_types = _query("""
@@ -2039,6 +2124,133 @@ def listings_certificates_api(request):
         sort_dir=g.get("sort_dir") or None,
     )
     return JsonResponse(data)
+
+
+# ── Listing CSV Exports ───────────────────────────────────────────────────────
+
+@require_GET
+@require_permission("listings.incidents", "export")
+def listings_incidents_export(request):
+    from .analytics.listings import get_incident_listing, EXPORT_PAGE_SIZE
+    g = request.GET
+    data = get_incident_listing(
+        page=1, page_size=EXPORT_PAGE_SIZE,
+        rig=g.get("rig") or None,
+        year=int(g["year"]) if g.get("year","").isdigit() else None,
+        severity=g.get("severity") or None,
+        person_injured=g.get("injured") or None,
+        incident_type=g.get("incident_type") or None,
+        search=g.get("search") or None,
+    )
+    rows = [{k: v for k, v in r.items() if k not in ("description","id")}
+            for r in data.get("rows", [])]
+    return _csv_response(rows, "incidents.csv")
+
+
+@require_GET
+@require_permission("listings.hazard_cards", "export")
+def listings_hazard_cards_export(request):
+    from .analytics.listings import get_hazard_card_listing, EXPORT_PAGE_SIZE
+    g = request.GET
+    data = get_hazard_card_listing(
+        page=1, page_size=EXPORT_PAGE_SIZE,
+        rig=g.get("rig") or None,
+        year=int(g["year"]) if g.get("year","").isdigit() else None,
+        hazard_type=g.get("hazard_type") or None,
+        status=g.get("status") or None,
+        tfs=g.get("tfs") or None,
+        search=g.get("search") or None,
+    )
+    rows = [{k: v for k, v in r.items() if k not in ("id",)}
+            for r in data.get("rows", [])]
+    return _csv_response(rows, "hazard_cards.csv")
+
+
+@require_GET
+@require_permission("listings.employees", "export")
+def listings_employees_export(request):
+    from .analytics.listings import get_employee_listing, EXPORT_PAGE_SIZE
+    g = request.GET
+    data = get_employee_listing(
+        page=1, page_size=EXPORT_PAGE_SIZE,
+        rig=g.get("rig") or None,
+        rank=g.get("rank") or None,
+        category=g.get("category") or None,
+        emp_type=g.get("emp_type") or None,
+        status=g.get("status") or None,
+        gender=g.get("gender") or None,
+        search=g.get("search") or None,
+    )
+    rows = [{k: v for k, v in r.items() if k not in ("id",)}
+            for r in data.get("rows", [])]
+    return _csv_response(rows, "employees.csv")
+
+
+@require_GET
+@require_permission("listings.staff", "export")
+def listings_staff_export(request):
+    from .analytics.listings import get_staff_listing, EXPORT_PAGE_SIZE
+    g = request.GET
+    data = get_staff_listing(
+        page=1, page_size=EXPORT_PAGE_SIZE,
+        company=g.get("company") or None,
+        dept=g.get("dept") or None,
+        status=g.get("status") or None,
+        gender=g.get("gender") or None,
+        search=g.get("search") or None,
+    )
+    rows = [{k: v for k, v in r.items() if k not in ("id",)}
+            for r in data.get("rows", [])]
+    return _csv_response(rows, "staff.csv")
+
+
+@require_GET
+@require_permission("listings.crew_rotations", "export")
+def listings_crew_rotations_export(request):
+    from .analytics.listings import get_crew_rotation_listing, EXPORT_PAGE_SIZE
+    g = request.GET
+    data = get_crew_rotation_listing(
+        page=1, page_size=EXPORT_PAGE_SIZE,
+        rig=g.get("rig") or None,
+        rank=g.get("rank") or None,
+        status=g.get("status") or None,
+        search=g.get("search") or None,
+    )
+    rows = [{k: v for k, v in r.items() if k not in ("id",)}
+            for r in data.get("rows", [])]
+    return _csv_response(rows, "crew_rotations.csv")
+
+
+@require_GET
+@require_permission("listings.invoices", "export")
+def listings_invoices_export(request):
+    from .analytics.listings import get_invoice_listing, EXPORT_PAGE_SIZE
+    g = request.GET
+    data = get_invoice_listing(
+        page=1, page_size=EXPORT_PAGE_SIZE,
+        year=int(g["year"]) if g.get("year","").isdigit() else None,
+        vendor=g.get("vendor") or None,
+        search=g.get("search") or None,
+    )
+    rows = [{k: v for k, v in r.items() if k not in ("id",)}
+            for r in data.get("rows", [])]
+    return _csv_response(rows, "invoices.csv")
+
+
+@require_GET
+@require_permission("listings.certificates", "export")
+def listings_certificates_export(request):
+    from .analytics.listings import get_certificate_listing, EXPORT_PAGE_SIZE
+    g = request.GET
+    data = get_certificate_listing(
+        page=1, page_size=EXPORT_PAGE_SIZE,
+        status=g.get("status") or None,
+        cert_type=g.get("cert_type") or None,
+        search=g.get("search") or None,
+    )
+    rows = [{k: v for k, v in r.items() if k not in ("id",)}
+            for r in data.get("rows", [])]
+    return _csv_response(rows, "certificates.csv")
 
 
 # ── Chat API ───────────────────────────────────────────────────────────────────
@@ -2477,46 +2689,51 @@ def admin_user_rights_page(request):
 def admin_users_api(request):
     """Paginated, searchable list of Mst_user rows for the user picker."""
     from django.db import connections as _conn
+    from .models import UserProfile
 
-    q     = request.GET.get("q", "").strip()
-    page  = max(int(request.GET.get("page", 1)), 1)
-    limit = 50
-    offset = (page - 1) * limit
+    q          = request.GET.get("q", "").strip()
+    admin_only = request.GET.get("admin_only") == "1"
+    page       = max(int(request.GET.get("page", 1)), 1)
+    limit      = 50
+    offset     = (page - 1) * limit
 
+    admin_ids = set(
+        UserProfile.objects.filter(is_app_admin=True).values_list("user_id", flat=True)
+    )
+
+    conditions, params_base = [], []
     if q:
-        like = f"%{q}%"
-        where = "WHERE USER_NAME LIKE %s OR USER_LOGIN_ID LIKE %s"
-        sql_counts = (f"SELECT COUNT(*), "
-                      f"SUM(CASE WHEN USER_ACTIVE='Y' THEN 1 ELSE 0 END), "
-                      f"SUM(CASE WHEN USER_ACTIVE!='Y' OR USER_ACTIVE IS NULL THEN 1 ELSE 0 END) "
-                      f"FROM Mst_user {where}")
-        sql_rows   = (f"SELECT USER_ID, USER_LOGIN_ID, USER_NAME, USER_EMAIL, USER_ACTIVE "
-                      f"FROM Mst_user {where} ORDER BY USER_NAME LIMIT %s OFFSET %s")
-        params_counts = [like, like]
-        params_rows   = [like, like, limit, offset]
-    else:
-        sql_counts = ("SELECT COUNT(*), "
-                      "SUM(CASE WHEN USER_ACTIVE='Y' THEN 1 ELSE 0 END), "
-                      "SUM(CASE WHEN USER_ACTIVE!='Y' OR USER_ACTIVE IS NULL THEN 1 ELSE 0 END) "
-                      "FROM Mst_user")
-        sql_rows   = ("SELECT USER_ID, USER_LOGIN_ID, USER_NAME, USER_EMAIL, USER_ACTIVE "
-                      "FROM Mst_user ORDER BY USER_NAME LIMIT %s OFFSET %s")
-        params_counts = []
-        params_rows   = [limit, offset]
+        conditions.append("(USER_NAME LIKE %s OR USER_LOGIN_ID LIKE %s)")
+        params_base += [f"%{q}%", f"%{q}%"]
+    if admin_only:
+        if admin_ids:
+            placeholders = ",".join(["%s"] * len(admin_ids))
+            conditions.append(f"USER_ID IN ({placeholders})")
+            params_base += list(admin_ids)
+        else:
+            conditions.append("1=0")
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    sql_counts = (
+        f"SELECT COUNT(*), "
+        f"SUM(CASE WHEN USER_ACTIVE='Y' THEN 1 ELSE 0 END), "
+        f"SUM(CASE WHEN USER_ACTIVE!='Y' OR USER_ACTIVE IS NULL THEN 1 ELSE 0 END) "
+        f"FROM Mst_user {where}"
+    )
+    sql_rows = (
+        f"SELECT USER_ID, USER_LOGIN_ID, USER_NAME, USER_EMAIL, USER_ACTIVE "
+        f"FROM Mst_user {where} ORDER BY USER_NAME LIMIT %s OFFSET %s"
+    )
 
     with _conn["default"].cursor() as cursor:
-        cursor.execute(sql_counts, params_counts)
-        counts_row = cursor.fetchone()
-        total        = counts_row[0]
-        active_count = int(counts_row[1] or 0)
+        cursor.execute(sql_counts, params_base)
+        counts_row     = cursor.fetchone()
+        total          = counts_row[0]
+        active_count   = int(counts_row[1] or 0)
         inactive_count = int(counts_row[2] or 0)
-        cursor.execute(sql_rows, params_rows)
+        cursor.execute(sql_rows, params_base + [limit, offset])
         rows = cursor.fetchall()
-
-    from .models import UserProfile
-    admin_ids = set(
-        UserProfile.objects.filter(is_app_admin=True).values_list("user_login_id", flat=True)
-    )
 
     users = [
         {
@@ -2525,33 +2742,34 @@ def admin_users_api(request):
             "name":         r[2] or r[1],
             "email":        r[3] or "",
             "active":       r[4] == "Y",
-            "is_app_admin": r[1] in admin_ids,
+            "is_app_admin": r[0] in admin_ids,
         }
         for r in rows
     ]
     return JsonResponse({
         "users": users, "page": page, "total": total,
         "active_count": active_count, "inactive_count": inactive_count,
+        "admin_count": len(admin_ids),
         "has_more": offset + limit < total,
     })
 
 
 @_require_app_admin
 @require_GET
-def admin_user_perms_api(request, login_id):
+def admin_user_perms_api(request, user_id):
     """Return current permissions for one user."""
     from .models import UserPermission, UserProfile
     from .permissions import get_menu_registry
 
     try:
-        profile = UserProfile.objects.get(user_login_id=login_id)
+        profile = UserProfile.objects.get(user_id=user_id)
         is_admin = profile.is_app_admin
     except UserProfile.DoesNotExist:
         is_admin = False
 
     perm_rows = {
         p.menu_key: p
-        for p in UserPermission.objects.filter(user_login_id=login_id)
+        for p in UserPermission.objects.filter(user_id=user_id)
     }
 
     menus = []
@@ -2576,7 +2794,7 @@ def admin_user_perms_api(request, login_id):
 
 @_require_app_admin
 @csrf_exempt
-def admin_user_perms_save_api(request, login_id):
+def admin_user_perms_save_api(request, user_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
 
@@ -2588,8 +2806,14 @@ def admin_user_perms_save_api(request, login_id):
     from .models import UserPermission, UserProfile
     from .permissions import get_menu_registry
 
-    is_admin = bool(data.get("is_app_admin", False))
-    profile, _ = UserProfile.objects.get_or_create(user_login_id=login_id)
+    is_admin  = bool(data.get("is_app_admin", False))
+    login_id  = data.get("login_id", "")
+    profile, _ = UserProfile.objects.get_or_create(
+        user_id=user_id,
+        defaults={"user_login_id": login_id},
+    )
+    if login_id and profile.user_login_id != login_id:
+        profile.user_login_id = login_id
     profile.is_app_admin = is_admin
     profile.save()
 
@@ -2602,7 +2826,7 @@ def admin_user_perms_save_api(request, login_id):
             continue
         p = menus[key]
         UserPermission.objects.update_or_create(
-            user_login_id=login_id,
+            user_id=user_id,
             menu_key=key,
             defaults={
                 "can_view":   bool(p.get("view")),
@@ -2619,12 +2843,333 @@ def admin_user_perms_save_api(request, login_id):
 
 @_require_app_admin
 @csrf_exempt
-def admin_user_admin_toggle_api(request, login_id):
+def admin_user_admin_toggle_api(request, user_id):
     """Toggle is_app_admin for a user."""
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
     from .models import UserProfile
-    profile, _ = UserProfile.objects.get_or_create(user_login_id=login_id)
+    try:
+        data = json.loads(request.body or "{}")
+        login_id = data.get("login_id", "")
+    except json.JSONDecodeError:
+        login_id = ""
+    profile, _ = UserProfile.objects.get_or_create(
+        user_id=user_id,
+        defaults={"user_login_id": login_id},
+    )
     profile.is_app_admin = not profile.is_app_admin
     profile.save()
     return JsonResponse({"is_app_admin": profile.is_app_admin})
+
+
+# ── User Management ────────────────────────────────────────────────────────────
+
+@_require_app_admin
+def admin_user_management_page(request):
+    return render(request, "chatbot/admin/user_management.html")
+
+
+@_require_app_admin
+@require_GET
+def admin_user_management_list_api(request):
+    """Paginated user list with auth_type (local/ad) and active status."""
+    from django.db import connections as _conn
+    from .models import CbMstUserPassword
+
+    q          = request.GET.get("q", "").strip()
+    page       = max(int(request.GET.get("page", 1)), 1)
+    local_only = request.GET.get("local_only") == "1"
+    limit  = 50
+    offset = (page - 1) * limit
+
+    # Fetch all local-password user IDs once (cross-db lookup)
+    all_local_ids = set(
+        CbMstUserPassword.objects.using("chathistory").values_list("user_id", flat=True)
+    )
+    local_count = len(all_local_ids)
+
+    conditions, params_base = [], []
+    if q:
+        conditions.append("(USER_NAME LIKE %s OR USER_LOGIN_ID LIKE %s)")
+        params_base += [f"%{q}%", f"%{q}%"]
+    if local_only:
+        if all_local_ids:
+            placeholders = ",".join(["%s"] * len(all_local_ids))
+            conditions.append(f"USER_ID IN ({placeholders})")
+            params_base += list(all_local_ids)
+        else:
+            conditions.append("1=0")
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    sql_counts = (
+        f"SELECT COUNT(*), "
+        f"SUM(CASE WHEN USER_ACTIVE='Y' THEN 1 ELSE 0 END), "
+        f"SUM(CASE WHEN USER_ACTIVE!='Y' OR USER_ACTIVE IS NULL THEN 1 ELSE 0 END) "
+        f"FROM Mst_user {where}"
+    )
+    sql_rows = (
+        f"SELECT USER_ID, USER_LOGIN_ID, USER_NAME, USER_EMAIL, USER_ACTIVE "
+        f"FROM Mst_user {where} ORDER BY USER_NAME LIMIT %s OFFSET %s"
+    )
+
+    with _conn["default"].cursor() as cursor:
+        cursor.execute(sql_counts, params_base)
+        cr = cursor.fetchone()
+        total          = int(cr[0] or 0)
+        active_count   = int(cr[1] or 0)
+        inactive_count = int(cr[2] or 0)
+        cursor.execute(sql_rows, params_base + [limit, offset])
+        rows = cursor.fetchall()
+
+    # Mark auth_type for the returned page
+    page_ids = [r[0] for r in rows]
+    local_ids = all_local_ids & set(page_ids)
+
+    users = [
+        {
+            "user_id":   r[0],
+            "login_id":  r[1],
+            "name":      r[2] or r[1],
+            "email":     r[3] or "",
+            "active":    r[4] == "Y",
+            "auth_type": "local" if r[0] in local_ids else "ad",
+        }
+        for r in rows
+    ]
+    return JsonResponse({
+        "users": users, "page": page, "total": total,
+        "active_count": active_count, "inactive_count": inactive_count,
+        "local_count": local_count,
+        "has_more": offset + limit < total,
+    })
+
+
+@_require_app_admin
+@require_GET
+def admin_user_management_get_api(request, user_id):
+    from django.db import connections as _conn
+    from .models import CbMstUserPassword
+
+    with _conn["default"].cursor() as cursor:
+        cursor.execute(
+            "SELECT u.USER_ID, u.USER_LOGIN_ID, u.USER_NAME, u.USER_EMAIL, u.USER_ACTIVE, "
+            "u.USER_TYPE_ID, u.DEPT_ID, u.USER_FROM, u.USER_TO, u.EMP_ID, u.NONEMP_ID, "
+            "u.CR_DT, u.MOD_DT, d.Dept_Dispname "
+            "FROM Mst_user u "
+            "LEFT JOIN Mst_Department d ON d.Dept_Id = u.DEPT_ID "
+            "WHERE u.USER_ID = %s",
+            [user_id],
+        )
+        row = cursor.fetchone()
+
+    if not row:
+        return JsonResponse({"error": "User not found"}, status=404)
+
+    has_local = CbMstUserPassword.objects.using("chathistory").filter(user_id=user_id).exists()
+
+    def _dt(v):
+        return v.strftime("%Y-%m-%d") if v else ""
+
+    return JsonResponse({
+        "user_id":    row[0],
+        "login_id":   row[1] or "",
+        "name":       row[2] or row[1] or "",
+        "email":      row[3] or "",
+        "active":     row[4] == "Y",
+        "user_type":  row[5] or "",
+        "dept_id":    row[6],
+        "dept_name":  row[13] or "",
+        "user_from":  _dt(row[7]),
+        "user_to":    _dt(row[8]),
+        "emp_id":     row[9],
+        "nonemp_id":  row[10],
+        "created_at": _dt(row[11]),
+        "modified_at":_dt(row[12]),
+        "auth_type":  "local" if has_local else "ad",
+    })
+
+
+@_require_app_admin
+@require_GET
+def admin_user_management_meta_api(request):
+    from django.db import connections as _conn
+    with _conn["default"].cursor() as cursor:
+        cursor.execute("SELECT Dept_Id, Dept_Dispname FROM Mst_Department ORDER BY Dept_Dispname")
+        depts = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+    return JsonResponse({"departments": depts})
+
+
+@_require_app_admin
+@csrf_exempt
+def admin_user_management_update_api(request, user_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    name      = data.get("name", "").strip()
+    email     = data.get("email", "").strip()
+    dept_id   = data.get("dept_id") or None
+    user_type = data.get("user_type", "").strip().upper() or None
+    user_from = data.get("user_from", "").strip() or None
+    user_to   = data.get("user_to", "").strip() or None
+
+    if not name:
+        return JsonResponse({"error": "Name is required"}, status=400)
+    if user_type and user_type not in ("E", "N"):
+        return JsonResponse({"error": "User type must be E or N"}, status=400)
+
+    from django.db import connections as _conn
+    from .models import UserProfile
+
+    try:
+        admin_profile = UserProfile.objects.get(user_login_id=request.user.username)
+        mod_user_id = admin_profile.user_id
+    except Exception:
+        mod_user_id = 1
+
+    with _conn["default"].cursor() as cursor:
+        cursor.execute("SELECT USER_ID FROM Mst_user WHERE USER_ID = %s", [user_id])
+        if not cursor.fetchone():
+            return JsonResponse({"error": "User not found"}, status=404)
+
+        cursor.execute(
+            "UPDATE Mst_user SET USER_NAME=%s, USER_EMAIL=%s, DEPT_ID=%s, "
+            "USER_TYPE_ID=%s, USER_FROM=%s, USER_TO=%s, MOD_USER_ID=%s, MOD_DT=NOW() "
+            "WHERE USER_ID=%s",
+            [name, email or None, dept_id, user_type, user_from, user_to, mod_user_id, user_id],
+        )
+
+    return JsonResponse({"success": True})
+
+
+@_require_app_admin
+@csrf_exempt
+def admin_user_management_create_api(request):
+    """Create a new user in Mst_user + optionally set a local password."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    login_id  = data.get("login_id", "").strip()
+    name      = data.get("name", "").strip()
+    email     = data.get("email", "").strip()
+    password  = data.get("password", "").strip()
+    user_type = (data.get("user_type") or "E").strip().upper()
+    dept_id   = data.get("dept_id") or None
+    user_from = data.get("user_from") or None
+    user_to   = data.get("user_to") or None
+
+    if not login_id or not name:
+        return JsonResponse({"error": "login_id and name are required"}, status=400)
+    if user_type not in ("E", "N"):
+        user_type = "E"
+
+    from django.db import connections as _conn
+    from .auth_backend import _sha256
+    from .models import CbMstUserPassword
+
+    with _conn["default"].cursor() as cursor:
+        cursor.execute(
+            "SELECT COUNT(*) FROM Mst_user WHERE UPPER(USER_LOGIN_ID) = UPPER(%s)",
+            [login_id],
+        )
+        if cursor.fetchone()[0] > 0:
+            return JsonResponse({"error": "Login ID already exists"}, status=400)
+
+        cursor.execute("SELECT COALESCE(MAX(USER_ID), 0) + 1 FROM Mst_user")
+        new_user_id = cursor.fetchone()[0]
+
+        from .models import UserProfile
+        try:
+            admin_profile = UserProfile.objects.get(user_login_id=request.user.username)
+            cr_user_id = admin_profile.user_id
+        except Exception:
+            cr_user_id = 1
+
+        from_expr = "%s" if user_from else "CURDATE()"
+        cursor.execute(
+            "INSERT INTO Mst_user "
+            "(USER_ID, USER_LOGIN_ID, USER_NAME, USER_EMAIL, USER_ACTIVE, "
+            f" USER_TYPE_ID, DEPT_ID, USER_FROM, USER_TO, CR_USER_ID, CR_DT) "
+            f"VALUES (%s, %s, %s, %s, 'Y', %s, %s, {from_expr}, %s, %s, NOW())",
+            ([new_user_id, login_id, name, email or None, user_type, dept_id]
+             + ([user_from] if user_from else [])
+             + [user_to, cr_user_id]),
+        )
+
+    if password and new_user_id:
+        CbMstUserPassword.objects.using("chathistory").create(
+            user_id=new_user_id,
+            password_hash=_sha256(password),
+        )
+
+    return JsonResponse({"success": True, "user_id": new_user_id})
+
+
+@_require_app_admin
+@csrf_exempt
+def admin_user_management_set_password_api(request, user_id):
+    """Set or reset a user's local password in cb_mst_user_password."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    password = data.get("password", "").strip()
+    if not password:
+        return JsonResponse({"error": "password is required"}, status=400)
+
+    from .auth_backend import _sha256
+    from .models import CbMstUserPassword
+
+    CbMstUserPassword.objects.using("chathistory").update_or_create(
+        user_id=user_id,
+        defaults={"password_hash": _sha256(password)},
+    )
+    return JsonResponse({"success": True, "auth_type": "local"})
+
+
+@_require_app_admin
+@csrf_exempt
+def admin_user_management_remove_password_api(request, user_id):
+    """Remove local password — user falls back to AD authentication."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    from .models import CbMstUserPassword
+    CbMstUserPassword.objects.using("chathistory").filter(user_id=user_id).delete()
+    return JsonResponse({"success": True, "auth_type": "ad"})
+
+
+@_require_app_admin
+@csrf_exempt
+def admin_user_management_toggle_active_api(request, user_id):
+    """Toggle USER_ACTIVE in Mst_user (Y ↔ N)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    from django.db import connections as _conn
+    with _conn["default"].cursor() as cursor:
+        cursor.execute(
+            "SELECT USER_ACTIVE FROM Mst_user WHERE USER_ID = %s", [user_id]
+        )
+        row = cursor.fetchone()
+        if not row:
+            return JsonResponse({"error": "User not found"}, status=404)
+        new_active = "N" if row[0] == "Y" else "Y"
+        cursor.execute(
+            "UPDATE Mst_user SET USER_ACTIVE = %s WHERE USER_ID = %s",
+            [new_active, user_id],
+        )
+    return JsonResponse({"success": True, "active": new_active == "Y"})

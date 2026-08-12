@@ -35,6 +35,9 @@
     #search-input { width: 220px; }
     .filter-spacer { flex: 1; }
     .results-count { font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+    .export-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 13px; background:#1a3f7a; color:#fff; border:none; border-radius:7px; font-size:0.8rem; font-weight:600; font-family:inherit; cursor:pointer; transition:background .15s; white-space:nowrap; }
+    .export-btn:hover { background:#153264; }
+    .export-btn svg { flex-shrink:0; }
 
     /* ── Table ── */
     .listing-table-wrap {
@@ -145,6 +148,12 @@
 
     <div class="filter-spacer"></div>
     <div class="results-count" id="results-count"></div>
+    {% if can_export %}
+    <button class="export-btn" onclick="doExport()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </button>
+    {% endif %}
   </div>
 
   <div class="listing-table-wrap">
@@ -363,5 +372,22 @@
     await loadMeta();
     await loadData();
   })();
+
+  function doExport() {
+    const params = new URLSearchParams();
+    const year = document.getElementById('f-year').value;
+    const rig = document.getElementById('f-rig').value;
+    const severity = document.getElementById('f-severity').value;
+    const injured = document.getElementById('f-injured').value;
+    const type = document.getElementById('f-type').value;
+    const search = document.getElementById('search-input').value;
+    if (year) params.set('year', year);
+    if (rig) params.set('rig', rig);
+    if (severity) params.set('severity', severity);
+    if (injured) params.set('injured', injured);
+    if (type) params.set('incident_type', type);
+    if (search) params.set('search', search);
+    window.location.href = '/api/listings/incidents/export/?' + params.toString();
+  }
 </script>
 {% endblock %}
