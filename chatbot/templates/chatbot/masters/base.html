@@ -1,0 +1,249 @@
+{% extends 'chatbot/base.html' %}
+
+{% block main_class %}masters-layout{% endblock %}
+{% block secondary_sidebar %}{% endblock %}
+{% block topbar %}{% endblock %}
+
+{% block content %}
+<style>
+  .main-area.masters-layout { overflow: hidden !important; }
+
+  .ms-shell { display: flex; height: 100%; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .ms-sidebar {
+    width: 240px; min-width: 240px;
+    background: #fff; border-right: 1px solid #dde3ee;
+    display: flex; flex-direction: column; overflow: hidden;
+    transition: width .22s ease, min-width .22s ease;
+  }
+  .ms-shell.sidebar-collapsed .ms-sidebar { width: 0; min-width: 0; border-right: none; }
+  .ms-sidebar-hdr {
+    padding: 12px 12px 10px 16px; border-bottom: 1px solid #dde3ee;
+    flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+  }
+  .ms-sidebar-title {
+    flex: 1; font-size: 10px; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: #94a3b8;
+  }
+  .ms-collapse-btn {
+    width: 22px; height: 22px; border-radius: 5px; border: 1px solid #e8ecf2;
+    background: #f8faff; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; color: #94a3b8; transition: background .12s, color .12s;
+  }
+  .ms-collapse-btn:hover { background: #eff6ff; color: #2563eb; border-color: #bdd7ff; }
+  .ms-collapse-btn svg { transition: transform .22s ease; }
+
+  /* Top strip — shown only when sidebar is collapsed */
+  .ms-top-strip {
+    display: none; flex-shrink: 0;
+    align-items: center; gap: 8px;
+    padding: 7px 12px;
+    border-bottom: 1px solid #e8ecf2;
+    background: #fff;
+  }
+  .ms-shell.sidebar-collapsed .ms-top-strip { display: flex; }
+  .ms-expand-btn {
+    width: 22px; height: 22px; border-radius: 5px; border: 1px solid #e8ecf2;
+    background: #f8faff; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; color: #94a3b8; transition: background .12s, color .12s;
+  }
+  .ms-expand-btn:hover { background: #eff6ff; color: #2563eb; border-color: #bdd7ff; }
+  .ms-sidebar-body { overflow-y: auto; flex: 1; padding: 8px 0 16px; }
+  .ms-sidebar-body::-webkit-scrollbar { width: 4px; }
+  .ms-sidebar-body::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
+
+  .ms-group { margin-bottom: 2px; }
+  .ms-group-btn {
+    width: 100%; display: flex; align-items: center; gap: 7px;
+    padding: 7px 14px; background: none; border: none; cursor: pointer;
+    text-align: left; font-family: inherit; transition: background .12s;
+  }
+  .ms-group-btn:hover { background: #f8faff; }
+  .ms-group-icon {
+    width: 22px; height: 22px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .ms-group-label {
+    flex: 1; font-size: 11px; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase; color: #475569;
+  }
+  .ms-group-count {
+    font-size: 10px; font-weight: 600; color: #94a3b8;
+    background: #f1f4f9; border-radius: 10px; padding: 1px 6px;
+  }
+  .ms-chevron { color: #94a3b8; transition: transform .2s; flex-shrink: 0; }
+  .ms-group.open .ms-chevron { transform: rotate(90deg); }
+
+  .ms-items { overflow: hidden; max-height: 0; transition: max-height .25s ease; }
+  .ms-group.open .ms-items { max-height: 500px; }
+
+  .ms-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px 6px 44px; text-decoration: none;
+    font-size: 13px; color: #475569;
+    border-left: 2px solid transparent;
+    transition: background .1s, color .1s, border-color .1s;
+  }
+  .ms-item:hover { background: #f0f4ff; color: #1a3f7a; }
+  .ms-item.active { background: #eff6ff; color: #1a3f7a; border-left-color: #2563eb; font-weight: 600; }
+  .ms-item-dot { width: 5px; height: 5px; border-radius: 50%; background: #cbd5e1; flex-shrink: 0; transition: background .1s; }
+  .ms-item:hover .ms-item-dot,
+  .ms-item.active .ms-item-dot { background: #2563eb; }
+
+  .ms-coming-soon { padding: 6px 14px 6px 44px; font-size: 11px; color: #94a3b8; font-style: italic; }
+
+  .ms-back-link svg { flex-shrink: 0; }
+
+  /* ── Content area ── */
+  .ms-content-area {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+    position: relative;
+  }
+  /* flex-shrink:0 for the page-header block that master pages render first */
+  .ms-content-area > .page-header { flex-shrink: 0; }
+  /* Scrollable wrapper for index/overview pages */
+  .ms-scroll { flex: 1; overflow-y: auto; padding: 28px 28px 48px; }
+  .ms-scroll::-webkit-scrollbar { width: 5px; }
+  .ms-scroll::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
+</style>
+
+<div class="ms-shell" id="ms-shell">
+
+  <!-- ── Sidebar ── -->
+  <nav class="ms-sidebar">
+    <div class="ms-sidebar-hdr">
+      <div class="ms-sidebar-title">Masters</div>
+      <button class="ms-collapse-btn" id="ms-collapse-btn" title="Collapse sidebar">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+    <div class="ms-sidebar-body">
+
+      <div class="ms-group" id="ms-grp-general">
+        <button class="ms-group-btn" onclick="msToggle('ms-grp-general')">
+          <span class="ms-group-icon" style="background:#eff6ff">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          </span>
+          <span class="ms-group-label">General</span>
+          <span class="ms-group-count" id="ms-cnt-general">7</span>
+          <svg class="ms-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <div class="ms-items">
+          <a class="ms-item" href="/masters/rigs/"><span class="ms-item-dot"></span>Rigs</a>
+          <a class="ms-item" href="/masters/cost-centre/"><span class="ms-item-dot"></span>Cost Centres</a>
+          <a class="ms-item" href="/masters/cost-centre-type/"><span class="ms-item-dot"></span>Cost Centre Types</a>
+          <a class="ms-item" href="/masters/operator/"><span class="ms-item-dot"></span>Operators</a>
+          <a class="ms-item" href="/masters/contractor/"><span class="ms-item-dot"></span>Contractors</a>
+          <a class="ms-item" href="/masters/cert-institutes/"><span class="ms-item-dot"></span>Cert Institutes</a>
+          <a class="ms-item" href="/masters/email-notification-types/"><span class="ms-item-dot"></span>Email Notification Types</a>
+        </div>
+      </div>
+
+      <div class="ms-group" id="ms-grp-hr">
+        <button class="ms-group-btn" onclick="msToggle('ms-grp-hr')">
+          <span class="ms-group-icon" style="background:#f0fdf4">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="ms-group-label">HR</span>
+          <span class="ms-group-count" id="ms-cnt-hr">3</span>
+          <svg class="ms-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <div class="ms-items">
+          <a class="ms-item" href="/masters/travel-eligibility/"><span class="ms-item-dot"></span>Travel Eligibility</a>
+          <a class="ms-item" href="/masters/reporting-structure/"><span class="ms-item-dot"></span>Reporting Structure</a>
+          <a class="ms-item" href="/masters/job-descriptions/"><span class="ms-item-dot"></span>Job Descriptions</a>
+        </div>
+      </div>
+
+      <div class="ms-group" id="ms-grp-qhse">
+        <button class="ms-group-btn" onclick="msToggle('ms-grp-qhse')">
+          <span class="ms-group-icon" style="background:#fff7ed">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </span>
+          <span class="ms-group-label">QHSE</span>
+          <span class="ms-group-count" id="ms-cnt-qhse">0</span>
+          <svg class="ms-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <div class="ms-items">
+          <div class="ms-coming-soon">Coming soon…</div>
+        </div>
+      </div>
+
+      <div class="ms-group" id="ms-grp-projects">
+        <button class="ms-group-btn" onclick="msToggle('ms-grp-projects')">
+          <span class="ms-group-icon" style="background:#fdf4ff">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          </span>
+          <span class="ms-group-label">Projects</span>
+          <span class="ms-group-count" id="ms-cnt-projects">0</span>
+          <svg class="ms-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <div class="ms-items">
+          <div class="ms-coming-soon">Coming soon…</div>
+        </div>
+      </div>
+
+    </div>
+  </nav>
+
+  <!-- ── Content ── -->
+  <div class="ms-content-area">
+    <!-- Top strip with expand button — visible only when sidebar is collapsed -->
+    <div class="ms-top-strip">
+      <button class="ms-expand-btn" id="ms-expand-btn" title="Expand sidebar">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+    {% block ms_content %}{% endblock %}
+  </div>
+
+</div>
+
+<script>
+(function () {
+  const path = location.pathname;
+
+  // Mark active item and open its group
+  const items = document.querySelectorAll('.ms-item');
+  let activeGroup = null;
+  items.forEach(a => {
+    if (path === a.getAttribute('href') || path.startsWith(a.getAttribute('href'))) {
+      a.classList.add('active');
+      activeGroup = a.closest('.ms-group');
+    }
+  });
+
+  // On /masters/ index, open GENERAL by default
+  const defaultGroup = activeGroup || document.getElementById('ms-grp-general');
+  if (defaultGroup) defaultGroup.classList.add('open');
+
+  window.msToggle = function (id) {
+    document.getElementById(id).classList.toggle('open');
+  };
+
+  // Sidebar collapse toggle
+  const shell = document.getElementById('ms-shell');
+  const collapseBtn = document.getElementById('ms-collapse-btn');
+  const expandFab   = document.getElementById('ms-expand-btn');
+  const STORAGE_KEY = 'ms_sidebar_collapsed';
+
+  function setSidebarState(collapsed) {
+    shell.classList.toggle('sidebar-collapsed', collapsed);
+    try { localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0'); } catch(e) {}
+  }
+
+  // Restore from localStorage
+  try {
+    if (localStorage.getItem(STORAGE_KEY) === '1') shell.classList.add('sidebar-collapsed');
+  } catch(e) {}
+
+  collapseBtn.addEventListener('click', function () {
+    setSidebarState(!shell.classList.contains('sidebar-collapsed'));
+  });
+  expandFab.addEventListener('click', function () {
+    setSidebarState(false);
+  });
+})();
+</script>
+{% endblock %}

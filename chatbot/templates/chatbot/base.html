@@ -396,6 +396,7 @@
   </aside>
 
   <!-- ── Secondary sidebar ──────────────────────────────────────── -->
+  {% block secondary_sidebar %}
   {% if active_section and active_section.children %}
   <aside class="secondary-sidebar" id="secondary-sidebar">
     <div class="ss-header">
@@ -414,6 +415,7 @@
     </nav>
   </aside>
   {% endif %}
+  {% endblock %}
 
   <!-- ── Main content ───────────────────────────────────────────── -->
   <main class="main-area {% block main_class %}{% endblock %}" id="main-area">

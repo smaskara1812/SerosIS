@@ -3173,3 +3173,487 @@ def admin_user_management_toggle_active_api(request, user_id):
             [new_active, user_id],
         )
     return JsonResponse({"success": True, "active": new_active == "Y"})
+
+
+# ── Travel Eligibility Master ─────────────────────────────────────────────────
+
+_TRAVEL_MODE_LABELS = {"A": "Air", "R": "Rail", "C": "Coach"}
+
+@require_permission("masters.travel_eligibility", "view")
+def travel_eligibility_page(request):
+    return render(request, "chatbot/masters/travel_eligibility.html")
+
+
+@require_GET
+def travel_eligibility_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute(
+            "SELECT fs_category_id, fs_category_name FROM Mst_Fs_Category ORDER BY fs_category_name"
+        )
+        categories = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+        cursor.execute(
+            "SELECT rank_id, rank_name, rank_abrv, fs_category_id FROM Mst_Rank ORDER BY fs_category_id, rank_order, rank_name"
+        )
+        ranks = [{"id": r[0], "name": r[1], "abrv": r[2], "category_id": r[3]} for r in cursor.fetchall()]
+    modes = [
+        {"code": "A", "label": "Air"},
+        {"code": "R", "label": "Rail"},
+        {"code": "C", "label": "Coach"},
+    ]
+    return JsonResponse({"categories": categories, "ranks": ranks, "modes": modes})
+
+
+@require_GET
+def travel_eligibility_list_api(request):
+    from django.db import connections
+    category_id = request.GET.get("category_id")
+    mode = request.GET.get("mode")
+    q = request.GET.get("q", "").strip()
+    page = max(1, int(request.GET.get("page", 1)))
+    _ps = request.GET.get("page_size", "25")
+    page_size = int(_ps) if _ps and _ps.isdigit() and int(_ps) in (25, 50, 75, 100) else 25
+
+    conditions = []
+    params = []
+    if category_id:
+        conditions.append("te.Fs_Category_Id = %s")
+        params.append(category_id)
+    if mode:
+        conditions.append("te.Travel_Mode = %s")
+        params.append(mode)
+    if q:
+        conditions.append("(r.rank_name LIKE %s OR r.rank_abrv LIKE %s OR te.Travel_Class LIKE %s OR c.fs_category_name LIKE %s)")
+        like = f"%{q}%"
+        params.extend([like, like, like, like])
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    offset = (page - 1) * page_size
+
+    with connections["default"].cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) FROM eos_Travel_Eligibility te {where}
+            """,
+            params,
+        )
+        total = cursor.fetchone()[0]
+
+        cursor.execute(
+            f"""
+            SELECT te.Travel_Eligibility_Id, c.fs_category_name, r.rank_name, r.rank_abrv,
+                   te.Travel_Mode, te.Travel_Class, te.Travel_Preference,
+                   te.Eligible_From, te.Eligible_To
+            FROM eos_Travel_Eligibility te
+            LEFT JOIN Mst_Fs_Category c ON c.fs_category_id = te.Fs_Category_Id
+            LEFT JOIN Mst_Rank r ON r.rank_id = te.Rank_Id
+            {where}
+            ORDER BY c.fs_category_name, r.rank_order, te.Travel_Mode, te.Travel_Preference
+            LIMIT %s OFFSET %s
+            """,
+            params + [page_size, offset],
+        )
+        rows = cursor.fetchall()
+
+    records = [
+        {
+            "id": r[0],
+            "category": r[1] or "",
+            "rank": r[2] or "",
+            "rank_abrv": r[3] or "",
+            "mode": _TRAVEL_MODE_LABELS.get(r[4], r[4]),
+            "mode_code": r[4],
+            "travel_class": r[5] or "",
+            "preference": r[6],
+            "eligible_from": str(r[7]) if r[7] else "",
+            "eligible_to": str(r[8]) if r[8] else "",
+        }
+        for r in rows
+    ]
+    return JsonResponse({"records": records, "total": total, "page": page, "page_size": page_size})
+
+
+@require_GET
+def travel_eligibility_get_api(request, rec_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT Travel_Eligibility_Id, Fs_Category_Id, Rank_Id,
+                   Travel_Mode, Travel_Class, Travel_Preference,
+                   Eligible_From, Eligible_To
+            FROM eos_Travel_Eligibility WHERE Travel_Eligibility_Id = %s
+            """,
+            [rec_id],
+        )
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse({
+        "id": row[0],
+        "category_id": row[1],
+        "rank_id": row[2],
+        "mode": row[3],
+        "travel_class": row[4] or "",
+        "preference": row[5],
+        "eligible_from": str(row[6]) if row[6] else "",
+        "eligible_to": str(row[7]) if row[7] else "",
+    })
+
+
+@csrf_exempt
+def travel_eligibility_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    import json
+    data = json.loads(request.body)
+    rec_id = data.get("id")
+    category_id = data.get("category_id")
+    rank_id = data.get("rank_id")
+    mode = data.get("mode", "").strip().upper()
+    travel_class = data.get("travel_class", "").strip()
+    preference = data.get("preference")
+    eligible_from = data.get("eligible_from") or None
+    eligible_to = data.get("eligible_to") or None
+
+    if not all([category_id, rank_id, mode, travel_class, preference, eligible_from]):
+        return JsonResponse({"error": "All required fields must be filled"}, status=400)
+    if mode not in ("A", "R", "C"):
+        return JsonResponse({"error": "Invalid travel mode"}, status=400)
+
+    user_id = request.user.id if request.user.is_authenticated else 1
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        if rec_id:
+            cursor.execute(
+                """UPDATE eos_Travel_Eligibility
+                   SET Fs_Category_Id=%s, Rank_Id=%s, Travel_Mode=%s,
+                       Travel_Class=%s, Travel_Preference=%s,
+                       Eligible_From=%s, Eligible_To=%s,
+                       Mod_User_Id=%s, Mod_Dt=NOW()
+                   WHERE Travel_Eligibility_Id=%s""",
+                [category_id, rank_id, mode, travel_class, preference,
+                 eligible_from, eligible_to, user_id, rec_id],
+            )
+            new_id = rec_id
+        else:
+            cursor.execute(
+                """INSERT INTO eos_Travel_Eligibility
+                   (Fs_Category_Id, Rank_Id, Travel_Mode, Travel_Class,
+                    Travel_Preference, Eligible_From, Eligible_To, Cr_User_Id, Cr_Dt)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())""",
+                [category_id, rank_id, mode, travel_class, preference,
+                 eligible_from, eligible_to, user_id],
+            )
+            new_id = cursor.lastrowid
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def travel_eligibility_delete_api(request, rec_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute(
+            "DELETE FROM eos_Travel_Eligibility WHERE Travel_Eligibility_Id=%s", [rec_id]
+        )
+    return JsonResponse({"success": True})
+
+
+# ─── Reporting Structure master ───────────────────────────────────────────────
+
+@require_permission("masters.reporting_structure", "view")
+def reporting_structure_page(request):
+    return render(request, "chatbot/masters/reporting_structure.html")
+
+
+@require_GET
+def reporting_structure_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("SELECT Fs_Category_Id, Fs_Category_Name FROM Mst_Fs_Category ORDER BY Fs_Category_Name")
+        cats = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+        cursor.execute("SELECT Rank_Id, Rank_Name, Rank_Abrv, Fs_Category_Id FROM Mst_Rank ORDER BY Rank_Name")
+        ranks = [{"id": r[0], "name": r[1], "abrv": r[2], "category_id": r[3]} for r in cursor.fetchall()]
+    return JsonResponse({"categories": cats, "ranks": ranks})
+
+
+@require_GET
+def reporting_structure_list_api(request):
+    from django.db import connections
+    _ps = request.GET.get("page_size", "25")
+    page_size = int(_ps) if _ps and _ps.isdigit() and int(_ps) in (25, 50, 75, 100) else 25
+    page = max(int(request.GET.get("page", 1)), 1)
+    offset = (page - 1) * page_size
+    cat_id  = request.GET.get("category_id", "")
+    q       = request.GET.get("q", "").strip()
+
+    where, params = ["1=1"], []
+    if cat_id:
+        where.append("rs.Fs_Category_Id = %s"); params.append(cat_id)
+    if q:
+        like = f"%{q}%"
+        where.append("(r.Rank_Name LIKE %s OR r.Rank_Abrv LIKE %s OR rr.Rank_Name LIKE %s OR rr.Rank_Abrv LIKE %s OR c.Fs_Category_Name LIKE %s)")
+        params += [like, like, like, like, like]
+
+    sql_base = """
+        FROM eos_Reporting_Structure rs
+        JOIN Mst_Fs_Category c  ON c.Fs_Category_Id  = rs.Fs_Category_Id
+        JOIN Mst_Rank r          ON r.Rank_Id          = rs.Rank_Id
+        JOIN Mst_Rank rr         ON rr.Rank_Id         = rs.Reporting_Rank_Id
+        WHERE """ + " AND ".join(where)
+
+    with connections["default"].cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) " + sql_base, params)
+        total = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT rs.Reporting_Structure_Id, c.Fs_Category_Name, r.Rank_Name, r.Rank_Abrv, rr.Rank_Name, rr.Rank_Abrv "
+            + sql_base + " ORDER BY c.Fs_Category_Name, r.Rank_Name LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        rows = [
+            {"id": row[0], "category": row[1],
+             "rank": row[2], "rank_abrv": row[3],
+             "reporting_rank": row[4], "reporting_rank_abrv": row[5]}
+            for row in cursor.fetchall()
+        ]
+    return JsonResponse({"records": rows, "total": total, "page": page, "page_size": page_size})
+
+
+@require_GET
+def reporting_structure_get_api(request, rec_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute(
+            "SELECT Reporting_Structure_Id, Fs_Category_Id, Rank_Id, Reporting_Rank_Id "
+            "FROM eos_Reporting_Structure WHERE Reporting_Structure_Id=%s", [rec_id]
+        )
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse({"id": row[0], "category_id": row[1], "rank_id": row[2], "reporting_rank_id": row[3]})
+
+
+@csrf_exempt
+def reporting_structure_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    import json as _json
+    from django.db import connections
+    body = _json.loads(request.body)
+    rec_id       = body.get("id")
+    category_id  = body.get("category_id")
+    rank_id      = body.get("rank_id")
+    rep_rank_id  = body.get("reporting_rank_id")
+    user_id      = request.user.id if request.user.is_authenticated else 1
+
+    if not all([category_id, rank_id, rep_rank_id]):
+        return JsonResponse({"error": "category_id, rank_id and reporting_rank_id are required"}, status=400)
+
+    with connections["default"].cursor() as cursor:
+        if rec_id:
+            cursor.execute(
+                "UPDATE eos_Reporting_Structure SET Fs_Category_Id=%s, Rank_Id=%s, Reporting_Rank_Id=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE Reporting_Structure_Id=%s",
+                [category_id, rank_id, rep_rank_id, user_id, rec_id],
+            )
+            new_id = rec_id
+        else:
+            cursor.execute(
+                "INSERT INTO eos_Reporting_Structure (Fs_Category_Id, Rank_Id, Reporting_Rank_Id, Cr_User_Id, Cr_Dt) VALUES (%s, %s, %s, %s, NOW())",
+                [category_id, rank_id, rep_rank_id, user_id],
+            )
+            new_id = cursor.lastrowid
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def reporting_structure_delete_api(request, rec_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("DELETE FROM eos_Reporting_Structure WHERE Reporting_Structure_Id=%s", [rec_id])
+    return JsonResponse({"success": True})
+
+
+# ── Job Descriptions ─────────────────────────────────────────────────────────
+
+@require_permission("masters.job_descriptions", "view")
+def job_description_page(request):
+    return render(request, "chatbot/masters/job_description.html")
+
+
+@require_GET
+def job_description_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        cur.execute("SELECT Fs_Category_Id, Fs_Category_Name FROM Mst_Fs_Category ORDER BY Fs_Category_Name")
+        cats = [{"id": r[0], "name": r[1]} for r in cur.fetchall()]
+        cur.execute("SELECT Rank_Id, Rank_Name, Rank_Abrv, Fs_Category_Id FROM Mst_Rank ORDER BY Rank_Name")
+        ranks = [{"id": r[0], "name": r[1], "abrv": r[2], "category_id": r[3]} for r in cur.fetchall()]
+    return JsonResponse({"categories": cats, "ranks": ranks})
+
+
+@require_GET
+def job_description_list_api(request):
+    from django.db import connections
+    cat_id = request.GET.get("category_id", "")
+    q      = request.GET.get("q", "").strip()
+    active = request.GET.get("active", "")
+    _ps    = request.GET.get("page_size", "25")
+    page_size = int(_ps) if _ps and _ps.isdigit() and int(_ps) in (25, 50, 75, 100) else 25
+    try:
+        page = max(1, int(request.GET.get("page", 1)))
+    except ValueError:
+        page = 1
+
+    where, params = [], []
+    if cat_id:
+        where.append("h.Fs_Category_Id = %s"); params.append(cat_id)
+    if active in ("Y", "N"):
+        where.append("h.JD_Hdr_Active = %s"); params.append(active)
+    if q:
+        where.append("(h.JD_Hdr_Description LIKE %s OR r.Rank_Name LIKE %s OR c.Fs_Category_Name LIKE %s)")
+        params += [f"%{q}%", f"%{q}%", f"%{q}%"]
+
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    base = f"""
+        FROM eos_Job_Description_Hdr h
+        JOIN Mst_Fs_Category c ON c.Fs_Category_Id = h.Fs_Category_Id
+        JOIN Mst_Rank r ON r.Rank_Id = h.Rank_Id
+        {where_sql}
+    """
+    with connections["default"].cursor() as cur:
+        cur.execute(f"SELECT COUNT(*) {base}", params)
+        total = cur.fetchone()[0]
+        offset = (page - 1) * page_size
+        cur.execute(
+            f"SELECT h.JD_Hdr_Id, c.Fs_Category_Name, r.Rank_Name, r.Rank_Abrv, h.JD_Hdr_Description, h.JD_Hdr_Order, h.JD_Hdr_Active {base} ORDER BY h.Fs_Category_Id, h.Rank_Id, h.JD_Hdr_Order LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        rows = cur.fetchall()
+    records = [
+        {"id": r[0], "category": r[1], "rank": r[2], "rank_abrv": r[3],
+         "description": r[4], "display_order": r[5], "active": r[6]}
+        for r in rows
+    ]
+    return JsonResponse({"records": records, "total": total})
+
+
+@require_GET
+def job_description_get_api(request, hdr_id):
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        cur.execute(
+            "SELECT h.JD_Hdr_Id, h.Fs_Category_Id, c.Fs_Category_Name, h.Rank_Id, r.Rank_Name, r.Rank_Abrv, h.JD_Hdr_Description, h.JD_Hdr_Order, h.JD_Hdr_Active "
+            "FROM eos_Job_Description_Hdr h "
+            "JOIN Mst_Fs_Category c ON c.Fs_Category_Id = h.Fs_Category_Id "
+            "JOIN Mst_Rank r ON r.Rank_Id = h.Rank_Id "
+            "WHERE h.JD_Hdr_Id = %s",
+            [hdr_id],
+        )
+        h = cur.fetchone()
+        if not h:
+            return JsonResponse({"error": "Not found"}, status=404)
+        cur.execute(
+            "SELECT JD_Dtl_Id, JD_Dtl_Description, JD_Dtl_Order, JD_Dtl_Active FROM eos_Job_Description_Dtl WHERE JD_Hdr_Id = %s ORDER BY JD_Dtl_Order",
+            [hdr_id],
+        )
+        dtls = [{"id": r[0], "description": r[1], "display_order": r[2], "active": r[3]} for r in cur.fetchall()]
+    return JsonResponse({
+        "id": h[0], "category_id": h[1], "category": h[2],
+        "rank_id": h[3], "rank": h[4], "rank_abrv": h[5],
+        "description": h[6], "display_order": h[7], "active": h[8],
+        "lines": dtls,
+    })
+
+
+@csrf_exempt
+def job_description_save_hdr_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    import json as _json
+    body        = _json.loads(request.body)
+    hdr_id      = body.get("id")
+    category_id = body.get("category_id")
+    rank_id     = body.get("rank_id")
+    description = (body.get("description") or "").strip()
+    order       = body.get("display_order", 1)
+    active      = body.get("active", "Y")
+    user_id     = request.user.id if request.user.is_authenticated else 1
+
+    if not all([category_id, rank_id, description]):
+        return JsonResponse({"error": "category_id, rank_id and description are required"}, status=400)
+
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        if hdr_id:
+            cur.execute(
+                "UPDATE eos_Job_Description_Hdr SET Fs_Category_Id=%s, Rank_Id=%s, JD_Hdr_Description=%s, JD_Hdr_Order=%s, JD_Hdr_Active=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE JD_Hdr_Id=%s",
+                [category_id, rank_id, description, order, active, user_id, hdr_id],
+            )
+            new_id = hdr_id
+        else:
+            cur.execute("SELECT COALESCE(MAX(JD_Hdr_Id), 0) + 1 FROM eos_Job_Description_Hdr")
+            new_id = cur.fetchone()[0]
+            cur.execute(
+                "INSERT INTO eos_Job_Description_Hdr (JD_Hdr_Id, Fs_Category_Id, Rank_Id, JD_Hdr_Description, JD_Hdr_Order, JD_Hdr_Active, Cr_User_Id, Cr_Dt) VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())",
+                [new_id, category_id, rank_id, description, order, active, user_id],
+            )
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def job_description_delete_hdr_api(request, hdr_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        cur.execute("DELETE FROM eos_Job_Description_Dtl WHERE JD_Hdr_Id=%s", [hdr_id])
+        cur.execute("DELETE FROM eos_Job_Description_Hdr WHERE JD_Hdr_Id=%s", [hdr_id])
+    return JsonResponse({"success": True})
+
+
+@csrf_exempt
+def job_description_save_dtl_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    import json as _json
+    body        = _json.loads(request.body)
+    dtl_id      = body.get("id")
+    hdr_id      = body.get("hdr_id")
+    description = (body.get("description") or "").strip()
+    order       = body.get("display_order", 1)
+    active      = body.get("active", "Y")
+    user_id     = request.user.id if request.user.is_authenticated else 1
+
+    if not description:
+        return JsonResponse({"error": "description is required"}, status=400)
+
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        if dtl_id:
+            cur.execute(
+                "UPDATE eos_Job_Description_Dtl SET JD_Dtl_Description=%s, JD_Dtl_Order=%s, JD_Dtl_Active=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE JD_Dtl_Id=%s",
+                [description, order, active, user_id, dtl_id],
+            )
+            new_id = dtl_id
+        else:
+            cur.execute("SELECT COALESCE(MAX(JD_Dtl_Id), 0) + 1 FROM eos_Job_Description_Dtl")
+            new_id = cur.fetchone()[0]
+            cur.execute(
+                "INSERT INTO eos_Job_Description_Dtl (JD_Dtl_Id, JD_Hdr_Id, JD_Dtl_Description, JD_Dtl_Order, JD_Dtl_Active, Cr_User_Id, Cr_Dt) VALUES (%s,%s,%s,%s,%s,%s,NOW())",
+                [new_id, hdr_id, description, order, active, user_id],
+            )
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def job_description_delete_dtl_api(request, dtl_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        cur.execute("DELETE FROM eos_Job_Description_Dtl WHERE JD_Dtl_Id=%s", [dtl_id])
+    return JsonResponse({"success": True})

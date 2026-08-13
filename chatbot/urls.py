@@ -23,6 +23,8 @@ urlpatterns = [
     path("masters/contractor/", views.contractor_master_page, name="contractor_master"),
     path("masters/email-notification-types/", views.email_notification_type_page, name="email_notification_type"),
     path("masters/cert-institutes/", views.cert_institute_page, name="cert_institute"),
+    path("masters/travel-eligibility/", views.travel_eligibility_page, name="travel_eligibility"),
+    path("masters/reporting-structure/", views.reporting_structure_page, name="reporting_structure"),
 
     # ── Contractor Master API ──────────────────────────────────────────────────
     path("api/masters/contractor/", views.contractor_list_api, name="contractor_list"),
@@ -57,6 +59,27 @@ urlpatterns = [
     path("api/masters/cost-centre-type/<int:type_id>/deactivate/", views.cost_centre_type_deactivate_api, name="cost_centre_type_deactivate"),
     path("api/masters/cost-centre-type/<int:type_id>/check-delete/", views.cost_centre_type_check_delete_api, name="cost_centre_type_check_delete"),
     path("api/masters/cost-centre-type/<int:type_id>/delete/", views.cost_centre_type_delete_api, name="cost_centre_type_delete"),
+
+    # ── Travel Eligibility API ─────────────────────────────────────────────────
+    path("api/masters/travel-eligibility/meta/", views.travel_eligibility_meta_api, name="travel_eligibility_meta"),
+    path("api/masters/travel-eligibility/", views.travel_eligibility_list_api, name="travel_eligibility_list"),
+    path("api/masters/travel-eligibility/save/", views.travel_eligibility_save_api, name="travel_eligibility_save"),
+    path("api/masters/travel-eligibility/<int:rec_id>/", views.travel_eligibility_get_api, name="travel_eligibility_get"),
+    path("api/masters/travel-eligibility/<int:rec_id>/delete/", views.travel_eligibility_delete_api, name="travel_eligibility_delete"),
+    path("api/masters/reporting-structure/meta/", views.reporting_structure_meta_api, name="reporting_structure_meta"),
+    path("api/masters/reporting-structure/", views.reporting_structure_list_api, name="reporting_structure_list"),
+    path("api/masters/reporting-structure/save/", views.reporting_structure_save_api, name="reporting_structure_save"),
+    path("api/masters/reporting-structure/<int:rec_id>/", views.reporting_structure_get_api, name="reporting_structure_get"),
+    path("api/masters/reporting-structure/<int:rec_id>/delete/", views.reporting_structure_delete_api, name="reporting_structure_delete"),
+
+    path("masters/job-descriptions/", views.job_description_page, name="job_description"),
+    path("api/masters/job-descriptions/meta/", views.job_description_meta_api, name="job_description_meta"),
+    path("api/masters/job-descriptions/", views.job_description_list_api, name="job_description_list"),
+    path("api/masters/job-descriptions/save/", views.job_description_save_hdr_api, name="job_description_save_hdr"),
+    path("api/masters/job-descriptions/<int:hdr_id>/", views.job_description_get_api, name="job_description_get"),
+    path("api/masters/job-descriptions/<int:hdr_id>/delete/", views.job_description_delete_hdr_api, name="job_description_delete_hdr"),
+    path("api/masters/job-descriptions/dtl/save/", views.job_description_save_dtl_api, name="job_description_save_dtl"),
+    path("api/masters/job-descriptions/dtl/<int:dtl_id>/delete/", views.job_description_delete_dtl_api, name="job_description_delete_dtl"),
 
     path("api/masters/cert-institute/", views.cert_institute_list_api, name="cert_institute_list"),
     path("api/masters/cert-institute/save/", views.cert_institute_save_api, name="cert_institute_save"),

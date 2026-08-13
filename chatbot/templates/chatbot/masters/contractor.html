@@ -1,4 +1,4 @@
-{% extends 'chatbot/base.html' %}
+{% extends 'chatbot/masters/base.html' %}
 {% load static %}
 
 {% block title %}Contractor — Seros{% endblock %}
@@ -38,11 +38,8 @@
     .main-layout { flex: 1; display: grid; grid-template-columns: 1fr 360px; overflow: hidden; }
 
     .records-panel { display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
-    .panel-head { flex-shrink: 0; background: linear-gradient(150deg, #0d2147 0%, #1d4a8c 100%); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
-    .panel-head-title { font-size: 0.95rem; font-weight: 700; color: #fff; }
-    .panel-head-counts { font-size: 0.7rem; color: rgba(255,255,255,0.48); margin-top: 2px; }
-    .btn-new-pill { background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.22); color: #fff; padding: 7px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: background 0.15s; }
-    .btn-new-pill:hover { background: rgba(255,255,255,0.24); }
+    .btn-new { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 6px; background: #1a3f7a; color: #fff; border: none; font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: background .15s; letter-spacing: .02em; }
+    .btn-new:hover { background: #2563eb; }
 
     .panel-controls { flex-shrink: 0; background: var(--surface); padding: 12px 16px 0; }
     .search-wrap { position: relative; margin-bottom: 10px; }
@@ -133,7 +130,7 @@
 </style>
 {% endblock %}
 
-{% block content %}
+{% block ms_content %}
 <div class="page-header">
   <div class="breadcrumb">
     <a href="/">Home</a><span class="breadcrumb-sep">/</span>
@@ -144,22 +141,16 @@
     <div class="page-title">Contractor</div>
     <div class="page-stats">
       <span class="stat-chip total"><span class="sdot-sm"></span><span id="stat-total">—</span> total</span>
+      <button class="btn-new" onclick="openAddDialog()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New
+      </button>
     </div>
   </div>
 </div>
 
 <div class="main-layout">
   <div class="records-panel">
-    <div class="panel-head">
-      <div>
-        <div class="panel-head-title">Contractors</div>
-        <div class="panel-head-counts"><span id="ph-total">—</span> records</div>
-      </div>
-      <button class="btn-new-pill" onclick="openAddDialog()">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        New
-      </button>
-    </div>
     <div class="panel-controls">
       <div class="search-wrap">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -282,7 +273,6 @@ fetch('/api/masters/contractor/').then(r => r.json()).then(data => {
 function updateCounts() {
   const tot = allRecords.length;
   document.getElementById('stat-total').textContent = tot;
-  document.getElementById('ph-total').textContent = tot;
 }
 
 function sorted() {
