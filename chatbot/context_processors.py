@@ -84,6 +84,7 @@ _ADMIN_NAV_ITEM = {
     "children": [
         {"id": "admin.user_rights",     "label": "User Rights",     "url": "/admin-panel/user-rights/"},
         {"id": "admin.user_management", "label": "User Management", "url": "/admin-panel/user-management/"},
+        {"id": "admin.audit_trail",     "label": "Audit Trail",     "url": "/admin-panel/audit-trail/"},
     ],
 }
 

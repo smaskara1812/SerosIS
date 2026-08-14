@@ -1,0 +1,446 @@
+{% extends 'chatbot/masters/base.html' %}
+{% load static %}
+
+{% block title %}Contact Exposure Type — Seros{% endblock %}
+
+{% block styles %}
+<style>
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F2F4F8; --surface: #fff; --border: #E4E8EF;
+      --primary: #1a3f7a; --accent: #2563eb; --accent-light: #EEF3FF;
+      --text: #111827; --text-2: #4B5563; --text-3: #9CA3AF;
+      --success: #059669; --success-bg: #D1FAE5;
+      --danger: #DC2626; --danger-bg: #FEE2E2;
+      --stripe-n: #d97706;
+      --row-hover: rgba(37,99,235,0.035); --row-sel: #EEF3FF; --row-sel-b: #2563eb;
+      --radius: 12px; --radius-sm: 6px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+      --shadow-lg: 0 20px 60px rgba(0,0,0,0.22);
+    }
+    html, body { height: 100%; }
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
+
+
+    .page-header { flex-shrink: 0; padding: 16px 24px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+    .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 0.74rem; color: var(--text-3); margin-bottom: 7px; }
+    .breadcrumb a { color: var(--text-3); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { opacity: 0.45; }
+    .page-title-row { display: flex; align-items: center; justify-content: space-between; }
+    .page-title { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+    .page-stats { display: flex; gap: 8px; }
+    .stat-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+    .stat-chip.total { background: #F1F5F9; color: #475569; }
+    .sdot-sm { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .main-layout { flex: 1; display: grid; grid-template-columns: 1fr 360px; overflow: hidden; }
+
+    .records-panel { display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+    .btn-new { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 6px; background: #1a3f7a; color: #fff; border: none; font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: background .15s; letter-spacing: .02em; }
+    .btn-new:hover { background: #2563eb; }
+
+    .panel-controls { flex-shrink: 0; background: var(--surface); padding: 12px 16px 0; }
+    .search-wrap { position: relative; margin-bottom: 10px; }
+    .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+    .search-input { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.83rem; color: var(--text); background: var(--bg); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    .search-input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .search-input::placeholder { color: var(--text-3); }
+    .sort-bar { display: flex; align-items: center; gap: 3px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .sort-label { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-3); margin-right: 4px; }
+    .sort-btn { padding: 4px 9px; border-radius: 4px; font-family: inherit; font-size: 0.7rem; font-weight: 600; border: 1px solid transparent; background: transparent; color: var(--text-3); cursor: pointer; display: inline-flex; align-items: center; gap: 2px; transition: all 0.12s; }
+    .sort-btn:hover { background: var(--bg); color: var(--text-2); }
+    .sort-btn.active { background: var(--accent-light); color: var(--accent); border-color: rgba(37,99,235,0.15); }
+
+    .records-scroll { flex: 1; overflow-y: auto; background: var(--surface); }
+    .record-row { display: flex; align-items: center; border-left: 4px solid var(--stripe-n); border-bottom: 1px solid #F0F2F7; cursor: pointer; transition: background 0.1s; }
+    .record-row:hover { background: var(--row-hover); }
+    .record-row.selected { background: var(--row-sel); border-left-color: var(--row-sel-b) !important; }
+    .record-row.selected .row-name { color: var(--primary); }
+    .row-content { flex: 1; padding: 12px 12px 12px 14px; min-width: 0; }
+    .row-name { font-size: 0.875rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row-id { font-size: 0.7rem; color: var(--text-3); margin-top: 2px; font-family: 'SF Mono', monospace; }
+    .list-empty { text-align: center; padding: 60px 20px; color: var(--text-3); font-size: 0.85rem; }
+
+    .form-panel { background: var(--bg); display: flex; flex-direction: column; overflow: hidden; padding: 20px; }
+    .form-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--text-3); }
+    .empty-icon { width: 56px; height: 56px; border-radius: 14px; background: #E9ECF1; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+    .empty-title { font-size: 0.9rem; font-weight: 600; color: var(--text-2); }
+    .empty-sub { font-size: 0.78rem; text-align: center; max-width: 200px; line-height: 1.5; }
+    .form-card { flex: 1; display: none; flex-direction: column; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+    .form-card.visible { display: flex; }
+    .form-card-header { flex-shrink: 0; padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .form-card-title { font-size: 0.88rem; font-weight: 700; color: var(--primary); }
+    .rec-badge { font-size: 0.68rem; font-weight: 600; background: var(--accent-light); color: var(--accent); padding: 3px 10px; border-radius: 10px; }
+    .form-body { flex: 1; overflow-y: auto; padding: 18px 20px; }
+    .form-section { margin-bottom: 18px; }
+    .sec-label { display: block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-3); padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-2); margin-bottom: 5px; }
+    .req { color: var(--danger); margin-left: 2px; }
+    .form-hint { font-size: 0.7rem; color: var(--text-3); margin-top: 4px; }
+    .form-control { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.83rem; color: var(--text); background: var(--surface); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .form-control::placeholder { color: var(--text-3); }
+    .form-footer { flex-shrink: 0; padding: 13px 20px; border-top: 1px solid var(--border); background: #FAFBFD; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; white-space: nowrap; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #163268; transform: translateY(-1px); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #047857; transform: translateY(-1px); }
+    #btn-save.dirty { background: #d97706 !important; box-shadow: 0 0 0 3px rgba(217,119,6,0.25) !important; }
+    #btn-save.dirty:hover { background: #b45309 !important; }
+    .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
+    .btn-ghost:hover:not(:disabled) { background: var(--bg); }
+    .btn-danger-ol { background: var(--surface); color: var(--danger); border: 1px solid #FECACA; }
+    .btn-danger-ol:hover:not(:disabled) { background: var(--danger-bg); border-color: var(--danger); }
+    .btn-danger-s { background: var(--danger); color: #fff; border: none; }
+    .btn-danger-s:hover { background: #B91C1C; }
+
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(10,20,40,0.55); z-index: 500; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+    .overlay.open { display: flex; }
+    .modal { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-lg); width: 420px; max-width: 95vw; max-height: 92vh; display: flex; flex-direction: column; animation: mIn 0.28s cubic-bezier(0.34,1.4,0.64,1); overflow: hidden; }
+    @keyframes mIn { from { transform: scale(0.88) translateY(24px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+    .modal-head { flex-shrink: 0; padding: 18px 24px 16px; background: linear-gradient(150deg, #0d2147 0%, #1d4a8c 100%); display: flex; align-items: flex-start; justify-content: space-between; }
+    .modal-head-title { font-size: 1rem; font-weight: 700; color: #fff; }
+    .modal-head-sub { font-size: 0.73rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
+    .modal-close { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.8); width: 30px; height: 30px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: inherit; }
+    .modal-close:hover { background: rgba(255,255,255,0.24); }
+    .modal-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+    .modal-foot { flex-shrink: 0; padding: 14px 24px; border-top: 1px solid var(--border); background: #FAFBFD; display: flex; justify-content: flex-end; gap: 10px; }
+
+    .confirm-ov { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 600; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+    .confirm-ov.open { display: flex; }
+    .confirm-box { background: var(--surface); border-radius: 14px; padding: 28px; max-width: 400px; width: 90%; box-shadow: var(--shadow-lg); animation: mIn 0.25s cubic-bezier(.34,1.4,.64,1); }
+    .confirm-icon { width: 44px; height: 44px; border-radius: 10px; background: var(--danger-bg); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+    .confirm-box h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .confirm-box p { font-size: 0.85rem; color: var(--text-2); line-height: 1.5; margin-bottom: 22px; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    .toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 900; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    .toast { padding: 12px 18px; border-radius: var(--radius-sm); font-size: 0.83rem; font-weight: 600; display: flex; align-items: center; gap: 8px; transform: translateX(120%); opacity: 0; transition: transform 0.3s cubic-bezier(.34,1.4,.64,1), opacity 0.3s; pointer-events: all; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.success { background: var(--surface); color: var(--success); border: 1px solid var(--success-bg); border-left: 3px solid var(--success); }
+    .toast.error   { background: var(--surface); color: var(--danger);  border: 1px solid var(--danger-bg);  border-left: 3px solid var(--danger); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+
+</style>
+{% endblock %}
+
+{% block ms_content %}
+<div class="page-header">
+  <div class="breadcrumb">
+    <a href="/">Home</a><span class="breadcrumb-sep">/</span>
+    <a href="/masters/">Masters</a><span class="breadcrumb-sep">/</span>
+    <span>QHSE</span><span class="breadcrumb-sep">/</span>
+    <span>Contact Exposure Type</span>
+  </div>
+  <div class="page-title-row">
+    <div class="page-title">Contact Exposure Type</div>
+    <div class="page-stats">
+      <span class="stat-chip total"><span class="sdot-sm"></span><span id="stat-total">—</span> total</span>
+      <button class="btn-new" onclick="openAddDialog()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="main-layout">
+  <div class="records-panel">
+    <div class="panel-controls">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input class="search-input" id="filter-input" type="text" placeholder="Search type name…" oninput="applyFilter()" autocomplete="off">
+      </div>
+      <div class="sort-bar">
+        <span class="sort-label">Sort</span>
+        <button class="sort-btn active" id="sb-name" onclick="setSort('name')">Name <span class="si">↑</span></button>
+        <button class="sort-btn" id="sb-id" onclick="setSort('id')">ID <span class="si"></span></button>
+      </div>
+    </div>
+    <div class="records-scroll" id="records-list"><div class="list-empty">Loading…</div></div>
+  </div>
+
+  <div class="form-panel">
+    <div class="form-empty" id="form-empty">
+      <div class="empty-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      </div>
+      <div class="empty-title">No record selected</div>
+      <div class="empty-sub">Click a row to view and edit it</div>
+    </div>
+    <div class="form-card" id="form-card">
+      <div class="form-card-header">
+        <span class="form-card-title">Edit Contact Exposure Type</span>
+        <span class="rec-badge" id="rec-badge"></span>
+      </div>
+      <div class="form-body">
+        <input type="hidden" id="f-id">
+        <div class="form-section">
+          <span class="sec-label">Type Information</span>
+          <div class="form-group">
+            <label class="form-label">Type <span class="req">*</span></label>
+            <input type="text" class="form-control" id="f-name" maxlength="65" placeholder="e.g. Noise">
+            <div class="form-hint">Max 65 characters</div>
+          </div>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-danger-ol" id="btn-delete" onclick="confirmDelete()">Delete</button>
+        <button class="btn btn-success" id="btn-save" onclick="saveRecord()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add modal -->
+<div class="overlay" id="add-modal" onclick="bgClose(event,'add-modal')">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">New Contact Exposure Type</div>
+        <div class="modal-head-sub">Add a new contact exposure type</div>
+      </div>
+      <button class="modal-close" onclick="closeAddDialog()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <span class="sec-label">Type Information</span>
+        <div class="form-group">
+          <label class="form-label">Type <span class="req">*</span></label>
+          <input type="text" class="form-control" id="d-name" maxlength="65" placeholder="e.g. Noise">
+          <div class="form-hint">Max 65 characters</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeAddDialog()">Cancel</button>
+      <button class="btn btn-primary" id="btn-add-dialog" onclick="saveDialogRecord()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Type
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="confirm-ov" id="confirm-ov" onclick="if(event.target.id==='confirm-ov')closeConfirm()">
+  <div class="confirm-box">
+    <div class="confirm-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+    </div>
+    <h3>Delete Contact Exposure Type?</h3>
+    <p id="confirm-msg">This record will be permanently deleted and cannot be undone.</p>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-danger-s" id="confirm-action-btn" onclick="doDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-ov" id="blocked-ov" onclick="if(event.target.id==='blocked-ov')closeBlocked()">
+  <div class="confirm-box">
+    <div class="confirm-icon" style="background:#FEF3C7">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <h3>Cannot Delete</h3>
+    <p>This record is still referenced and cannot be deleted:</p>
+    <ul id="blocked-list" style="margin:10px 0 18px;padding-left:18px;font-size:0.84rem;color:var(--text-2);line-height:1.8"></ul>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" onclick="closeBlocked()">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+let allRecords = [], currentId = null, sortKey = 'name', sortDir = 1;
+
+fetch('/api/masters/contact-exposure-type/').then(r => r.json()).then(data => {
+  allRecords = data.results || []; updateCounts(); renderList(sorted());
+}).catch(() => {
+  document.getElementById('records-list').innerHTML = '<div class="list-empty" style="color:var(--danger)">Failed to load</div>';
+});
+
+function updateCounts() {
+  const tot = allRecords.length;
+  document.getElementById('stat-total').textContent = tot;
+}
+
+function sorted() {
+  const q = document.getElementById('filter-input').value.toLowerCase().trim();
+  let rows = q ? allRecords.filter(r => (r.Contact_Expo_Type_Name||'').toLowerCase().includes(q)) : allRecords.slice();
+  rows.sort((a,b) => {
+    if (sortKey==='name') return (a.Contact_Expo_Type_Name||'').localeCompare(b.Contact_Expo_Type_Name||'') * sortDir;
+    if (sortKey==='id')   return (a.Contact_Expo_Type_Id - b.Contact_Expo_Type_Id) * sortDir;
+    return 0;
+  });
+  return rows;
+}
+function applyFilter() { renderList(sorted()); }
+
+function setSort(key) {
+  if (sortKey===key) sortDir*=-1; else { sortKey=key; sortDir=1; }
+  document.querySelectorAll('.sort-btn').forEach(b => { b.classList.remove('active'); b.querySelector('.si').textContent=''; });
+  const btn = document.getElementById('sb-'+key);
+  if (btn) { btn.classList.add('active'); btn.querySelector('.si').textContent = sortDir===1?'↑':'↓'; }
+  renderList(sorted());
+}
+
+function renderList(rows) {
+  const c = document.getElementById('records-list');
+  if (!rows.length) { c.innerHTML = '<div class="list-empty">No records match</div>'; return; }
+  c.innerHTML = rows.map(r => `
+    <div class="record-row ${r.Contact_Expo_Type_Id===currentId?'selected':''}" id="row-${r.Contact_Expo_Type_Id}" onclick="selectRecord(${r.Contact_Expo_Type_Id})">
+      <div class="row-content">
+        <div class="row-name">${esc(r.Contact_Expo_Type_Name)}</div>
+        <div class="row-id">ID ${r.Contact_Expo_Type_Id}</div>
+      </div>
+    </div>`).join('');
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function selectRecord(id) {
+  currentId = id;
+  document.querySelectorAll('.record-row').forEach(r => r.classList.remove('selected'));
+  const row = document.getElementById('row-'+id);
+  if (row) { row.classList.add('selected'); row.scrollIntoView({block:'nearest'}); }
+  fetch('/api/masters/contact-exposure-type/'+id+'/').then(r=>r.json()).then(d => {
+    document.getElementById('f-id').value   = d.Contact_Expo_Type_Id;
+    document.getElementById('f-name').value = d.Contact_Expo_Type_Name||'';
+    document.getElementById('rec-badge').textContent = 'ID '+d.Contact_Expo_Type_Id;
+    document.getElementById('form-empty').style.display = 'none';
+    document.getElementById('form-card').classList.add('visible');
+      _setDirty(false);
+      _applySavePerm(false);
+  });
+}
+
+function saveRecord() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { showToast('Type name is required','error'); return; }
+  spinBtn('btn-save','Saving…', () =>
+    fetch('/api/masters/contact-exposure-type/save/', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contact_expo_type_id: currentId, contact_expo_type_name: name})
+    }).then(r=>r.json()).then(d => {
+      if (d.error) { showToast(d.error,'error'); return; }
+      showToast('Changes saved','success'); _setDirty(false);
+      refreshRecords();
+    }).catch(()=>showToast('Network error','error'))
+  );
+}
+
+function openAddDialog() {
+  document.getElementById('d-name').value = '';
+  document.getElementById('add-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('d-name').focus(), 80);
+}
+function closeAddDialog() { document.getElementById('add-modal').classList.remove('open'); }
+
+function saveDialogRecord() {
+  const name = document.getElementById('d-name').value.trim();
+  if (!name) { showToast('Type name is required','error'); return; }
+  spinBtn('btn-add-dialog','Adding…', () =>
+    fetch('/api/masters/contact-exposure-type/save/', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contact_expo_type_id: null, contact_expo_type_name: name})
+    }).then(r=>r.json()).then(d => {
+      if (d.error) { showToast(d.error,'error'); return; }
+      showToast('Type added · ID '+d.contact_expo_type_id,'success');
+      closeAddDialog();
+      refreshRecords().then(()=>selectRecord(d.contact_expo_type_id));
+    }).catch(()=>showToast('Network error','error'))
+  );
+}
+
+function confirmDelete() {
+  const btn = document.getElementById('btn-delete');
+  const orig = btn.innerHTML; btn.disabled = true;
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
+  fetch('/api/masters/contact-exposure-type/'+currentId+'/check-delete/').then(r=>r.json()).then(d=>{
+    btn.disabled = false; btn.innerHTML = orig;
+    if (!d.can_delete) { showBlocked(d.references); return; }
+    document.getElementById('confirm-msg').textContent = `"${document.getElementById('f-name').value}" will be permanently deleted. This cannot be undone.`;
+    document.getElementById('confirm-ov').classList.add('open');
+  }).catch(()=>{ btn.disabled=false; btn.innerHTML=orig; showToast('Network error','error'); });
+}
+function closeConfirm() { document.getElementById('confirm-ov').classList.remove('open'); }
+function doDelete() {
+  closeConfirm();
+  fetch('/api/masters/contact-exposure-type/'+currentId+'/delete/', {method:'POST'}).then(r=>r.json()).then(d => {
+    if (d.error) { showToast(d.error,'error'); return; }
+    showToast('Type deleted','success');
+    currentId = null;
+    _setDirty(false); document.getElementById('form-card').classList.remove('visible');
+    document.getElementById('form-empty').style.display = '';
+    refreshRecords();
+  }).catch(()=>showToast('Network error','error'));
+}
+function showBlocked(refs) {
+  document.getElementById('blocked-list').innerHTML = refs.map(r=>`<li><strong>${r.count}</strong> ${r.label}</li>`).join('');
+  document.getElementById('blocked-ov').classList.add('open');
+}
+function closeBlocked() { document.getElementById('blocked-ov').classList.remove('open'); }
+
+function refreshRecords() {
+  return fetch('/api/masters/contact-exposure-type/').then(r=>r.json()).then(data => {
+    allRecords = data.results||[]; updateCounts(); renderList(sorted());
+  });
+}
+
+function bgClose(e, id) {
+  if (e.target.id===id) { id==='add-modal' ? closeAddDialog() : closeConfirm(); }
+}
+
+function spinBtn(id, label, fn) {
+  const btn=document.getElementById(id), orig=btn.innerHTML; btn.disabled=true;
+  btn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> ${label}`;
+  fn().finally(()=>{ btn.disabled=false; btn.innerHTML=orig; });
+}
+
+function showToast(msg, type) {
+  const el=document.createElement('div'); el.className='toast '+type;
+  el.innerHTML=(type==='success'
+    ?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
+    :'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+  )+msg;
+  document.getElementById('toast-wrap').appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),350); }, 3200);
+}
+
+// ── Dirty-state tracking ──────────────────────────────────────────────────
+(function() {
+  function setDirty(v) {
+    const btn = document.getElementById('btn-save');
+    if (btn) btn.classList.toggle('dirty', v);
+  }
+  window._setDirty = setDirty;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const fc = document.getElementById('form-card');
+    if (!fc) return;
+    fc.addEventListener('input',  () => setDirty(true));
+    fc.addEventListener('change', () => setDirty(true));
+  });
+})();
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.contact_exposure_types')
+    .then(r => r.json())
+    .then(p => _applyPermUI(p));
+})();
+</script>
+{% endblock %}

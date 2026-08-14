@@ -82,6 +82,34 @@ class CbMstUserPassword(models.Model):
         return f"LocalPwd(user_id={self.user_id})"
 
 
+class CbAuditLog(models.Model):
+    """Append-only audit trail of actions performed in the system.
+    Lives in the chathistory DB (cb_ prefix routes it there). Never edited/deleted from the app."""
+    ts           = models.DateTimeField(auto_now_add=True, db_index=True)
+    user_id      = models.IntegerField(null=True, blank=True, db_index=True)  # Mst_user USER_ID; null for superuser w/o profile
+    username     = models.CharField(max_length=50)                            # login id, e.g. "smaskara"
+    action       = models.CharField(max_length=24, db_index=True)            # create/update/delete/deactivate/export/login/login_failed/logout/permission_change
+    entity       = models.CharField(max_length=60, db_index=True)            # e.g. "masters.hazard_types", "auth", "admin.user_rights"
+    entity_label = models.CharField(max_length=80, blank=True)               # human label, e.g. "Hazard Type"
+    record_id    = models.CharField(max_length=40, blank=True)               # affected row PK (string; blank if N/A)
+    record_label = models.CharField(max_length=200, blank=True)              # affected row's name
+    changes      = models.JSONField(null=True, blank=True)                   # {column: {"old": ..., "new": ...}}
+    ip           = models.CharField(max_length=45, blank=True)
+    user_agent   = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        db_table = "cb_audit_log"
+        ordering = ["-ts"]
+        indexes = [
+            models.Index(fields=["entity", "ts"]),
+            models.Index(fields=["user_id", "ts"]),
+            models.Index(fields=["action", "ts"]),
+        ]
+
+    def __str__(self):
+        return f"{self.ts} {self.username} {self.action} {self.entity}"
+
+
 class Conversation(models.Model):
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title      = models.CharField(max_length=255, default="New Chat")

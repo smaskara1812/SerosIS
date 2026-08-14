@@ -16,6 +16,7 @@ from .rag.chain import get_rag_chain
 from .health import run_all as run_health_checks
 from .analytics.router import route as analytics_route
 from .permissions import require_permission, get_user_access as _get_access
+from . import audit as _audit
 
 
 def _invalidate_user_perm_cache(user_id):
@@ -913,8 +914,9 @@ def cost_centre_type_save_api(request):
     if not name or not short:
         return JsonResponse({"error": "Type Name and Short Name are required"}, status=400)
     now = datetime.now()
-    cr_user_id = 1
+    cr_user_id = _audit.ops_user_id(request)
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.cost_centre_types", type_id)
         if type_id:
             cursor.execute("""
                 UPDATE eos_Mst_Cost_Centre_Type
@@ -922,6 +924,7 @@ def cost_centre_type_save_api(request):
                     Cost_Centre_Type_Active=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Cost_Centre_Type_Id=%s
             """, [name, short, active, cr_user_id, now, type_id])
+            _audit.record_save(request, cursor, "masters.cost_centre_types", type_id, _before)
             return JsonResponse({"success": True, "Cost_Centre_Type_Id": type_id, "action": "updated"})
         else:
             cursor.execute("SELECT COALESCE(MAX(Cost_Centre_Type_Id), 0) + 1 FROM eos_Mst_Cost_Centre_Type")
@@ -932,6 +935,7 @@ def cost_centre_type_save_api(request):
                      Cost_Centre_Type_Active, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, [new_id, name, short, "Y", cr_user_id, now])
+            _audit.record_save(request, cursor, "masters.cost_centre_types", new_id, _before)
             return JsonResponse({"success": True, "Cost_Centre_Type_Id": new_id, "action": "inserted"})
 
 @csrf_exempt
@@ -943,11 +947,13 @@ def cost_centre_type_deactivate_api(request, type_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.cost_centre_types", type_id)
         cursor.execute("""
             UPDATE eos_Mst_Cost_Centre_Type
             SET Cost_Centre_Type_Active='N', Mod_User_Id=%s, Mod_Dt=%s
             WHERE Cost_Centre_Type_Id=%s
-        """, [1, datetime.now(), type_id])
+        """, [_audit.ops_user_id(request), datetime.now(), type_id])
+    _audit.record_deactivate(request, "masters.cost_centre_types", type_id, _before)
     return JsonResponse({"success": True})
 
 # ── Cost Centre Master ────────────────────────────────────────────────────────
@@ -1058,8 +1064,9 @@ def cost_centre_save_api(request):
     if not name or not old_name or not type_id:
         return JsonResponse({"error": "Name, Old Name and Type are required"}, status=400)
     now = datetime.now()
-    cr_user_id = 1
+    cr_user_id = _audit.ops_user_id(request)
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.cost_centres", cc_id)
         if cc_id:
             cursor.execute("""
                 UPDATE eos_Mst_Cost_Centre
@@ -1068,6 +1075,7 @@ def cost_centre_save_api(request):
                     Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Cost_Centre_Id=%s
             """, [name, old_name, type_id, rig_id, loc_id, active, cr_user_id, now, cc_id])
+            _audit.record_save(request, cursor, "masters.cost_centres", cc_id, _before)
             return JsonResponse({"success": True, "Cost_Centre_Id": cc_id, "action": "updated"})
         else:
             cursor.execute("SELECT COALESCE(MAX(Cost_Centre_Id), 0) + 1 FROM eos_Mst_Cost_Centre")
@@ -1079,6 +1087,7 @@ def cost_centre_save_api(request):
                      Cost_Centre_Active, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, [new_id, name, old_name, type_id, rig_id, loc_id, "Y", cr_user_id, now])
+            _audit.record_save(request, cursor, "masters.cost_centres", new_id, _before)
             return JsonResponse({"success": True, "Cost_Centre_Id": new_id, "action": "inserted"})
 
 @csrf_exempt
@@ -1090,11 +1099,13 @@ def cost_centre_deactivate_api(request, cc_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.cost_centres", cc_id)
         cursor.execute("""
             UPDATE eos_Mst_Cost_Centre
             SET Cost_Centre_Active='N', Mod_User_Id=%s, Mod_Dt=%s
             WHERE Cost_Centre_Id=%s
-        """, [1, datetime.now(), cc_id])
+        """, [_audit.ops_user_id(request), datetime.now(), cc_id])
+    _audit.record_deactivate(request, "masters.cost_centres", cc_id, _before)
     return JsonResponse({"success": True})
 
 # ── Operator Master Form ──────────────────────────────────────────────────────
@@ -1175,8 +1186,9 @@ def operator_save_api(request):
     if not name or not short_name:
         return JsonResponse({"error": "Operator name and short name are required"}, status=400)
     now = datetime.now()
-    cr_user_id = 1
+    cr_user_id = _audit.ops_user_id(request)
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.operators", op_id)
         if op_id:
             cursor.execute("""
                 UPDATE eos_Mst_Operator
@@ -1187,6 +1199,7 @@ def operator_save_api(request):
                 WHERE Operator_Id=%s
             """, [name, short_name, sap_code, wbs_code, country_id, loc_id,
                   contact, tel, email, active, cr_user_id, now, op_id])
+            _audit.record_save(request, cursor, "masters.operators", op_id, _before)
             return JsonResponse({"success": True, "Operator_Id": op_id, "action": "updated"})
         else:
             cursor.execute("SELECT COALESCE(MAX(Operator_Id), 0) + 1 FROM eos_Mst_Operator")
@@ -1199,6 +1212,7 @@ def operator_save_api(request):
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, [new_id, name, short_name, sap_code, wbs_code, country_id, loc_id,
                   contact, tel, email, "Y", cr_user_id, now])
+            _audit.record_save(request, cursor, "masters.operators", new_id, _before)
             return JsonResponse({"success": True, "Operator_Id": new_id, "action": "inserted"})
 
 @csrf_exempt
@@ -1210,11 +1224,13 @@ def operator_deactivate_api(request, op_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.operators", op_id)
         cursor.execute("""
             UPDATE eos_Mst_Operator
             SET Operator_Active='N', Mod_User_Id=%s, Mod_Dt=%s
             WHERE Operator_Id=%s
-        """, [1, datetime.now(), op_id])
+        """, [_audit.ops_user_id(request), datetime.now(), op_id])
+    _audit.record_deactivate(request, "masters.operators", op_id, _before)
     return JsonResponse({"success": True})
 
 @require_GET
@@ -1260,6 +1276,7 @@ def cost_centre_type_delete_api(request, type_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.cost_centre_types", type_id)
         for table, col in [
             ("eos_Mst_Cost_Centre", "Cost_Centre_Type_Id"),
             ("eos_Mst_HSE_Manhours_Party", "Cost_Centre_Type_Id"),
@@ -1268,6 +1285,7 @@ def cost_centre_type_delete_api(request, type_id):
             if cursor.fetchone()[0] > 0:
                 return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
         cursor.execute("DELETE FROM eos_Mst_Cost_Centre_Type WHERE Cost_Centre_Type_Id=%s", [type_id])
+    _audit.record_delete(request, "masters.cost_centre_types", type_id, _before)
     return JsonResponse({"success": True})
 
 
@@ -1302,6 +1320,7 @@ def cost_centre_delete_api(request, cc_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.cost_centres", cc_id)
         for table, col in [
             ("eos_Invoice_Hdr", "Cost_Centre_Id"),
             ("eos_Actual_Crew_Expense", "Cost_Centre_Id"),
@@ -1314,6 +1333,7 @@ def cost_centre_delete_api(request, cc_id):
             if cursor.fetchone()[0] > 0:
                 return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
         cursor.execute("DELETE FROM eos_Mst_Cost_Centre WHERE Cost_Centre_Id=%s", [cc_id])
+    _audit.record_delete(request, "masters.cost_centres", cc_id, _before)
     return JsonResponse({"success": True})
 
 
@@ -1346,6 +1366,7 @@ def operator_delete_api(request, op_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.operators", op_id)
         for table, col in [
             ("eos_Mst_Project", "Operator_Id"),
             ("eos_Mst_Project_Contract", "Operator_Id"),
@@ -1356,6 +1377,7 @@ def operator_delete_api(request, op_id):
             if cursor.fetchone()[0] > 0:
                 return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
         cursor.execute("DELETE FROM eos_Mst_Operator WHERE Operator_Id=%s", [op_id])
+    _audit.record_delete(request, "masters.operators", op_id, _before)
     return JsonResponse({"success": True})
 
 
@@ -1390,6 +1412,7 @@ def rig_master_delete_api(request, rig_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.rigs", rig_id)
         for table, col in [
             ("eos_Mst_Cost_Centre", "Rig_Id"),
             ("eos_Incident_Details", "Rig_Id"),
@@ -1402,6 +1425,7 @@ def rig_master_delete_api(request, rig_id):
             if cursor.fetchone()[0] > 0:
                 return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
         cursor.execute("DELETE FROM eos_Mst_Rig WHERE Rig_Id=%s", [rig_id])
+    _audit.record_delete(request, "masters.rigs", rig_id, _before)
     return JsonResponse({"success": True})
 
 
@@ -1509,9 +1533,10 @@ def rig_master_save_api(request):
             return JsonResponse({"error": f"{field} is required"}, status=400)
 
     now = datetime.now()
-    cr_user_id = 1  # placeholder until auth
+    cr_user_id = _audit.ops_user_id(request)  # placeholder until auth
 
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.rigs", rig_id)
         if rig_id:
             rig_active = body.get("Rig_Active", "Y")
             if rig_active not in ("Y", "N"):
@@ -1532,6 +1557,7 @@ def rig_master_save_api(request):
                 body.get("Org_Unit_Code") or None, body["Rig_From"],
                 rig_active, cr_user_id, now, rig_id,
             ])
+            _audit.record_save(request, cursor, "masters.rigs", rig_id, _before)
             return JsonResponse({"success": True, "Rig_Id": rig_id, "action": "updated"})
         else:
             cursor.execute("SELECT COALESCE(MAX(Rig_Id), 0) + 1 FROM eos_Mst_Rig")
@@ -1552,6 +1578,7 @@ def rig_master_save_api(request):
                 body.get("Org_Unit_Code") or None, body["Rig_From"],
                 cr_user_id, now,
             ])
+            _audit.record_save(request, cursor, "masters.rigs", new_id, _before)
             return JsonResponse({"success": True, "Rig_Id": new_id, "action": "inserted"})
 
 
@@ -2177,6 +2204,7 @@ def listings_users_export(request):
             }
             for r in cursor.fetchall()
         ]
+    _audit.record_action(request, "export", "listings.users", None, "%d row(s)" % len(rows), None)
     return _csv_response(rows, "users.csv")
 
 
@@ -2229,6 +2257,7 @@ def listings_incidents_export(request):
     )
     rows = [{k: v for k, v in r.items() if k not in ("description","id")}
             for r in data.get("rows", [])]
+    _audit.record_action(request, "export", "listings.incidents", None, "%d row(s)" % len(rows), None)
     return _csv_response(rows, "incidents.csv")
 
 
@@ -2248,6 +2277,7 @@ def listings_hazard_cards_export(request):
     )
     rows = [{k: v for k, v in r.items() if k not in ("id",)}
             for r in data.get("rows", [])]
+    _audit.record_action(request, "export", "listings.hazard_cards", None, "%d row(s)" % len(rows), None)
     return _csv_response(rows, "hazard_cards.csv")
 
 
@@ -2268,6 +2298,7 @@ def listings_employees_export(request):
     )
     rows = [{k: v for k, v in r.items() if k not in ("id",)}
             for r in data.get("rows", [])]
+    _audit.record_action(request, "export", "listings.employees", None, "%d row(s)" % len(rows), None)
     return _csv_response(rows, "employees.csv")
 
 
@@ -2286,6 +2317,7 @@ def listings_staff_export(request):
     )
     rows = [{k: v for k, v in r.items() if k not in ("id",)}
             for r in data.get("rows", [])]
+    _audit.record_action(request, "export", "listings.staff", None, "%d row(s)" % len(rows), None)
     return _csv_response(rows, "staff.csv")
 
 
@@ -2303,6 +2335,7 @@ def listings_crew_rotations_export(request):
     )
     rows = [{k: v for k, v in r.items() if k not in ("id",)}
             for r in data.get("rows", [])]
+    _audit.record_action(request, "export", "listings.crew_rotations", None, "%d row(s)" % len(rows), None)
     return _csv_response(rows, "crew_rotations.csv")
 
 
@@ -2319,6 +2352,7 @@ def listings_invoices_export(request):
     )
     rows = [{k: v for k, v in r.items() if k not in ("id",)}
             for r in data.get("rows", [])]
+    _audit.record_action(request, "export", "listings.invoices", None, "%d row(s)" % len(rows), None)
     return _csv_response(rows, "invoices.csv")
 
 
@@ -2335,6 +2369,7 @@ def listings_certificates_export(request):
     )
     rows = [{k: v for k, v in r.items() if k not in ("id",)}
             for r in data.get("rows", [])]
+    _audit.record_action(request, "export", "listings.certificates", None, "%d row(s)" % len(rows), None)
     return _csv_response(rows, "certificates.csv")
 
 
@@ -2520,13 +2555,15 @@ def contractor_save_api(request):
     if not contractor_name:
         return JsonResponse({"error": "Contractor name is required"}, status=400)
     now = datetime.now()
+    _uid = _audit.ops_user_id(request)
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.contractors", contractor_id)
         if contractor_id:
             cursor.execute("""
                 UPDATE eos_Mst_Contractor
                 SET Contractor_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Contractor_Id=%s
-            """, [contractor_name, 1, now, contractor_id])
+            """, [contractor_name, _uid, now, contractor_id])
         else:
             cursor.execute("SELECT COALESCE(MAX(Contractor_Id),0)+1 FROM eos_Mst_Contractor")
             new_id = cursor.fetchone()[0]
@@ -2534,8 +2571,9 @@ def contractor_save_api(request):
                 INSERT INTO eos_Mst_Contractor
                     (Contractor_Id, Contractor_Name, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s)
-            """, [new_id, contractor_name, 1, now])
+            """, [new_id, contractor_name, _uid, now])
             contractor_id = new_id
+        _audit.record_save(request, cursor, "masters.contractors", contractor_id, _before)
     return JsonResponse({"success": True, "contractor_id": contractor_id})
 
 
@@ -2553,7 +2591,1037 @@ def contractor_delete_api(request, contractor_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.contractors", contractor_id)
         cursor.execute("DELETE FROM eos_Mst_Contractor WHERE Contractor_Id=%s", [contractor_id])
+    _audit.record_delete(request, "masters.contractors", contractor_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Rig Operation Master ──────────────────────────────────────────────────────
+
+@require_permission("masters.rig_operations", "view")
+def rig_operation_page(request):
+    return render(request, "chatbot/masters/rig_operation.html")
+
+
+@require_GET
+def rig_operation_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Rig_Operation_Id, Rig_Operation_Name
+            FROM eos_Mst_Rig_Operation
+            WHERE Rig_Operation_Name LIKE %s
+            ORDER BY Rig_Operation_Name
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def rig_operation_get_api(request, op_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Rig_Operation_Id, Rig_Operation_Name
+            FROM eos_Mst_Rig_Operation
+            WHERE Rig_Operation_Id=%s
+        """, [op_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def rig_operation_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("rig_operation_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.rig_operations", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body          = json.loads(request.body)
+    op_id         = body.get("rig_operation_id")
+    op_name       = (body.get("rig_operation_name") or "").strip()
+    if not op_name:
+        return JsonResponse({"error": "Operation name is required"}, status=400)
+    now = datetime.now()
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.rig_operations", op_id)
+        if op_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Rig_Operation
+                SET Rig_Operation_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Rig_Operation_Id=%s
+            """, [op_name, _uid, now, op_id])
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Rig_Operation_Id),0)+1 FROM eos_Mst_Rig_Operation")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Rig_Operation
+                    (Rig_Operation_Id, Rig_Operation_Name, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s)
+            """, [new_id, op_name, _uid, now])
+            op_id = new_id
+        _audit.record_save(request, cursor, "masters.rig_operations", op_id, _before)
+    return JsonResponse({"success": True, "rig_operation_id": op_id})
+
+
+@require_GET
+def rig_operation_check_delete_api(request, op_id):
+    return JsonResponse({"can_delete": True, "references": []})
+
+
+@csrf_exempt
+def rig_operation_delete_api(request, op_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.rig_operations", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.rig_operations", op_id)
+        cursor.execute("DELETE FROM eos_Mst_Rig_Operation WHERE Rig_Operation_Id=%s", [op_id])
+    _audit.record_delete(request, "masters.rig_operations", op_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Contact Exposure Type Master ──────────────────────────────────────────────
+
+@require_permission("masters.contact_exposure_types", "view")
+def contact_exposure_type_page(request):
+    return render(request, "chatbot/masters/contact_exposure_type.html")
+
+
+@require_GET
+def contact_exposure_type_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Contact_Expo_Type_Id, Contact_Expo_Type_Name
+            FROM eos_Mst_Contact_Exposure_Type
+            WHERE Contact_Expo_Type_Name LIKE %s
+            ORDER BY Contact_Expo_Type_Name
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def contact_exposure_type_get_api(request, type_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Contact_Expo_Type_Id, Contact_Expo_Type_Name
+            FROM eos_Mst_Contact_Exposure_Type
+            WHERE Contact_Expo_Type_Id=%s
+        """, [type_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def contact_exposure_type_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("contact_expo_type_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.contact_exposure_types", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body      = json.loads(request.body)
+    type_id   = body.get("contact_expo_type_id")
+    type_name = (body.get("contact_expo_type_name") or "").strip()
+    if not type_name:
+        return JsonResponse({"error": "Type name is required"}, status=400)
+    now = datetime.now()
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.contact_exposure_types", type_id)
+        if type_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Contact_Exposure_Type
+                SET Contact_Expo_Type_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Contact_Expo_Type_Id=%s
+            """, [type_name, _uid, now, type_id])
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Contact_Expo_Type_Id),0)+1 FROM eos_Mst_Contact_Exposure_Type")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Contact_Exposure_Type
+                    (Contact_Expo_Type_Id, Contact_Expo_Type_Name, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s)
+            """, [new_id, type_name, _uid, now])
+            type_id = new_id
+        _audit.record_save(request, cursor, "masters.contact_exposure_types", type_id, _before)
+    return JsonResponse({"success": True, "contact_expo_type_id": type_id})
+
+
+@require_GET
+def contact_exposure_type_check_delete_api(request, type_id):
+    return JsonResponse({"can_delete": True, "references": []})
+
+
+@csrf_exempt
+def contact_exposure_type_delete_api(request, type_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.contact_exposure_types", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.contact_exposure_types", type_id)
+        cursor.execute("DELETE FROM eos_Mst_Contact_Exposure_Type WHERE Contact_Expo_Type_Id=%s", [type_id])
+    _audit.record_delete(request, "masters.contact_exposure_types", type_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Indicator Type Master ─────────────────────────────────────────────────────
+
+_INDICATOR_REPORT_TYPES = ("Leading", "Lagging")
+
+
+@require_permission("masters.indicator_types", "view")
+def indicator_type_page(request):
+    return render(request, "chatbot/masters/indicator_type.html")
+
+
+@require_GET
+def indicator_type_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Indicator_Type_Id, Indicator_Type_Name, Report_Type, Indicator_Type_Order
+            FROM eos_Mst_Indicator_Type
+            WHERE Indicator_Type_Name LIKE %s
+            ORDER BY Report_Type, Indicator_Type_Order
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def indicator_type_get_api(request, type_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Indicator_Type_Id, Indicator_Type_Name, Report_Type, Indicator_Type_Order
+            FROM eos_Mst_Indicator_Type
+            WHERE Indicator_Type_Id=%s
+        """, [type_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def indicator_type_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("indicator_type_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.indicator_types", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body        = json.loads(request.body)
+    type_id     = body.get("indicator_type_id")
+    type_name   = (body.get("indicator_type_name") or "").strip()
+    report_type = (body.get("report_type") or "").strip()
+    if not type_name:
+        return JsonResponse({"error": "Indicator type name is required"}, status=400)
+    if report_type not in _INDICATOR_REPORT_TYPES:
+        return JsonResponse({"error": "Report type must be Leading or Lagging"}, status=400)
+    now = datetime.now()
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.indicator_types", type_id)
+        if type_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Indicator_Type
+                SET Indicator_Type_Name=%s, Report_Type=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Indicator_Type_Id=%s
+            """, [type_name, report_type, _uid, now, type_id])
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Indicator_Type_Id),0)+1 FROM eos_Mst_Indicator_Type")
+            new_id = cursor.fetchone()[0]
+            # Order is a per-Report_Type sequence.
+            cursor.execute("SELECT COALESCE(MAX(Indicator_Type_Order),0)+1 FROM eos_Mst_Indicator_Type WHERE Report_Type=%s", [report_type])
+            new_order = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Indicator_Type
+                    (Indicator_Type_Id, Indicator_Type_Name, Indicator_Type_Order, Report_Type, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, [new_id, type_name, new_order, report_type, _uid, now])
+            type_id = new_id
+        _audit.record_save(request, cursor, "masters.indicator_types", type_id, _before)
+    return JsonResponse({"success": True, "indicator_type_id": type_id})
+
+
+@require_GET
+def indicator_type_check_delete_api(request, type_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM eos_Mst_Indicator_Subtype WHERE Indicator_Type_Id=%s", [type_id])
+        n = cursor.fetchone()[0]
+    if n:
+        return JsonResponse({"can_delete": False, "references": [{"count": n, "label": "Indicator Subtype(s)"}]})
+    return JsonResponse({"can_delete": True, "references": []})
+
+
+@csrf_exempt
+def indicator_type_delete_api(request, type_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.indicator_types", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM eos_Mst_Indicator_Subtype WHERE Indicator_Type_Id=%s", [type_id])
+        if cursor.fetchone()[0]:
+            return JsonResponse({"error": "Cannot delete: referenced by Indicator Subtypes"}, status=409)
+        _before = _audit.snap(cursor, "masters.indicator_types", type_id)
+        cursor.execute("DELETE FROM eos_Mst_Indicator_Type WHERE Indicator_Type_Id=%s", [type_id])
+    _audit.record_delete(request, "masters.indicator_types", type_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Indicator Subtype Master ──────────────────────────────────────────────────
+
+@require_permission("masters.indicator_subtypes", "view")
+def indicator_subtype_page(request):
+    return render(request, "chatbot/masters/indicator_subtype.html")
+
+
+@require_GET
+def indicator_subtype_meta_api(request):
+    """Indicator Type options for the dropdown."""
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Indicator_Type_Id, Indicator_Type_Name, Report_Type
+            FROM eos_Mst_Indicator_Type
+            ORDER BY Report_Type, Indicator_Type_Order
+        """)
+        cols = [c[0] for c in cursor.description]
+        types = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"types": types})
+
+
+@require_GET
+def indicator_subtype_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT s.Indicator_Subtype_Id, s.Indicator_Type_Id, t.Indicator_Type_Name,
+                   t.Report_Type, s.Indicator_Subtype_Name, s.Indicator_Subtype_Order
+            FROM eos_Mst_Indicator_Subtype s
+            LEFT JOIN eos_Mst_Indicator_Type t ON s.Indicator_Type_Id = t.Indicator_Type_Id
+            WHERE s.Indicator_Subtype_Name LIKE %s
+            ORDER BY t.Indicator_Type_Name, s.Indicator_Subtype_Order
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def indicator_subtype_get_api(request, subtype_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Indicator_Subtype_Id, Indicator_Type_Id, Indicator_Subtype_Name, Indicator_Subtype_Order
+            FROM eos_Mst_Indicator_Subtype
+            WHERE Indicator_Subtype_Id=%s
+        """, [subtype_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def indicator_subtype_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("indicator_subtype_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.indicator_subtypes", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body         = json.loads(request.body)
+    subtype_id   = body.get("indicator_subtype_id")
+    subtype_name = (body.get("indicator_subtype_name") or "").strip()
+    type_id      = body.get("indicator_type_id")
+    if not subtype_name:
+        return JsonResponse({"error": "Indicator subtype name is required"}, status=400)
+    if not type_id:
+        return JsonResponse({"error": "Indicator type is required"}, status=400)
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.indicator_subtypes", subtype_id)
+        cursor.execute("SELECT COUNT(*) FROM eos_Mst_Indicator_Type WHERE Indicator_Type_Id=%s", [type_id])
+        if not cursor.fetchone()[0]:
+            return JsonResponse({"error": "Selected indicator type does not exist"}, status=400)
+        now = datetime.now()
+        if subtype_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Indicator_Subtype
+                SET Indicator_Subtype_Name=%s, Indicator_Type_Id=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Indicator_Subtype_Id=%s
+            """, [subtype_name, type_id, _uid, now, subtype_id])
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Indicator_Subtype_Id),0)+1 FROM eos_Mst_Indicator_Subtype")
+            new_id = cursor.fetchone()[0]
+            # Order is a per-Indicator_Type sequence.
+            cursor.execute("SELECT COALESCE(MAX(Indicator_Subtype_Order),0)+1 FROM eos_Mst_Indicator_Subtype WHERE Indicator_Type_Id=%s", [type_id])
+            new_order = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Indicator_Subtype
+                    (Indicator_Subtype_Id, Indicator_Type_Id, Indicator_Subtype_Name, Indicator_Subtype_Order, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, [new_id, type_id, subtype_name, new_order, _uid, now])
+            subtype_id = new_id
+        _audit.record_save(request, cursor, "masters.indicator_subtypes", subtype_id, _before)
+    return JsonResponse({"success": True, "indicator_subtype_id": subtype_id})
+
+
+@require_GET
+def indicator_subtype_check_delete_api(request, subtype_id):
+    from django.db import connections
+    refs = []
+    with connections["default"].cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM eos_Leading_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
+        n = cursor.fetchone()[0]
+        if n:
+            refs.append({"count": n, "label": "Leading Indicator record(s)"})
+        cursor.execute("SELECT COUNT(*) FROM eos_Lagging_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
+        n = cursor.fetchone()[0]
+        if n:
+            refs.append({"count": n, "label": "Lagging Indicator record(s)"})
+    return JsonResponse({"can_delete": not refs, "references": refs})
+
+
+@csrf_exempt
+def indicator_subtype_delete_api(request, subtype_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.indicator_subtypes", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM eos_Leading_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
+        leading = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM eos_Lagging_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
+        lagging = cursor.fetchone()[0]
+        if leading or lagging:
+            return JsonResponse({"error": "Cannot delete: referenced by Indicator records"}, status=409)
+        _before = _audit.snap(cursor, "masters.indicator_subtypes", subtype_id)
+        cursor.execute("DELETE FROM eos_Mst_Indicator_Subtype WHERE Indicator_Subtype_Id=%s", [subtype_id])
+    _audit.record_delete(request, "masters.indicator_subtypes", subtype_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Parts Of Body Master (add / edit only — no delete, widely referenced) ──────
+
+@require_permission("masters.parts_of_body", "view")
+def parts_of_body_page(request):
+    return render(request, "chatbot/masters/parts_of_body.html")
+
+
+@require_GET
+def parts_of_body_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Part_Of_Body_Id, Part_Of_Body_Name
+            FROM eos_Mst_Parts_Of_Body
+            WHERE Part_Of_Body_Name LIKE %s
+            ORDER BY Part_Of_Body_Name
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def parts_of_body_get_api(request, part_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Part_Of_Body_Id, Part_Of_Body_Name
+            FROM eos_Mst_Parts_Of_Body
+            WHERE Part_Of_Body_Id=%s
+        """, [part_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def parts_of_body_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("part_of_body_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.parts_of_body", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body      = json.loads(request.body)
+    part_id   = body.get("part_of_body_id")
+    part_name = (body.get("part_of_body_name") or "").strip()
+    if not part_name:
+        return JsonResponse({"error": "Parts Of Body is required"}, status=400)
+    now = datetime.now()
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.parts_of_body", part_id)
+        if part_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Parts_Of_Body
+                SET Part_Of_Body_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Part_Of_Body_Id=%s
+            """, [part_name, _uid, now, part_id])
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Part_Of_Body_Id),0)+1 FROM eos_Mst_Parts_Of_Body")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Parts_Of_Body
+                    (Part_Of_Body_Id, Part_Of_Body_Name, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s)
+            """, [new_id, part_name, _uid, now])
+            part_id = new_id
+        _audit.record_save(request, cursor, "masters.parts_of_body", part_id, _before)
+    return JsonResponse({"success": True, "part_of_body_id": part_id})
+
+
+# ── QHSE Category Master (add / edit only — referenced by QHSE actions) ─────────
+
+@require_permission("masters.qhse_categories", "view")
+def qhse_category_page(request):
+    return render(request, "chatbot/masters/qhse_category.html")
+
+
+@require_GET
+def qhse_category_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT QHSE_Category_Id, QHSE_Category_Name
+            FROM eos_Mst_QHSE_Category
+            WHERE QHSE_Category_Name LIKE %s
+            ORDER BY QHSE_Category_Name
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def qhse_category_get_api(request, cat_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT QHSE_Category_Id, QHSE_Category_Name
+            FROM eos_Mst_QHSE_Category
+            WHERE QHSE_Category_Id=%s
+        """, [cat_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def qhse_category_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("qhse_category_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.qhse_categories", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body     = json.loads(request.body)
+    cat_id   = body.get("qhse_category_id")
+    cat_name = (body.get("qhse_category_name") or "").strip()
+    if not cat_name:
+        return JsonResponse({"error": "Category is required"}, status=400)
+    now = datetime.now()
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.qhse_categories", cat_id)
+        if cat_id:
+            cursor.execute("""
+                UPDATE eos_Mst_QHSE_Category
+                SET QHSE_Category_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE QHSE_Category_Id=%s
+            """, [cat_name, _uid, now, cat_id])
+        else:
+            cursor.execute("SELECT COALESCE(MAX(QHSE_Category_Id),0)+1 FROM eos_Mst_QHSE_Category")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_QHSE_Category
+                    (QHSE_Category_Id, QHSE_Category_Name, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s)
+            """, [new_id, cat_name, _uid, now])
+            cat_id = new_id
+        _audit.record_save(request, cursor, "masters.qhse_categories", cat_id, _before)
+    return JsonResponse({"success": True, "qhse_category_id": cat_id})
+
+
+# ── HSE Activity Master ───────────────────────────────────────────────────────
+
+# Activity type is a fixed 2-char code → label map.
+_HSE_ACTIVITY_TYPES = {"IN": "Inspection", "DR": "Drill", "AU": "Audit", "OT": "Other"}
+
+
+@require_permission("masters.hse_activities", "view")
+def hse_activity_page(request):
+    return render(request, "chatbot/masters/hse_activity.html")
+
+
+@require_GET
+def hse_activity_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT HSE_Activity_Id, HSE_Activity_Name, HSE_Activity_Type
+            FROM eos_Mst_HSE_Activity
+            WHERE HSE_Activity_Name LIKE %s
+            ORDER BY HSE_Activity_Name
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def hse_activity_get_api(request, act_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT HSE_Activity_Id, HSE_Activity_Name, HSE_Activity_Type
+            FROM eos_Mst_HSE_Activity
+            WHERE HSE_Activity_Id=%s
+        """, [act_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def hse_activity_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("hse_activity_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.hse_activities", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body      = json.loads(request.body)
+    act_id    = body.get("hse_activity_id")
+    act_name  = (body.get("hse_activity_name") or "").strip()
+    act_type  = (body.get("hse_activity_type") or "").strip()
+    if not act_name:
+        return JsonResponse({"error": "Activity name is required"}, status=400)
+    if act_type not in _HSE_ACTIVITY_TYPES:
+        return JsonResponse({"error": "Activity type is required"}, status=400)
+    now = datetime.now()
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.hse_activities", act_id)
+        if act_id:
+            cursor.execute("""
+                UPDATE eos_Mst_HSE_Activity
+                SET HSE_Activity_Name=%s, HSE_Activity_Type=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE HSE_Activity_Id=%s
+            """, [act_name, act_type, _uid, now, act_id])
+        else:
+            cursor.execute("SELECT COALESCE(MAX(HSE_Activity_Id),0)+1 FROM eos_Mst_HSE_Activity")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_HSE_Activity
+                    (HSE_Activity_Id, HSE_Activity_Name, HSE_Activity_Type, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s, %s)
+            """, [new_id, act_name, act_type, _uid, now])
+            act_id = new_id
+        _audit.record_save(request, cursor, "masters.hse_activities", act_id, _before)
+    return JsonResponse({"success": True, "hse_activity_id": act_id})
+
+
+@require_GET
+def hse_activity_check_delete_api(request, act_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Activities WHERE HSE_Activity_Id=%s", [act_id])
+        n = cursor.fetchone()[0]
+    if n:
+        return JsonResponse({"can_delete": False, "references": [{"count": n, "label": "Monthly HSE Activity record(s)"}]})
+    return JsonResponse({"can_delete": True, "references": []})
+
+
+@csrf_exempt
+def hse_activity_delete_api(request, act_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.hse_activities", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Activities WHERE HSE_Activity_Id=%s", [act_id])
+        if cursor.fetchone()[0]:
+            return JsonResponse({"error": "Cannot delete: referenced by Monthly HSE Activity records"}, status=409)
+        _before = _audit.snap(cursor, "masters.hse_activities", act_id)
+        cursor.execute("DELETE FROM eos_Mst_HSE_Activity WHERE HSE_Activity_Id=%s", [act_id])
+    _audit.record_delete(request, "masters.hse_activities", act_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── HSE Consumable Master ─────────────────────────────────────────────────────
+
+@require_permission("masters.hse_consumables", "view")
+def hse_consumable_page(request):
+    return render(request, "chatbot/masters/hse_consumable.html")
+
+
+@require_GET
+def hse_consumable_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT HSE_Consumable_Id, HSE_Consumable_Name, HSE_Consumption_Unit
+            FROM eos_Mst_HSE_Consumable
+            WHERE HSE_Consumable_Name LIKE %s
+            ORDER BY HSE_Consumable_Name
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def hse_consumable_get_api(request, con_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT HSE_Consumable_Id, HSE_Consumable_Name, HSE_Consumption_Unit
+            FROM eos_Mst_HSE_Consumable
+            WHERE HSE_Consumable_Id=%s
+        """, [con_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def hse_consumable_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("hse_consumable_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.hse_consumables", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body      = json.loads(request.body)
+    con_id    = body.get("hse_consumable_id")
+    con_name  = (body.get("hse_consumable_name") or "").strip()
+    con_unit  = (body.get("hse_consumption_unit") or "").strip()
+    if not con_name:
+        return JsonResponse({"error": "Consumable name is required"}, status=400)
+    if not con_unit:
+        return JsonResponse({"error": "Consumption unit is required"}, status=400)
+    now = datetime.now()
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.hse_consumables", con_id)
+        if con_id:
+            cursor.execute("""
+                UPDATE eos_Mst_HSE_Consumable
+                SET HSE_Consumable_Name=%s, HSE_Consumption_Unit=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE HSE_Consumable_Id=%s
+            """, [con_name, con_unit, _uid, now, con_id])
+        else:
+            cursor.execute("SELECT COALESCE(MAX(HSE_Consumable_Id),0)+1 FROM eos_Mst_HSE_Consumable")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_HSE_Consumable
+                    (HSE_Consumable_Id, HSE_Consumable_Name, HSE_Consumption_Unit, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s, %s)
+            """, [new_id, con_name, con_unit, _uid, now])
+            con_id = new_id
+        _audit.record_save(request, cursor, "masters.hse_consumables", con_id, _before)
+    return JsonResponse({"success": True, "hse_consumable_id": con_id})
+
+
+@require_GET
+def hse_consumable_check_delete_api(request, con_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Environment WHERE HSE_Consumable_Id=%s", [con_id])
+        n = cursor.fetchone()[0]
+    if n:
+        return JsonResponse({"can_delete": False, "references": [{"count": n, "label": "Monthly HSE Environment record(s)"}]})
+    return JsonResponse({"can_delete": True, "references": []})
+
+
+@csrf_exempt
+def hse_consumable_delete_api(request, con_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.hse_consumables", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Environment WHERE HSE_Consumable_Id=%s", [con_id])
+        if cursor.fetchone()[0]:
+            return JsonResponse({"error": "Cannot delete: referenced by Monthly HSE Environment records"}, status=409)
+        _before = _audit.snap(cursor, "masters.hse_consumables", con_id)
+        cursor.execute("DELETE FROM eos_Mst_HSE_Consumable WHERE HSE_Consumable_Id=%s", [con_id])
+    _audit.record_delete(request, "masters.hse_consumables", con_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Hazard Type Master ────────────────────────────────────────────────────────
+
+_HAZARD_CLASSES = ("Negative", "Positive")
+
+# Tables that reference a hazard type — checked before delete.
+_HAZARD_REF_TABLES = (
+    ("eos_Hazard_ID_Card",            "Hazard ID Card record(s)"),
+    ("eos_Hazard_ID_Card_Client",     "Client Hazard ID Card record(s)"),
+    ("eos_Wkg_Hazard_ID_Card_Client", "Working Client Hazard ID Card record(s)"),
+)
+
+
+@require_permission("masters.hazard_types", "view")
+def hazard_type_page(request):
+    return render(request, "chatbot/masters/hazard_type.html")
+
+
+@require_GET
+def hazard_type_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Haz_Type_Id, Haz_Type_Name, Haz_Type_Class
+            FROM eos_Mst_Hazard_Type
+            WHERE Haz_Type_Name LIKE %s
+            ORDER BY Haz_Type_Name
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def hazard_type_get_api(request, haz_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        cursor.execute("""
+            SELECT Haz_Type_Id, Haz_Type_Name, Haz_Type_Class
+            FROM eos_Mst_Hazard_Type
+            WHERE Haz_Type_Id=%s
+        """, [haz_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def hazard_type_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("haz_type_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.hazard_types", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body       = json.loads(request.body)
+    haz_id     = body.get("haz_type_id")
+    haz_name   = (body.get("haz_type_name") or "").strip()
+    haz_class  = (body.get("haz_type_class") or "").strip()
+    if not haz_name:
+        return JsonResponse({"error": "Hazard type is required"}, status=400)
+    if haz_class not in _HAZARD_CLASSES:
+        return JsonResponse({"error": "Class must be Negative or Positive"}, status=400)
+    now = datetime.now()
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.hazard_types", haz_id)
+        if haz_id:
+            cursor.execute("""
+                UPDATE eos_Mst_Hazard_Type
+                SET Haz_Type_Name=%s, Haz_Type_Class=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Haz_Type_Id=%s
+            """, [haz_name, haz_class, _uid, now, haz_id])
+        else:
+            cursor.execute("SELECT COALESCE(MAX(Haz_Type_Id),0)+1 FROM eos_Mst_Hazard_Type")
+            new_id = cursor.fetchone()[0]
+            cursor.execute("""
+                INSERT INTO eos_Mst_Hazard_Type
+                    (Haz_Type_Id, Haz_Type_Name, Haz_Type_Class, Haz_Type_Active, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, 'Y', %s, %s)
+            """, [new_id, haz_name, haz_class, _uid, now])
+            haz_id = new_id
+        _audit.record_save(request, cursor, "masters.hazard_types", haz_id, _before)
+    return JsonResponse({"success": True, "haz_type_id": haz_id})
+
+
+@require_GET
+def hazard_type_check_delete_api(request, haz_id):
+    from django.db import connections
+    refs = []
+    with connections["default"].cursor() as cursor:
+        for table, label in _HAZARD_REF_TABLES:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE Haz_Type_Id=%s", [haz_id])
+            n = cursor.fetchone()[0]
+            if n:
+                refs.append({"count": n, "label": label})
+    return JsonResponse({"can_delete": not refs, "references": refs})
+
+
+@csrf_exempt
+def hazard_type_delete_api(request, haz_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.hazard_types", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        for table, _label in _HAZARD_REF_TABLES:
+            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE Haz_Type_Id=%s", [haz_id])
+            if cursor.fetchone()[0]:
+                return JsonResponse({"error": "Cannot delete: referenced by Hazard ID Card records"}, status=409)
+        _before = _audit.snap(cursor, "masters.hazard_types", haz_id)
+        cursor.execute("DELETE FROM eos_Mst_Hazard_Type WHERE Haz_Type_Id=%s", [haz_id])
+    _audit.record_delete(request, "masters.hazard_types", haz_id, _before)
     return JsonResponse({"success": True})
 
 
@@ -2620,8 +3688,9 @@ def cert_institute_save_api(request):
     if not name or not short or not loc_id:
         return JsonResponse({"error": "Institute Name, Short Name and Location are required"}, status=400)
     now = datetime.now()
-    cr_user_id = 1
+    cr_user_id = _audit.ops_user_id(request)
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.cert_institutes", inst_id)
         if inst_id:
             cursor.execute("""
                 UPDATE eos_Mst_Cert_Institute
@@ -2630,6 +3699,7 @@ def cert_institute_save_api(request):
                     Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Cert_Institute_Id=%s
             """, [name, short, address, loc_id, tel, cr_user_id, now, inst_id])
+            _audit.record_save(request, cursor, "masters.cert_institutes", inst_id, _before)
             return JsonResponse({"success": True, "Cert_Institute_Id": inst_id, "action": "updated"})
         else:
             cursor.execute("SELECT COALESCE(MAX(Cert_Institute_Id), 0) + 1 FROM eos_Mst_Cert_Institute")
@@ -2640,6 +3710,7 @@ def cert_institute_save_api(request):
                      Cert_Institute_Address, Location_Id, Tel_No, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, [new_id, name, short, address, loc_id, tel, cr_user_id, now])
+            _audit.record_save(request, cursor, "masters.cert_institutes", new_id, _before)
             return JsonResponse({"success": True, "Cert_Institute_Id": new_id, "action": "inserted"})
 
 @require_GET
@@ -2668,7 +3739,9 @@ def cert_institute_delete_api(request, inst_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.cert_institutes", inst_id)
         cursor.execute("DELETE FROM eos_Mst_Cert_Institute WHERE Cert_Institute_Id=%s", [inst_id])
+    _audit.record_delete(request, "masters.cert_institutes", inst_id, _before)
     return JsonResponse({"success": True})
 
 
@@ -2730,8 +3803,9 @@ def email_notification_type_save_api(request):
     if not name or not subject:
         return JsonResponse({"error": "Type Name and Subject are required"}, status=400)
     now = datetime.now()
-    cr_user_id = 1
+    cr_user_id = _audit.ops_user_id(request)
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.email_notification_types", type_id)
         if type_id:
             cursor.execute("""
                 UPDATE eos_Email_Notification_Type
@@ -2739,6 +3813,7 @@ def email_notification_type_save_api(request):
                     EN_Type_Active=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE EN_Type_Id=%s
             """, [name, subject, desc, active, cr_user_id, now, type_id])
+            _audit.record_save(request, cursor, "masters.email_notification_types", type_id, _before)
             return JsonResponse({"success": True, "EN_Type_Id": type_id, "action": "updated"})
         else:
             cursor.execute("SELECT COALESCE(MAX(EN_Type_Id), 0) + 1 FROM eos_Email_Notification_Type")
@@ -2749,6 +3824,7 @@ def email_notification_type_save_api(request):
                      EN_Type_Active, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, [new_id, name, subject, desc, "Y", cr_user_id, now])
+            _audit.record_save(request, cursor, "masters.email_notification_types", new_id, _before)
             return JsonResponse({"success": True, "EN_Type_Id": new_id, "action": "inserted"})
 
 @csrf_exempt
@@ -2760,11 +3836,13 @@ def email_notification_type_deactivate_api(request, type_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.email_notification_types", type_id)
         cursor.execute("""
             UPDATE eos_Email_Notification_Type
             SET EN_Type_Active='N', Mod_User_Id=%s, Mod_Dt=%s
             WHERE EN_Type_Id=%s
-        """, [1, datetime.now(), type_id])
+        """, [_audit.ops_user_id(request), datetime.now(), type_id])
+    _audit.record_deactivate(request, "masters.email_notification_types", type_id, _before)
     return JsonResponse({"success": True})
 
 
@@ -2936,6 +4014,13 @@ def admin_user_perms_save_api(request, user_id):
         user_id=user_id,
         defaults={"user_login_id": login_id},
     )
+    # Snapshot the user's current rights for the audit diff.
+    def _acts(obj):
+        get = (lambda a: obj.get(a)) if isinstance(obj, dict) else (lambda a: getattr(obj, "can_" + a))
+        return ",".join(a for a in ("view", "add", "edit", "delete", "export") if get(a)) or "—"
+    _old_admin = profile.is_app_admin
+    _old_perms = {up.menu_key: _acts(up) for up in UserPermission.objects.filter(user_id=user_id)}
+
     if login_id and profile.user_login_id != login_id:
         profile.user_login_id = login_id
     profile.is_app_admin = is_admin
@@ -2965,6 +4050,18 @@ def admin_user_perms_save_api(request, user_id):
     # Invalidate this user's cached permissions in all live sessions
     _invalidate_user_perm_cache(user_id)
 
+    # Audit the permission change (before → after diff).
+    _new_perms = {up.menu_key: _acts(up) for up in UserPermission.objects.filter(user_id=user_id)}
+    _changes = {}
+    if _old_admin != is_admin:
+        _changes["is_app_admin"] = {"old": _old_admin, "new": is_admin}
+    for _k in sorted(set(_old_perms) | set(_new_perms)):
+        _ov, _nv = _old_perms.get(_k, "—"), _new_perms.get(_k, "—")
+        if _ov != _nv:
+            _changes[_k] = {"old": _ov, "new": _nv}
+    _audit.record_action(request, "permission_change", "admin.user_rights",
+                         user_id, (login_id or profile.user_login_id), _changes or None)
+
     return JsonResponse({"success": True})
 
 
@@ -2984,10 +4081,77 @@ def admin_user_admin_toggle_api(request, user_id):
         user_id=user_id,
         defaults={"user_login_id": login_id},
     )
+    _was_admin = profile.is_app_admin
     profile.is_app_admin = not profile.is_app_admin
     profile.save()
     _invalidate_user_perm_cache(user_id)
+    _audit.record_action(request, "permission_change", "admin.user_rights",
+                         user_id, profile.user_login_id,
+                         {"is_app_admin": {"old": _was_admin, "new": profile.is_app_admin}})
     return JsonResponse({"is_app_admin": profile.is_app_admin})
+
+
+# ── Audit Trail (admin only) ───────────────────────────────────────────────────
+
+@_require_app_admin
+def admin_audit_trail_page(request):
+    return render(request, "chatbot/admin/audit_trail.html")
+
+
+@_require_app_admin
+@require_GET
+def admin_audit_facets_api(request):
+    """Distinct users / entities / actions for the filter dropdowns.
+    NOTE: .order_by() clears the model's default ordering (-ts) — otherwise Django
+    adds ts to the SELECT and .distinct() dedupes over (value, ts) pairs, producing
+    duplicate dropdown options."""
+    from .models import CbAuditLog
+    base = CbAuditLog.objects.order_by()
+    actions = sorted(set(base.values_list("action", flat=True)))
+    users   = sorted({u for u in base.values_list("username", flat=True) if u})
+    seen, entities = {}, []
+    for e in base.values_list("entity", "entity_label"):
+        key = e[0]
+        if key not in seen:
+            seen[key] = e[1] or key
+    entities = sorted(({"key": k, "label": v} for k, v in seen.items()), key=lambda x: x["label"])
+    return JsonResponse({"actions": actions, "users": users, "entities": entities})
+
+
+@_require_app_admin
+@require_GET
+def admin_audit_list_api(request):
+    from django.db.models import Q
+    from .models import CbAuditLog
+    qs = CbAuditLog.objects.all()
+    action = request.GET.get("action", "").strip()
+    entity = request.GET.get("entity", "").strip()
+    user   = request.GET.get("user", "").strip()
+    q      = request.GET.get("q", "").strip()
+    dfrom  = request.GET.get("from", "").strip()
+    dto    = request.GET.get("to", "").strip()
+    if action: qs = qs.filter(action=action)
+    if entity: qs = qs.filter(entity=entity)
+    if user:   qs = qs.filter(username=user)
+    if q:      qs = qs.filter(Q(record_label__icontains=q) | Q(username__icontains=q) | Q(entity_label__icontains=q))
+    if dfrom:  qs = qs.filter(ts__date__gte=dfrom)
+    if dto:    qs = qs.filter(ts__date__lte=dto)
+
+    total = qs.count()
+    try:
+        page = max(1, int(request.GET.get("page", 1)))
+    except (TypeError, ValueError):
+        page = 1
+    size = 30
+    rows = list(qs.order_by("-ts")[(page - 1) * size: page * size].values(
+        "id", "ts", "user_id", "username", "action", "entity", "entity_label",
+        "record_id", "record_label", "changes", "ip"))
+    for r in rows:
+        r["ts"] = r["ts"].strftime("%Y-%m-%d %H:%M:%S") if r["ts"] else ""
+    return JsonResponse({
+        "results": rows, "total": total, "page": page,
+        "page_size": size, "pages": (total + size - 1) // size,
+    })
 
 
 # ── User Management ────────────────────────────────────────────────────────────
@@ -3459,9 +4623,10 @@ def travel_eligibility_save_api(request):
     if mode not in ("A", "R", "C"):
         return JsonResponse({"error": "Invalid travel mode"}, status=400)
 
-    user_id = request.user.id if request.user.is_authenticated else 1
+    user_id = _audit.ops_user_id(request)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.travel_eligibility", rec_id)
         if rec_id:
             cursor.execute(
                 """UPDATE eos_Travel_Eligibility
@@ -3484,6 +4649,7 @@ def travel_eligibility_save_api(request):
                  eligible_from, eligible_to, user_id],
             )
             new_id = cursor.lastrowid
+        _audit.record_save(request, cursor, "masters.travel_eligibility", new_id, _before)
     return JsonResponse({"success": True, "id": new_id})
 
 
@@ -3496,9 +4662,11 @@ def travel_eligibility_delete_api(request, rec_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.travel_eligibility", rec_id)
         cursor.execute(
             "DELETE FROM eos_Travel_Eligibility WHERE Travel_Eligibility_Id=%s", [rec_id]
         )
+    _audit.record_delete(request, "masters.travel_eligibility", rec_id, _before)
     return JsonResponse({"success": True})
 
 
@@ -3597,12 +4765,13 @@ def reporting_structure_save_api(request):
     category_id  = body.get("category_id")
     rank_id      = body.get("rank_id")
     rep_rank_id  = body.get("reporting_rank_id")
-    user_id      = request.user.id if request.user.is_authenticated else 1
+    user_id      = _audit.ops_user_id(request)
 
     if not all([category_id, rank_id, rep_rank_id]):
         return JsonResponse({"error": "category_id, rank_id and reporting_rank_id are required"}, status=400)
 
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.reporting_structure", rec_id)
         if rec_id:
             cursor.execute(
                 "UPDATE eos_Reporting_Structure SET Fs_Category_Id=%s, Rank_Id=%s, Reporting_Rank_Id=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE Reporting_Structure_Id=%s",
@@ -3615,6 +4784,7 @@ def reporting_structure_save_api(request):
                 [category_id, rank_id, rep_rank_id, user_id],
             )
             new_id = cursor.lastrowid
+        _audit.record_save(request, cursor, "masters.reporting_structure", new_id, _before)
     return JsonResponse({"success": True, "id": new_id})
 
 
@@ -3627,7 +4797,9 @@ def reporting_structure_delete_api(request, rec_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.reporting_structure", rec_id)
         cursor.execute("DELETE FROM eos_Reporting_Structure WHERE Reporting_Structure_Id=%s", [rec_id])
+    _audit.record_delete(request, "masters.reporting_structure", rec_id, _before)
     return JsonResponse({"success": True})
 
 
@@ -3745,13 +4917,14 @@ def job_description_save_hdr_api(request):
     description = (body.get("description") or "").strip()
     order       = body.get("display_order", 1)
     active      = body.get("active", "Y")
-    user_id     = request.user.id if request.user.is_authenticated else 1
+    user_id     = _audit.ops_user_id(request)
 
     if not all([category_id, rank_id, description]):
         return JsonResponse({"error": "category_id, rank_id and description are required"}, status=400)
 
     from django.db import connections
     with connections["default"].cursor() as cur:
+        _before = _audit.snap(cur, "masters.job_descriptions", hdr_id)
         if hdr_id:
             cur.execute(
                 "UPDATE eos_Job_Description_Hdr SET Fs_Category_Id=%s, Rank_Id=%s, JD_Hdr_Description=%s, JD_Hdr_Order=%s, JD_Hdr_Active=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE JD_Hdr_Id=%s",
@@ -3765,6 +4938,7 @@ def job_description_save_hdr_api(request):
                 "INSERT INTO eos_Job_Description_Hdr (JD_Hdr_Id, Fs_Category_Id, Rank_Id, JD_Hdr_Description, JD_Hdr_Order, JD_Hdr_Active, Cr_User_Id, Cr_Dt) VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())",
                 [new_id, category_id, rank_id, description, order, active, user_id],
             )
+        _audit.record_save(request, cur, "masters.job_descriptions", new_id, _before)
     return JsonResponse({"success": True, "id": new_id})
 
 
@@ -3777,8 +4951,10 @@ def job_description_delete_hdr_api(request, hdr_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cur:
+        _before = _audit.snap(cur, "masters.job_descriptions", hdr_id)
         cur.execute("DELETE FROM eos_Job_Description_Dtl WHERE JD_Hdr_Id=%s", [hdr_id])
         cur.execute("DELETE FROM eos_Job_Description_Hdr WHERE JD_Hdr_Id=%s", [hdr_id])
+    _audit.record_delete(request, "masters.job_descriptions", hdr_id, _before)
     return JsonResponse({"success": True})
 
 
@@ -3803,7 +4979,7 @@ def job_description_save_dtl_api(request):
     description = (body.get("description") or "").strip()
     order       = body.get("display_order", 1)
     active      = body.get("active", "Y")
-    user_id     = request.user.id if request.user.is_authenticated else 1
+    user_id     = _audit.ops_user_id(request)
 
     if not description:
         return JsonResponse({"error": "description is required"}, status=400)
@@ -3823,6 +4999,9 @@ def job_description_save_dtl_api(request):
                 "INSERT INTO eos_Job_Description_Dtl (JD_Dtl_Id, JD_Hdr_Id, JD_Dtl_Description, JD_Dtl_Order, JD_Dtl_Active, Cr_User_Id, Cr_Dt) VALUES (%s,%s,%s,%s,%s,%s,NOW())",
                 [new_id, hdr_id, description, order, active, user_id],
             )
+    _audit.record_action(request, ("update" if dtl_id else "create"), "masters.job_descriptions",
+                         new_id, ("Detail line: " + description)[:200],
+                         {"JD_Dtl_Description": {"old": None, "new": description}})
     return JsonResponse({"success": True, "id": new_id})
 
 
@@ -3836,6 +5015,8 @@ def job_description_delete_dtl_api(request, dtl_id):
     from django.db import connections
     with connections["default"].cursor() as cur:
         cur.execute("DELETE FROM eos_Job_Description_Dtl WHERE JD_Dtl_Id=%s", [dtl_id])
+    _audit.record_action(request, "delete", "masters.job_descriptions", dtl_id,
+                         "Detail line #%s" % dtl_id, None)
     return JsonResponse({"success": True})
 
 
@@ -3931,13 +5112,14 @@ def competency_save_api(request):
     name      = data.get("name", "").strip()[:50]
     dept_id   = int(data.get("dept_id", 0))
     active    = "Y" if data.get("active") == "Y" else "N"
-    user_id   = request.user.id or 1
+    user_id   = _audit.ops_user_id(request)
 
     if not name or not dept_id:
         return JsonResponse({"error": "Name and department are required"}, status=400)
 
     from django.db import connections
     with connections["default"].cursor() as cur:
+        _before = _audit.snap(cur, "masters.competency", rec_id)
         if rec_id:
             cur.execute(
                 "UPDATE eos_Mst_Competency SET Competency_Name=%s, Dept_Id=%s, Active=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE Competency_Id=%s",
@@ -3951,6 +5133,7 @@ def competency_save_api(request):
                 "INSERT INTO eos_Mst_Competency (Competency_Id, Competency_Name, Dept_Id, Active, Cr_User_Id, Cr_Dt) VALUES (%s,%s,%s,%s,%s,NOW())",
                 [new_id, name, dept_id, active, user_id],
             )
+        _audit.record_save(request, cur, "masters.competency", new_id, _before)
     return JsonResponse({"success": True, "id": new_id})
 
 
@@ -3963,7 +5146,9 @@ def competency_delete_api(request, rec_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cur:
+        _before = _audit.snap(cur, "masters.competency", rec_id)
         cur.execute("DELETE FROM eos_Mst_Competency WHERE Competency_Id=%s", [rec_id])
+    _audit.record_delete(request, "masters.competency", rec_id, _before)
     return JsonResponse({"success": True})
 
 

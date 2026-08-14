@@ -25,6 +25,15 @@ urlpatterns = [
     path("masters/cert-institutes/", views.cert_institute_page, name="cert_institute"),
     path("masters/travel-eligibility/", views.travel_eligibility_page, name="travel_eligibility"),
     path("masters/reporting-structure/", views.reporting_structure_page, name="reporting_structure"),
+    path("masters/rig-operation/", views.rig_operation_page, name="rig_operation"),
+    path("masters/contact-exposure-type/", views.contact_exposure_type_page, name="contact_exposure_type"),
+    path("masters/indicator-type/", views.indicator_type_page, name="indicator_type"),
+    path("masters/indicator-subtype/", views.indicator_subtype_page, name="indicator_subtype"),
+    path("masters/parts-of-body/", views.parts_of_body_page, name="parts_of_body"),
+    path("masters/qhse-category/", views.qhse_category_page, name="qhse_category"),
+    path("masters/hse-activity/", views.hse_activity_page, name="hse_activity"),
+    path("masters/hse-consumable/", views.hse_consumable_page, name="hse_consumable"),
+    path("masters/hazard-type/", views.hazard_type_page, name="hazard_type"),
 
     # ── Contractor Master API ──────────────────────────────────────────────────
     path("api/masters/contractor/", views.contractor_list_api, name="contractor_list"),
@@ -32,6 +41,66 @@ urlpatterns = [
     path("api/masters/contractor/<int:contractor_id>/", views.contractor_get_api, name="contractor_get"),
     path("api/masters/contractor/<int:contractor_id>/check-delete/", views.contractor_check_delete_api, name="contractor_check_delete"),
     path("api/masters/contractor/<int:contractor_id>/delete/", views.contractor_delete_api, name="contractor_delete"),
+
+    # ── Rig Operation Master API ───────────────────────────────────────────────
+    path("api/masters/rig-operation/", views.rig_operation_list_api, name="rig_operation_list"),
+    path("api/masters/rig-operation/save/", views.rig_operation_save_api, name="rig_operation_save"),
+    path("api/masters/rig-operation/<int:op_id>/", views.rig_operation_get_api, name="rig_operation_get"),
+    path("api/masters/rig-operation/<int:op_id>/check-delete/", views.rig_operation_check_delete_api, name="rig_operation_check_delete"),
+    path("api/masters/rig-operation/<int:op_id>/delete/", views.rig_operation_delete_api, name="rig_operation_delete"),
+
+    # ── Contact Exposure Type Master API ───────────────────────────────────────
+    path("api/masters/contact-exposure-type/", views.contact_exposure_type_list_api, name="contact_exposure_type_list"),
+    path("api/masters/contact-exposure-type/save/", views.contact_exposure_type_save_api, name="contact_exposure_type_save"),
+    path("api/masters/contact-exposure-type/<int:type_id>/", views.contact_exposure_type_get_api, name="contact_exposure_type_get"),
+    path("api/masters/contact-exposure-type/<int:type_id>/check-delete/", views.contact_exposure_type_check_delete_api, name="contact_exposure_type_check_delete"),
+    path("api/masters/contact-exposure-type/<int:type_id>/delete/", views.contact_exposure_type_delete_api, name="contact_exposure_type_delete"),
+
+    # ── Indicator Type Master API ──────────────────────────────────────────────
+    path("api/masters/indicator-type/", views.indicator_type_list_api, name="indicator_type_list"),
+    path("api/masters/indicator-type/save/", views.indicator_type_save_api, name="indicator_type_save"),
+    path("api/masters/indicator-type/<int:type_id>/", views.indicator_type_get_api, name="indicator_type_get"),
+    path("api/masters/indicator-type/<int:type_id>/check-delete/", views.indicator_type_check_delete_api, name="indicator_type_check_delete"),
+    path("api/masters/indicator-type/<int:type_id>/delete/", views.indicator_type_delete_api, name="indicator_type_delete"),
+
+    # ── Indicator Subtype Master API ───────────────────────────────────────────
+    path("api/masters/indicator-subtype/meta/", views.indicator_subtype_meta_api, name="indicator_subtype_meta"),
+    path("api/masters/indicator-subtype/", views.indicator_subtype_list_api, name="indicator_subtype_list"),
+    path("api/masters/indicator-subtype/save/", views.indicator_subtype_save_api, name="indicator_subtype_save"),
+    path("api/masters/indicator-subtype/<int:subtype_id>/", views.indicator_subtype_get_api, name="indicator_subtype_get"),
+    path("api/masters/indicator-subtype/<int:subtype_id>/check-delete/", views.indicator_subtype_check_delete_api, name="indicator_subtype_check_delete"),
+    path("api/masters/indicator-subtype/<int:subtype_id>/delete/", views.indicator_subtype_delete_api, name="indicator_subtype_delete"),
+
+    # ── Parts Of Body Master API (add/edit only) ───────────────────────────────
+    path("api/masters/parts-of-body/", views.parts_of_body_list_api, name="parts_of_body_list"),
+    path("api/masters/parts-of-body/save/", views.parts_of_body_save_api, name="parts_of_body_save"),
+    path("api/masters/parts-of-body/<int:part_id>/", views.parts_of_body_get_api, name="parts_of_body_get"),
+
+    # ── QHSE Category Master API (add/edit only) ───────────────────────────────
+    path("api/masters/qhse-category/", views.qhse_category_list_api, name="qhse_category_list"),
+    path("api/masters/qhse-category/save/", views.qhse_category_save_api, name="qhse_category_save"),
+    path("api/masters/qhse-category/<int:cat_id>/", views.qhse_category_get_api, name="qhse_category_get"),
+
+    # ── HSE Activity Master API ────────────────────────────────────────────────
+    path("api/masters/hse-activity/", views.hse_activity_list_api, name="hse_activity_list"),
+    path("api/masters/hse-activity/save/", views.hse_activity_save_api, name="hse_activity_save"),
+    path("api/masters/hse-activity/<int:act_id>/", views.hse_activity_get_api, name="hse_activity_get"),
+    path("api/masters/hse-activity/<int:act_id>/check-delete/", views.hse_activity_check_delete_api, name="hse_activity_check_delete"),
+    path("api/masters/hse-activity/<int:act_id>/delete/", views.hse_activity_delete_api, name="hse_activity_delete"),
+
+    # ── HSE Consumable Master API ──────────────────────────────────────────────
+    path("api/masters/hse-consumable/", views.hse_consumable_list_api, name="hse_consumable_list"),
+    path("api/masters/hse-consumable/save/", views.hse_consumable_save_api, name="hse_consumable_save"),
+    path("api/masters/hse-consumable/<int:con_id>/", views.hse_consumable_get_api, name="hse_consumable_get"),
+    path("api/masters/hse-consumable/<int:con_id>/check-delete/", views.hse_consumable_check_delete_api, name="hse_consumable_check_delete"),
+    path("api/masters/hse-consumable/<int:con_id>/delete/", views.hse_consumable_delete_api, name="hse_consumable_delete"),
+
+    # ── Hazard Type Master API ─────────────────────────────────────────────────
+    path("api/masters/hazard-type/", views.hazard_type_list_api, name="hazard_type_list"),
+    path("api/masters/hazard-type/save/", views.hazard_type_save_api, name="hazard_type_save"),
+    path("api/masters/hazard-type/<int:haz_id>/", views.hazard_type_get_api, name="hazard_type_get"),
+    path("api/masters/hazard-type/<int:haz_id>/check-delete/", views.hazard_type_check_delete_api, name="hazard_type_check_delete"),
+    path("api/masters/hazard-type/<int:haz_id>/delete/", views.hazard_type_delete_api, name="hazard_type_delete"),
 
     # ── Operator Master API ────────────────────────────────────────────────────
     path("api/masters/operator/", views.operator_list_api, name="operator_list"),
@@ -173,6 +242,9 @@ urlpatterns = [
     path("api/admin/users/<int:user_id>/toggle-admin/", views.admin_user_admin_toggle_api, name="admin_user_admin_toggle_api"),
 
     path("admin-panel/user-management/", views.admin_user_management_page, name="admin_user_management"),
+    path("admin-panel/audit-trail/", views.admin_audit_trail_page, name="admin_audit_trail"),
+    path("api/admin/audit/", views.admin_audit_list_api, name="admin_audit_list"),
+    path("api/admin/audit/facets/", views.admin_audit_facets_api, name="admin_audit_facets"),
     path("api/admin/manage/meta/", views.admin_user_management_meta_api, name="admin_manage_meta"),
     path("api/admin/manage/users/", views.admin_user_management_list_api, name="admin_manage_users_list"),
     path("api/admin/manage/users/create/", views.admin_user_management_create_api, name="admin_manage_users_create"),

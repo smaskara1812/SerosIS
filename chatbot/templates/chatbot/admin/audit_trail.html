@@ -1,0 +1,197 @@
+{% extends 'chatbot/base.html' %}
+{% load static %}
+
+{% block title %}Audit Trail — Seros{% endblock %}
+
+{% block styles %}
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    --bg:#F2F4F8; --surface:#fff; --border:#E4E8EF; --primary:#1a3f7a; --accent:#2563eb;
+    --text:#111827; --text-2:#4B5563; --text-3:#9CA3AF; --radius:10px; --radius-sm:6px;
+  }
+  .at-wrap { display:flex; flex-direction:column; height:calc(100vh - 0px); background:var(--bg); font-family:'Plus Jakarta Sans',system-ui,sans-serif; overflow:hidden; }
+
+  .at-header { flex-shrink:0; background:var(--surface); border-bottom:1px solid var(--border); padding:16px 24px 14px; }
+  .at-breadcrumb { display:flex; align-items:center; gap:6px; font-size:.74rem; color:var(--text-3); margin-bottom:6px; }
+  .at-breadcrumb a { color:var(--text-3); text-decoration:none; } .at-breadcrumb a:hover { color:var(--accent); }
+  .at-sep { opacity:.45; }
+  .at-title-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .at-title { font-size:1.2rem; font-weight:700; color:var(--primary); }
+  .at-count { font-size:.72rem; font-weight:600; color:#475569; background:#F1F5F9; border-radius:20px; padding:4px 12px; }
+
+  .at-filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+  .at-search { position:relative; flex:1; min-width:220px; }
+  .at-search svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-3); }
+  .at-search input { width:100%; padding:8px 12px 8px 32px; border:1px solid var(--border); border-radius:var(--radius-sm); font-family:inherit; font-size:.82rem; background:var(--bg); outline:none; }
+  .at-search input:focus { border-color:var(--accent); background:var(--surface); box-shadow:0 0 0 3px rgba(37,99,235,.1); }
+  .at-sel { padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius-sm); font-family:inherit; font-size:.8rem; background:var(--surface); color:var(--text-2); cursor:pointer; max-width:200px; }
+  .at-date { padding:7px 9px; border:1px solid var(--border); border-radius:var(--radius-sm); font-family:inherit; font-size:.78rem; color:var(--text-2); }
+  .at-clear { padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text-2); font-family:inherit; font-size:.78rem; font-weight:600; cursor:pointer; }
+  .at-clear:hover { background:var(--bg); }
+
+  .at-body { flex:1; overflow-y:auto; padding:16px 24px; }
+  .at-list { display:flex; flex-direction:column; gap:6px; max-width:1100px; margin:0 auto; }
+
+  .at-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; transition:box-shadow .12s; }
+  .at-row:hover { box-shadow:0 2px 10px rgba(26,63,122,.06); }
+  .at-main { display:flex; align-items:center; gap:12px; padding:11px 16px; cursor:pointer; }
+  .at-main.no-toggle { cursor:default; }
+  .at-time { font-family:'SF Mono',ui-monospace,monospace; font-size:.72rem; color:var(--text-3); white-space:nowrap; min-width:132px; }
+  .at-badge { font-size:.64rem; font-weight:800; letter-spacing:.03em; text-transform:uppercase; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+  .b-create{background:#DCFCE7;color:#16a34a;} .b-update{background:#FEF3C7;color:#b45309;}
+  .b-delete{background:#FEE2E2;color:#dc2626;} .b-deactivate{background:#FFEDD5;color:#ea580c;}
+  .b-login{background:#EEF3FF;color:#2563eb;} .b-logout{background:#F1F5F9;color:#64748b;}
+  .b-login_failed{background:#FEE2E2;color:#dc2626;} .b-permission_change{background:#F5F3FF;color:#7c3aed;}
+  .b-export{background:#CCFBF1;color:#0d9488;}
+  .at-entity { font-size:.82rem; font-weight:700; color:var(--primary); white-space:nowrap; }
+  .at-record { font-size:.82rem; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+  .at-user { display:inline-flex; align-items:center; gap:6px; font-size:.75rem; color:var(--text-2); white-space:nowrap; }
+  .at-avatar { width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:.6rem; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .at-chev { color:var(--text-3); transition:transform .15s; flex-shrink:0; }
+  .at-row.open .at-chev { transform:rotate(90deg); }
+
+  .at-detail { display:none; border-top:1px solid var(--border); background:#FAFBFD; padding:12px 16px 14px; }
+  .at-row.open .at-detail { display:block; }
+  .at-meta { font-size:.72rem; color:var(--text-3); margin-bottom:10px; display:flex; gap:16px; flex-wrap:wrap; }
+  .at-meta b { color:var(--text-2); font-weight:600; }
+  .at-changes { width:100%; border-collapse:collapse; font-size:.78rem; }
+  .at-changes th { text-align:left; font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); padding:4px 10px; border-bottom:1px solid var(--border); }
+  .at-changes td { padding:5px 10px; border-bottom:1px solid #eef1f6; vertical-align:top; }
+  .at-field { font-weight:600; color:var(--text-2); font-family:'SF Mono',ui-monospace,monospace; font-size:.72rem; }
+  .at-old { color:#b91c1c; } .at-arrow { color:var(--text-3); padding:0 6px; } .at-new { color:#15803d; }
+  .at-nochange { color:var(--text-3); font-style:italic; }
+
+  .at-empty { text-align:center; padding:60px 20px; color:var(--text-3); font-size:.9rem; }
+  .at-pager { flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:12px; padding:12px; border-top:1px solid var(--border); background:var(--surface); }
+  .at-pager button { padding:6px 14px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); font-family:inherit; font-size:.78rem; cursor:pointer; color:var(--text-2); }
+  .at-pager button:disabled { opacity:.4; cursor:default; }
+  .at-pager button:not(:disabled):hover { background:var(--bg); border-color:var(--accent); color:var(--accent); }
+  .at-pager .info { font-size:.78rem; color:var(--text-3); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="at-wrap">
+  <div class="at-header">
+    <div class="at-breadcrumb"><a href="/">Home</a><span class="at-sep">/</span><span>Admin</span><span class="at-sep">/</span><span>Audit Trail</span></div>
+    <div class="at-title-row">
+      <div class="at-title">Audit Trail</div>
+      <span class="at-count" id="at-total">—</span>
+    </div>
+    <div class="at-filters">
+      <div class="at-search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="f-q" type="text" placeholder="Search record, user or entity…" autocomplete="off">
+      </div>
+      <select class="at-sel" id="f-action"><option value="">All actions</option></select>
+      <select class="at-sel" id="f-entity"><option value="">All areas</option></select>
+      <select class="at-sel" id="f-user"><option value="">All users</option></select>
+      <input class="at-date" id="f-from" type="date" title="From date">
+      <input class="at-date" id="f-to" type="date" title="To date">
+      <button class="at-clear" id="f-clear">Clear</button>
+    </div>
+  </div>
+
+  <div class="at-body">
+    <div class="at-list" id="at-list"><div class="at-empty">Loading…</div></div>
+  </div>
+
+  <div class="at-pager">
+    <button id="pg-prev">‹ Prev</button>
+    <span class="info" id="pg-info">—</span>
+    <button id="pg-next">Next ›</button>
+  </div>
+</div>
+
+<script>
+let page = 1, pages = 1;
+const ACTION_LABELS = { create:'Create', update:'Update', delete:'Delete', deactivate:'Deactivate',
+  login:'Login', logout:'Logout', login_failed:'Login failed', permission_change:'Permission change', export:'Export' };
+
+function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function initials(u){ return (u||'?').slice(0,2).toUpperCase(); }
+function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+
+fetch('/api/admin/audit/facets/').then(r=>r.json()).then(f=>{
+  const fa=document.getElementById('f-action');
+  f.actions.forEach(a=>fa.insertAdjacentHTML('beforeend',`<option value="${esc(a)}">${esc(ACTION_LABELS[a]||a)}</option>`));
+  const fe=document.getElementById('f-entity');
+  f.entities.forEach(e=>fe.insertAdjacentHTML('beforeend',`<option value="${esc(e.key)}">${esc(e.label)}</option>`));
+  const fu=document.getElementById('f-user');
+  f.users.forEach(u=>fu.insertAdjacentHTML('beforeend',`<option value="${esc(u)}">${esc(u)}</option>`));
+});
+
+function params(){
+  const p=new URLSearchParams();
+  const q=document.getElementById('f-q').value.trim(); if(q)p.set('q',q);
+  const a=document.getElementById('f-action').value; if(a)p.set('action',a);
+  const e=document.getElementById('f-entity').value; if(e)p.set('entity',e);
+  const u=document.getElementById('f-user').value; if(u)p.set('user',u);
+  const df=document.getElementById('f-from').value; if(df)p.set('from',df);
+  const dt=document.getElementById('f-to').value; if(dt)p.set('to',dt);
+  p.set('page',page);
+  return p.toString();
+}
+
+function load(){
+  fetch('/api/admin/audit/?'+params()).then(r=>r.json()).then(d=>{
+    pages=d.pages||1;
+    document.getElementById('at-total').textContent = d.total.toLocaleString()+' event'+(d.total===1?'':'s');
+    document.getElementById('pg-info').textContent = d.total ? `Page ${d.page} of ${d.pages}` : 'No events';
+    document.getElementById('pg-prev').disabled = d.page<=1;
+    document.getElementById('pg-next').disabled = d.page>=d.pages;
+    render(d.results);
+  });
+}
+
+function render(rows){
+  const c=document.getElementById('at-list');
+  if(!rows.length){ c.innerHTML='<div class="at-empty">No audit events match these filters.</div>'; return; }
+  c.innerHTML = rows.map(r=>{
+    const hasChanges = r.changes && Object.keys(r.changes).length;
+    const expandable = hasChanges || r.record_id || r.ip;
+    let detail='';
+    if(expandable){
+      let tbl='';
+      if(hasChanges){
+        tbl='<table class="at-changes"><thead><tr><th>Field</th><th>Old</th><th></th><th>New</th></tr></thead><tbody>'+
+          Object.entries(r.changes).map(([k,v])=>`<tr><td class="at-field">${esc(k)}</td><td class="at-old">${esc(v.old)}</td><td class="at-arrow">→</td><td class="at-new">${esc(v.new)}</td></tr>`).join('')+
+          '</tbody></table>';
+      } else {
+        tbl='<div class="at-nochange">No field-level changes recorded.</div>';
+      }
+      detail=`<div class="at-detail">
+        <div class="at-meta">
+          ${r.record_id?`<span><b>Record ID:</b> ${esc(r.record_id)}</span>`:''}
+          <span><b>User ID:</b> ${esc(r.user_id==null?'—':r.user_id)}</span>
+          ${r.ip?`<span><b>IP:</b> ${esc(r.ip)}</span>`:''}
+        </div>${tbl}</div>`;
+    }
+    return `<div class="at-row">
+      <div class="at-main ${expandable?'':'no-toggle'}" ${expandable?'onclick="this.parentNode.classList.toggle(\'open\')"':''}>
+        <span class="at-time">${esc(r.ts)}</span>
+        <span class="at-badge b-${esc(r.action)}">${esc(ACTION_LABELS[r.action]||r.action)}</span>
+        <span class="at-entity">${esc(r.entity_label||r.entity)}</span>
+        <span class="at-record">${esc(r.record_label||'')}</span>
+        <span class="at-user"><span class="at-avatar">${esc(initials(r.username))}</span>${esc(r.username)}</span>
+        ${expandable?'<svg class="at-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg>':'<span style="width:16px"></span>'}
+      </div>${detail}
+    </div>`;
+  }).join('');
+}
+
+const reload = ()=>{ page=1; load(); };
+document.getElementById('f-q').addEventListener('input', debounce(reload,300));
+['f-action','f-entity','f-user','f-from','f-to'].forEach(id=>document.getElementById(id).addEventListener('change',reload));
+document.getElementById('f-clear').addEventListener('click',()=>{
+  ['f-q','f-from','f-to'].forEach(id=>document.getElementById(id).value='');
+  ['f-action','f-entity','f-user'].forEach(id=>document.getElementById(id).value='');
+  reload();
+});
+document.getElementById('pg-prev').addEventListener('click',()=>{ if(page>1){page--;load();document.querySelector('.at-body').scrollTop=0;} });
+document.getElementById('pg-next').addEventListener('click',()=>{ if(page<pages){page++;load();document.querySelector('.at-body').scrollTop=0;} });
+
+load();
+</script>
+{% endblock %}
