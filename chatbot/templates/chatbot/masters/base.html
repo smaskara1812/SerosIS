@@ -6,7 +6,10 @@
 
 {% block content %}
 <style>
+  :root { --surface: #fff; --bg: #F2F4F8; --border: #E4E8EF; --text: #1E293B; --radius: 10px; --radius-sm: 6px; --shadow: 0 1px 4px rgba(0,0,0,.07); --shadow-lg: 0 8px 32px rgba(0,0,0,.12); }
   .main-area.masters-layout { overflow: hidden !important; }
+  /* Permission lock: wins over any per-record inline display set by showForm/selectRecord. */
+  .perm-hidden { display: none !important; }
 
   .ms-shell { display: flex; height: 100%; overflow: hidden; }
 
@@ -120,69 +123,25 @@
     </div>
     <div class="ms-sidebar-body">
 
-      <div class="ms-group" id="ms-grp-general">
-        <button class="ms-group-btn" onclick="msToggle('ms-grp-general')">
-          <span class="ms-group-icon" style="background:#eff6ff">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-          </span>
-          <span class="ms-group-label">General</span>
-          <span class="ms-group-count" id="ms-cnt-general">7</span>
+      {% for grp in masters_nav %}
+      {% if not grp.items or grp.visible_count %}
+      <div class="ms-group" id="ms-grp-{{ grp.id }}">
+        <button class="ms-group-btn" onclick="msToggle('ms-grp-{{ grp.id }}')">
+          <span class="ms-group-icon" style="background:{{ grp.icon_bg }}">{{ grp.icon|safe }}</span>
+          <span class="ms-group-label">{{ grp.label }}</span>
+          <span class="ms-group-count" id="ms-cnt-{{ grp.id }}">{{ grp.visible_count }}</span>
           <svg class="ms-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
         <div class="ms-items">
-          <a class="ms-item" href="/masters/rigs/"><span class="ms-item-dot"></span>Rigs</a>
-          <a class="ms-item" href="/masters/cost-centre/"><span class="ms-item-dot"></span>Cost Centres</a>
-          <a class="ms-item" href="/masters/cost-centre-type/"><span class="ms-item-dot"></span>Cost Centre Types</a>
-          <a class="ms-item" href="/masters/operator/"><span class="ms-item-dot"></span>Operators</a>
-          <a class="ms-item" href="/masters/contractor/"><span class="ms-item-dot"></span>Contractors</a>
-          <a class="ms-item" href="/masters/cert-institutes/"><span class="ms-item-dot"></span>Cert Institutes</a>
-          <a class="ms-item" href="/masters/email-notification-types/"><span class="ms-item-dot"></span>Email Notification Types</a>
+          {% if grp.items %}
+            {% for m in grp.items %}{% if m.can_view %}<a class="ms-item" href="{{ m.url }}"><span class="ms-item-dot"></span>{{ m.label }}</a>{% endif %}{% endfor %}
+          {% else %}
+            <div class="ms-coming-soon">Coming soon…</div>
+          {% endif %}
         </div>
       </div>
-
-      <div class="ms-group" id="ms-grp-hr">
-        <button class="ms-group-btn" onclick="msToggle('ms-grp-hr')">
-          <span class="ms-group-icon" style="background:#f0fdf4">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </span>
-          <span class="ms-group-label">HR</span>
-          <span class="ms-group-count" id="ms-cnt-hr">3</span>
-          <svg class="ms-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-        <div class="ms-items">
-          <a class="ms-item" href="/masters/travel-eligibility/"><span class="ms-item-dot"></span>Travel Eligibility</a>
-          <a class="ms-item" href="/masters/reporting-structure/"><span class="ms-item-dot"></span>Reporting Structure</a>
-          <a class="ms-item" href="/masters/job-descriptions/"><span class="ms-item-dot"></span>Job Descriptions</a>
-        </div>
-      </div>
-
-      <div class="ms-group" id="ms-grp-qhse">
-        <button class="ms-group-btn" onclick="msToggle('ms-grp-qhse')">
-          <span class="ms-group-icon" style="background:#fff7ed">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </span>
-          <span class="ms-group-label">QHSE</span>
-          <span class="ms-group-count" id="ms-cnt-qhse">0</span>
-          <svg class="ms-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-        <div class="ms-items">
-          <div class="ms-coming-soon">Coming soon…</div>
-        </div>
-      </div>
-
-      <div class="ms-group" id="ms-grp-projects">
-        <button class="ms-group-btn" onclick="msToggle('ms-grp-projects')">
-          <span class="ms-group-icon" style="background:#fdf4ff">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-          </span>
-          <span class="ms-group-label">Projects</span>
-          <span class="ms-group-count" id="ms-cnt-projects">0</span>
-          <svg class="ms-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-        <div class="ms-items">
-          <div class="ms-coming-soon">Coming soon…</div>
-        </div>
-      </div>
+      {% endif %}
+      {% endfor %}
 
     </div>
   </nav>
@@ -245,5 +204,40 @@
     setSidebarState(false);
   });
 })();
+
+// ── Shared permission-UI plumbing for every master page ──────────────────────
+// Each master page fetches /api/me/perms/?key=... then calls _applyPermUI(p).
+// `p` is the raw API response ({is_admin, can_add, can_edit, can_delete}).
+//
+// Destructive controls (New, hard-delete, soft-delete/deactivate) are locked with
+// the persistent .perm-hidden class so a later showForm/selectRecord that sets an
+// inline `style.display` can NOT re-reveal them. Save is add-or-edit dependent, so
+// its per-record visibility is set by _applySavePerm(isNew) from within
+// showForm/selectRecord/openAdd*.
+window._applyPermUI = function(p) {
+  const canAdd    = !!(p.is_admin || p.can_add);
+  const canEdit   = !!(p.is_admin || p.can_edit);
+  const canDelete = !!(p.is_admin || p.can_delete);
+  window._pagePerms = { canAdd, canEdit, canDelete };
+
+  const lock = (sel, hide) =>
+    document.querySelectorAll(sel).forEach(el => el.classList.toggle('perm-hidden', hide));
+
+  lock('#btn-new, .btn-new', !canAdd);
+  // Hard delete + soft-delete/deactivate are all governed by the delete permission.
+  lock('#btn-delete, .btn-delete, #btn-delete-hdr, #btn-deactivate, .btn-deactivate', !canDelete);
+  // If the user can neither add nor edit, the Save button can never apply.
+  lock('#btn-save, .btn-save', !canAdd && !canEdit);
+
+  return window._pagePerms;
+};
+
+// Per-record Save visibility: new record needs add, existing needs edit.
+window._applySavePerm = function(isNew) {
+  const p = window._pagePerms;
+  if (!p) return;
+  const allowed = isNew ? p.canAdd : p.canEdit;
+  document.querySelectorAll('#btn-save, .btn-save').forEach(el => el.style.display = allowed ? '' : 'none');
+};
 </script>
 {% endblock %}

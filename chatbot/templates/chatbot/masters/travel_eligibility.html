@@ -48,7 +48,7 @@
   .filter-select:focus { border-color: var(--accent); background: var(--surface); }
 
   /* Table */
-  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; }
+  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; background: var(--surface); }
   .table-wrap::-webkit-scrollbar { width: 5px; height: 5px; }
   .table-wrap::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
   table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
@@ -138,6 +138,9 @@
   .btn-primary:hover { background: #1d4ed8; }
   .btn-ghost { background: transparent; color: var(--text-2); border: 1.5px solid var(--border); }
   .btn-ghost:hover { background: var(--bg); }
+  /* Dirty-state save button */
+  #btn-save.dirty, .btn-save.dirty { background: #d97706 !important; box-shadow: 0 0 0 3px rgba(217,119,6,0.25) !important; }
+  #btn-save.dirty:hover, .btn-save.dirty:hover { background: #b45309 !important; }
 </style>
 {% endblock %}
 
@@ -499,7 +502,7 @@ async function saveNewRecord() {
   });
   const data = await res.json();
   if (data.success) {
-    showToast('Record created', 'success');
+    showToast('Record created', 'success'); setDirty(false);
     closeAddModal();
     await loadRecords();
     selectRow(data.id);
@@ -511,6 +514,7 @@ async function saveNewRecord() {
 function showForm(data) {
   document.getElementById('placeholder').style.display = 'none';
   document.getElementById('form-area').style.display   = 'flex';
+  setDirty(false);
 
   const isNew = !data;
   document.getElementById('form-title').textContent = isNew ? 'New Rule' : 'Edit Rule';
@@ -534,9 +538,11 @@ function showForm(data) {
     document.getElementById('eligible-from').value = data.eligible_from;
     document.getElementById('eligible-to').value   = data.eligible_to;
   }
+  _applySavePerm(isNew);
 }
 
 function cancelEdit() {
+  setDirty(false);
   document.getElementById('placeholder').style.display = '';
   document.getElementById('form-area').style.display   = 'none';
   document.querySelectorAll('#records-body tr').forEach(tr => tr.classList.remove('selected'));
@@ -790,5 +796,25 @@ function showToast(msg, type = 'success') {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = ''; }, 3000);
 }
+
+// ── Dirty-state tracking ──────────────────────────────────────────────────
+let _formDirty = false;
+function setDirty(v) {
+  _formDirty = v;
+  document.querySelectorAll('.btn-save').forEach(b => b.classList.toggle('dirty', v));
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const fa = document.getElementById('form-area');
+  if (!fa) return;
+  fa.addEventListener('input',  () => setDirty(true));
+  fa.addEventListener('change', () => setDirty(true));
+});
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.travel_eligibility')
+    .then(r => r.json())
+    .then(p => _applyPermUI(p));
+})();
 </script>
 {% endblock %}

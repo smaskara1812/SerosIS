@@ -119,245 +119,57 @@
 {% block ms_content %}
 <div class="ms-scroll">
 
-  <!-- GENERAL -->
-  <div class="ms-section" id="section-general">
-    <div class="ms-section-hdr">
-      <span class="ms-section-icon" style="background:#eff6ff">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-      </span>
-      <span class="ms-section-name">General</span>
-      <span class="ms-section-count">7 masters</span>
-      <span class="ms-divider"></span>
+  {% for grp in masters_nav %}
+  {% if grp.items %}
+    {% if grp.visible_count %}
+    <div class="ms-section" id="section-{{ grp.id }}">
+      <div class="ms-section-hdr">
+        <span class="ms-section-icon" style="background:{{ grp.icon_bg }}">{{ grp.icon|safe }}</span>
+        <span class="ms-section-name">{{ grp.label }}</span>
+        <span class="ms-section-count">{{ grp.visible_count }} master{{ grp.visible_count|pluralize }}</span>
+        <span class="ms-divider"></span>
+      </div>
+      <div class="ms-cards">
+        {% for m in grp.items %}{% if m.can_view %}
+        <a class="ms-card" href="{{ m.url }}">
+          <div class="ms-card-top">
+            <span class="ms-card-icon" style="background:{{ m.card_bg }}">{{ m.icon|safe }}</span>
+            <div>
+              <div class="ms-card-name">{{ m.label }}</div>
+            </div>
+          </div>
+        </a>
+        {% endif %}{% endfor %}
+      </div>
     </div>
-    <div class="ms-cards">
-
-      <a class="ms-card" href="/masters/rigs/">
-        <div class="ms-card-top">
-          <span class="ms-card-icon" style="background:#eff6ff">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M2 20h20M4 20V8l8-4 8 4v12"/><path d="M10 20v-6h4v6"/></svg>
-          </span>
-          <div>
-            <div class="ms-card-name">Rigs</div>
-            <div class="ms-card-sub">RIG MASTER</div>
-          </div>
-        </div>
-        <div class="ms-card-meta">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></ellipse></svg>
-          eos_Mst_Rig · Add / Edit
-        </div>
-      </a>
-
-      <a class="ms-card" href="/masters/cost-centre/">
-        <div class="ms-card-top">
-          <span class="ms-card-icon" style="background:#f0fdf4">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-          </span>
-          <div>
-            <div class="ms-card-name">Cost Centres</div>
-            <div class="ms-card-sub">COST CENTRE MASTER</div>
-          </div>
-        </div>
-        <div class="ms-card-meta">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></ellipse></svg>
-          eos_Mst_Cost_Centre · Add / Edit / Deactivate
-        </div>
-      </a>
-
-      <a class="ms-card" href="/masters/cost-centre-type/">
-        <div class="ms-card-top">
-          <span class="ms-card-icon" style="background:#fff7ed">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          </span>
-          <div>
-            <div class="ms-card-name">Cost Centre Types</div>
-            <div class="ms-card-sub">COST CENTRE TYPE MASTER</div>
-          </div>
-        </div>
-        <div class="ms-card-meta">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></ellipse></svg>
-          eos_Mst_Cost_Centre_Type · Add / Edit / Deactivate
-        </div>
-      </a>
-
-      <a class="ms-card" href="/masters/operator/">
-        <div class="ms-card-top">
-          <span class="ms-card-icon" style="background:#fdf4ff">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-          </span>
-          <div>
-            <div class="ms-card-name">Operators</div>
-            <div class="ms-card-sub">OPERATOR MASTER</div>
-          </div>
-        </div>
-        <div class="ms-card-meta">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></ellipse></svg>
-          eos_Mst_Operator · Add / Edit / Deactivate
-        </div>
-      </a>
-
-      <a class="ms-card" href="/masters/contractor/">
-        <div class="ms-card-top">
-          <span class="ms-card-icon" style="background:#fff1f2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-          </span>
-          <div>
-            <div class="ms-card-name">Contractors</div>
-            <div class="ms-card-sub">CONTRACTOR MASTER</div>
-          </div>
-        </div>
-        <div class="ms-card-meta">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></ellipse></svg>
-          eos_Mst_Contractor · Add / Edit / Delete
-        </div>
-      </a>
-
-      <a class="ms-card" href="/masters/cert-institutes/">
-        <div class="ms-card-top">
-          <span class="ms-card-icon" style="background:#eff6ff">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
-          </span>
-          <div>
-            <div class="ms-card-name">Cert Institutes</div>
-            <div class="ms-card-sub">CERTIFICATION INSTITUTE MASTER</div>
-          </div>
-        </div>
-        <div class="ms-card-meta">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></ellipse></svg>
-          eos_Mst_Cert_Institute · Add / Edit / Delete
-        </div>
-      </a>
-
-      <a class="ms-card" href="/masters/email-notification-types/">
-        <div class="ms-card-top">
-          <span class="ms-card-icon" style="background:#f0fdf4">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          </span>
-          <div>
-            <div class="ms-card-name">Email Notification Types</div>
-            <div class="ms-card-sub">EMAIL NOTIFICATION TYPE</div>
-          </div>
-        </div>
-        <div class="ms-card-meta">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></ellipse></svg>
-          eos_Email_Notification_Type · Add / Edit / Deactivate
-        </div>
-      </a>
-
+    {% endif %}
+  {% else %}
+    <div class="ms-section" id="section-{{ grp.id }}">
+      <div class="ms-section-hdr">
+        <span class="ms-section-icon" style="background:{{ grp.icon_bg }}">{{ grp.icon|safe }}</span>
+        <span class="ms-section-name">{{ grp.label }}</span>
+        <span class="ms-section-count">0 masters</span>
+        <span class="ms-divider"></span>
+      </div>
+      <div class="ms-empty">
+        <div class="ms-empty-label">{{ grp.label }} Masters</div>
+        Forms will appear here once built
+      </div>
     </div>
-  </div>
+  {% endif %}
+  {% endfor %}
 
-  <!-- HR -->
-  <div class="ms-section" id="section-hr">
-    <div class="ms-section-hdr">
-      <span class="ms-section-icon" style="background:#f0fdf4">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      </span>
-      <span class="ms-section-name">HR</span>
-      <span class="ms-section-count">3 masters</span>
-      <span class="ms-divider"></span>
-    </div>
-    <div class="ms-cards">
-
-      <a class="ms-card" href="/masters/travel-eligibility/">
-        <div class="ms-card-top">
-          <span class="ms-card-icon" style="background:#f0fdf4">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M17 8h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2v4l-4-4H9a2 2 0 0 1-2-2v-1"/><path d="M3 4h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7l-4 4V6a2 2 0 0 1 2-2z"/></svg>
-          </span>
-          <div>
-            <div class="ms-card-name">Travel Eligibility</div>
-            <div class="ms-card-sub">HR MASTER</div>
-          </div>
-        </div>
-        <div class="ms-card-meta">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></ellipse></svg>
-          eos_Travel_Eligibility · Add / Edit / Delete
-        </div>
-      </a>
-
-      <a class="ms-card" href="/masters/reporting-structure/">
-        <div class="ms-card-top">
-          <span class="ms-card-icon" style="background:#eff6ff">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </span>
-          <div>
-            <div class="ms-card-name">Reporting Structure</div>
-            <div class="ms-card-sub">HR MASTER</div>
-          </div>
-        </div>
-        <div class="ms-card-meta">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></ellipse></svg>
-          eos_Reporting_Structure · Add / Edit / Delete
-        </div>
-      </a>
-
-      <a class="ms-card" href="/masters/job-descriptions/">
-        <div class="ms-card-top">
-          <span class="ms-card-icon" style="background:#fff7ed">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          </span>
-          <div>
-            <div class="ms-card-name">Job Descriptions</div>
-            <div class="ms-card-sub">HR MASTER</div>
-          </div>
-        </div>
-        <div class="ms-card-meta">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></ellipse></svg>
-          eos_Job_Description_Hdr / Dtl · Add / Edit / Delete
-        </div>
-      </a>
-
-    </div>
-  </div>
-
-  <!-- QHSE -->
-  <div class="ms-section" id="section-qhse">
-    <div class="ms-section-hdr">
-      <span class="ms-section-icon" style="background:#fff7ed">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      </span>
-      <span class="ms-section-name">QHSE</span>
-      <span class="ms-section-count">0 masters</span>
-      <span class="ms-divider"></span>
-    </div>
-    <div class="ms-empty">
-      <div class="ms-empty-label">QHSE Masters</div>
-      Forms will appear here once built
-    </div>
-  </div>
-
-  <!-- PROJECTS -->
-  <div class="ms-section" id="section-projects">
-    <div class="ms-section-hdr">
-      <span class="ms-section-icon" style="background:#fdf4ff">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-      </span>
-      <span class="ms-section-name">Projects</span>
-      <span class="ms-section-count">0 masters</span>
-      <span class="ms-divider"></span>
-    </div>
-    <div class="ms-empty">
-      <div class="ms-empty-label">Project Masters</div>
-      Forms will appear here once built
-    </div>
-  </div>
-
-</div>
 
 <script>
 /* Patch msToggle on this page to also scroll the matching content section */
 window.addEventListener('load', function () {
   var orig = window.msToggle;
-  var sectionMap = {
-    'ms-grp-general': 'section-general',
-    'ms-grp-hr':      'section-hr',
-    'ms-grp-qhse':    'section-qhse',
-    'ms-grp-projects':'section-projects'
-  };
+  // Sidebar group ids follow "ms-grp-<id>"; content sections follow "section-<id>".
   window.msToggle = function (id) {
     orig(id);
     var grp = document.getElementById(id);
-    if (grp && grp.classList.contains('open') && sectionMap[id]) {
-      var target = document.getElementById(sectionMap[id]);
+    if (grp && grp.classList.contains('open')) {
+      var target = document.getElementById(id.replace('ms-grp-', 'section-'));
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };

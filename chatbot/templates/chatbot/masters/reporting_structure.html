@@ -47,7 +47,7 @@
   .filter-select:focus { border-color: var(--accent); background: var(--surface); }
 
   /* Table */
-  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; }
+  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; background: var(--surface); }
   .table-wrap::-webkit-scrollbar { width: 5px; height: 5px; }
   .table-wrap::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
   table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
@@ -131,6 +131,9 @@
   #toast.show { transform: translateY(0); opacity: 1; }
   #toast.success { background: var(--success); }
   #toast.error { background: var(--danger); }
+  /* Dirty-state save button */
+  #btn-save.dirty, .btn-save.dirty { background: #d97706 !important; box-shadow: 0 0 0 3px rgba(217,119,6,0.25) !important; }
+  #btn-save.dirty:hover, .btn-save.dirty:hover { background: #b45309 !important; }
 </style>
 {% endblock %}
 
@@ -380,6 +383,7 @@ async function selectRow(id) {
 function showForm(data) {
   document.getElementById('placeholder').style.display = 'none';
   document.getElementById('form-area').style.display = 'flex';
+  setDirty(false);
   document.getElementById('form-title').textContent = 'Edit Rule';
   document.getElementById('form-sub').textContent = `ID #${data.id}`;
   document.getElementById('btn-delete').style.display = 'flex';
@@ -388,9 +392,11 @@ function showForm(data) {
   catCombo.set(data.category_id);
   rankCombo.set(data.rank_id, data.category_id);
   repRankCombo.set(data.reporting_rank_id, data.category_id);
+  _applySavePerm(false);
 }
 
 function cancelEdit() {
+  setDirty(false);
   document.getElementById('placeholder').style.display = '';
   document.getElementById('form-area').style.display = 'none';
   document.querySelectorAll('#records-body tr').forEach(tr => tr.classList.remove('selected'));
@@ -412,7 +418,7 @@ async function saveRecord() {
   });
   const data = await res.json();
   if (data.success) {
-    showToast('Record updated', 'success');
+    showToast('Record updated', 'success'); setDirty(false);
     await loadRecords();
     selectRow(data.id);
   } else {
@@ -459,7 +465,7 @@ async function saveNewRecord() {
   });
   const data = await res.json();
   if (data.success) {
-    showToast('Record created', 'success');
+    showToast('Record created', 'success'); setDirty(false);
     closeAddModal();
     await loadRecords();
     selectRow(data.id);
@@ -484,6 +490,7 @@ function makeCombo(textId, hiddenId, ddId, getOptions, onPick) {
       el.addEventListener('mousedown', e => {
         e.preventDefault(); inp.value = el.textContent; hid.value = el.dataset.id;
         dd.classList.remove('open'); hi = -1; if (onPick) onPick(el.dataset.id);
+            if (typeof setDirty === 'function') setDirty(true);
       });
     });
     dd.classList.add('open'); hi = -1;
@@ -579,5 +586,25 @@ function showToast(msg, type = 'success') {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = ''; }, 3000);
 }
+
+// ── Dirty-state tracking ──────────────────────────────────────────────────
+let _formDirty = false;
+function setDirty(v) {
+  _formDirty = v;
+  document.querySelectorAll('.btn-save').forEach(b => b.classList.toggle('dirty', v));
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const fa = document.getElementById('form-area');
+  if (!fa) return;
+  fa.addEventListener('input',  () => setDirty(true));
+  fa.addEventListener('change', () => setDirty(true));
+});
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.reporting_structure')
+    .then(r => r.json())
+    .then(p => _applyPermUI(p));
+})();
 </script>
 {% endblock %}

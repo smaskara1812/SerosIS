@@ -92,6 +92,8 @@
     .btn-primary:hover:not(:disabled) { background: #163268; transform: translateY(-1px); }
     .btn-success { background: var(--success); color: #fff; }
     .btn-success:hover:not(:disabled) { background: #047857; transform: translateY(-1px); }
+    #btn-save.dirty { background: #d97706 !important; box-shadow: 0 0 0 3px rgba(217,119,6,0.25) !important; }
+    #btn-save.dirty:hover { background: #b45309 !important; }
     .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
     .btn-ghost:hover:not(:disabled) { background: var(--bg); }
     .btn-danger-ol { background: var(--surface); color: var(--danger); border: 1px solid #FECACA; }
@@ -320,6 +322,8 @@ function selectRecord(id) {
     document.getElementById('rec-badge').textContent = 'ID '+d.Contractor_Id;
     document.getElementById('form-empty').style.display = 'none';
     document.getElementById('form-card').classList.add('visible');
+      _setDirty(false);
+      _applySavePerm(false);
   });
 }
 
@@ -331,7 +335,7 @@ function saveRecord() {
       body:JSON.stringify({contractor_id: currentId, contractor_name: name})
     }).then(r=>r.json()).then(d => {
       if (d.error) { showToast(d.error,'error'); return; }
-      showToast('Changes saved','success');
+      showToast('Changes saved','success'); _setDirty(false);
       refreshRecords();
     }).catch(()=>showToast('Network error','error'))
   );
@@ -377,7 +381,7 @@ function doDelete() {
     if (d.error) { showToast(d.error,'error'); return; }
     showToast('Contractor deleted','success');
     currentId = null;
-    document.getElementById('form-card').classList.remove('visible');
+    _setDirty(false); document.getElementById('form-card').classList.remove('visible');
     document.getElementById('form-empty').style.display = '';
     refreshRecords();
   }).catch(()=>showToast('Network error','error'));
@@ -414,5 +418,29 @@ function showToast(msg, type) {
   requestAnimationFrame(()=>el.classList.add('show'));
   setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),350); }, 3200);
 }
+
+// ── Dirty-state tracking ──────────────────────────────────────────────────
+(function() {
+  function setDirty(v) {
+    const btn = document.getElementById('btn-save');
+    if (btn) btn.classList.toggle('dirty', v);
+  }
+  window._setDirty = setDirty;
+
+  // Attach event delegation to form-card once DOM is ready
+  document.addEventListener('DOMContentLoaded', function() {
+    const fc = document.getElementById('form-card');
+    if (!fc) return;
+    fc.addEventListener('input',  () => setDirty(true));
+    fc.addEventListener('change', () => setDirty(true));
+  });
+})();
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.contractors')
+    .then(r => r.json())
+    .then(p => _applyPermUI(p));
+})();
 </script>
 {% endblock %}

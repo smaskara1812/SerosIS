@@ -49,7 +49,7 @@
   .filter-select:focus { border-color: var(--accent); background: var(--surface); }
 
   /* Table */
-  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; }
+  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; background: var(--surface); }
   .table-wrap::-webkit-scrollbar { width: 5px; }
   .table-wrap::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
   table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
@@ -196,6 +196,9 @@
   #toast.show { transform: translateY(0); opacity: 1; }
   #toast.success { background: var(--success); }
   #toast.error { background: var(--danger); }
+  /* Dirty-state save button */
+  #btn-save.dirty, .btn-save.dirty { background: #d97706 !important; box-shadow: 0 0 0 3px rgba(217,119,6,0.25) !important; }
+  #btn-save.dirty:hover, .btn-save.dirty:hover { background: #b45309 !important; }
 </style>
 {% endblock %}
 
@@ -505,6 +508,7 @@ function showForm(data) {
   currentHdrId = data.id;
   document.getElementById('placeholder').style.display = 'none';
   document.getElementById('form-area').style.display = 'flex';
+  setDirty(false);
   document.getElementById('form-title').textContent = 'Edit Section';
   document.getElementById('form-sub').textContent = `ID #${data.id} · ${data.lines.length} detail line${data.lines.length !== 1 ? 's' : ''}`;
   document.getElementById('btn-delete-hdr').style.display = 'flex';
@@ -521,9 +525,11 @@ function showForm(data) {
   const nextOrder = data.lines.length ? Math.max(...data.lines.map(l => l.display_order)) + 1 : 1;
   document.getElementById('add-dtl-order').value = nextOrder;
   document.getElementById('add-dtl-text').value = '';
+  _applySaveSectionPerm();
 }
 
 function cancelEdit() {
+  setDirty(false);
   currentHdrId = null;
   document.getElementById('placeholder').style.display = '';
   document.getElementById('form-area').style.display = 'none';
@@ -547,7 +553,7 @@ async function saveHdr() {
   });
   const data = await res.json();
   if (data.success) {
-    showToast('Section saved', 'success');
+    showToast('Section saved', 'success'); setDirty(false);
     await loadRecords();
     selectRow(data.id);
   } else {
@@ -697,7 +703,7 @@ async function saveNewHdr() {
   });
   const data = await res.json();
   if (data.success) {
-    showToast('Section created', 'success');
+    showToast('Section created', 'success'); setDirty(false);
     closeAddModal();
     await loadRecords();
     selectRow(data.id);
@@ -722,6 +728,7 @@ function makeCombo(textId, hiddenId, ddId, getOptions, onPick) {
       el.addEventListener('mousedown', e => {
         e.preventDefault(); inp.value = el.textContent; hid.value = el.dataset.id;
         dd.classList.remove('open'); hi = -1; if (onPick) onPick(el.dataset.id);
+            if (typeof setDirty === 'function') setDirty(true);
       });
     });
     dd.classList.add('open'); hi = -1;
@@ -773,6 +780,7 @@ function makeRankCombo(textId, hiddenId, ddId, getCatId) {
           inp.value = el.querySelector('span') ? el.childNodes[0].textContent.trim() : el.textContent.trim();
           hid.value = el.dataset.id;
           dd.classList.remove('open'); hi = -1;
+          if (typeof setDirty === 'function') setDirty(true);
         });
       });
     }
@@ -819,6 +827,36 @@ function showToast(msg, type = 'success') {
   el.textContent = msg; el.className = `show ${type}`;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+// ── Dirty-state tracking ──────────────────────────────────────────────────
+let _formDirty = false;
+function setDirty(v) {
+  _formDirty = v;
+  document.querySelectorAll('.btn-save').forEach(b => b.classList.toggle('dirty', v));
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const fa = document.getElementById('form-area');
+  if (!fa) return;
+  fa.addEventListener('input',  () => setDirty(true));
+  fa.addEventListener('change', () => setDirty(true));
+});
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.job_descriptions')
+    .then(r => r.json())
+    .then(p => { _applyPermUI(p); _applySaveSectionPerm(); });
+})();
+
+// In-panel section editing (Save Section + detail add/save/delete) requires edit permission.
+// Adding a whole new section is gated separately by btn-new (add permission).
+function _applySaveSectionPerm() {
+  const p = window._pagePerms;
+  if (!p) return;
+  const showEdit = p.canEdit ? '' : 'none';
+  document.querySelectorAll('.btn-save, .add-dtl-btn, .add-dtl-area, .dtl-save-btn').forEach(el => el.style.display = showEdit);
+  if (!p.canDelete) document.querySelectorAll('.dtl-btn.del').forEach(el => el.style.display = 'none');
 }
 </script>
 {% endblock %}

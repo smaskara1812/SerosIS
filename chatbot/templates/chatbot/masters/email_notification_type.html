@@ -357,6 +357,8 @@ function selectRecord(id) {
     document.getElementById('btn-deactivate').style.display = d.EN_Type_Active==='Y'?'inline-flex':'none';
     document.getElementById('form-empty').style.display = 'none';
     document.getElementById('form-card').classList.add('visible');
+      _setDirty(false);
+      _applySavePerm(false);
   });
 }
 
@@ -373,7 +375,7 @@ function saveRecord() {
         EN_Description: document.getElementById('f-desc').value,
         EN_Type_Active: document.getElementById('f-active').checked?'Y':'N'
       })
-    }).then(r=>r.json()).then(d=>{ if(d.error){showToast(d.error,'error');return;} showToast('Changes saved','success'); refreshRecords(); })
+    }).then(r=>r.json()).then(d=>{ if(d.error){showToast(d.error,'error');return;} showToast('Changes saved','success'); _setDirty(false); refreshRecords(); })
     .catch(()=>showToast('Network error','error'))
   );
 }
@@ -452,5 +454,29 @@ function showToast(msg,type) {
   requestAnimationFrame(()=>el.classList.add('show'));
   setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),350);},3200);
 }
+
+// ── Dirty-state tracking ──────────────────────────────────────────────────
+(function() {
+  function setDirty(v) {
+    const btn = document.getElementById('btn-save');
+    if (btn) btn.classList.toggle('dirty', v);
+  }
+  window._setDirty = setDirty;
+
+  // Attach event delegation to form-card once DOM is ready
+  document.addEventListener('DOMContentLoaded', function() {
+    const fc = document.getElementById('form-card');
+    if (!fc) return;
+    fc.addEventListener('input',  () => setDirty(true));
+    fc.addEventListener('change', () => setDirty(true));
+  });
+})();
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.email_notification_types')
+    .then(r => r.json())
+    .then(p => _applyPermUI(p));
+})();
 </script>
 {% endblock %}

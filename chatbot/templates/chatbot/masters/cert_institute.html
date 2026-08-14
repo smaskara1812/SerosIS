@@ -380,6 +380,8 @@ function selectRecord(id) {
     document.getElementById('rec-badge').textContent = 'ID '+d.Cert_Institute_Id;
     document.getElementById('form-empty').style.display = 'none';
     document.getElementById('form-card').classList.add('visible');
+      _setDirty(false);
+      _applySavePerm(false);
   });
 }
 
@@ -398,7 +400,7 @@ function saveRecord() {
         Location_Id: locId,
         Tel_No: document.getElementById('f-tel').value.trim(),
       })
-    }).then(r=>r.json()).then(d=>{ if(d.error){showToast(d.error,'error');return;} showToast('Changes saved','success'); refreshRecords(); })
+    }).then(r=>r.json()).then(d=>{ if(d.error){showToast(d.error,'error');return;} showToast('Changes saved','success'); _setDirty(false); refreshRecords(); })
     .catch(()=>showToast('Network error','error'))
   );
 }
@@ -461,7 +463,7 @@ function doDelete() {
     if(d.error){showToast(d.error,'error');return;}
     showToast('Deleted','success');
     currentId=null;
-    document.getElementById('form-card').classList.remove('visible');
+    _setDirty(false); document.getElementById('form-card').classList.remove('visible');
     document.getElementById('form-empty').style.display='';
     refreshRecords();
   }).catch(()=>showToast('Network error','error'));
@@ -548,5 +550,29 @@ function showToast(msg,type) {
   requestAnimationFrame(()=>el.classList.add('show'));
   setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),350);},3200);
 }
+
+// ── Dirty-state tracking ──────────────────────────────────────────────────
+(function() {
+  function setDirty(v) {
+    const btn = document.getElementById('btn-save');
+    if (btn) btn.classList.toggle('dirty', v);
+  }
+  window._setDirty = setDirty;
+
+  // Attach event delegation to form-card once DOM is ready
+  document.addEventListener('DOMContentLoaded', function() {
+    const fc = document.getElementById('form-card');
+    if (!fc) return;
+    fc.addEventListener('input',  () => setDirty(true));
+    fc.addEventListener('change', () => setDirty(true));
+  });
+})();
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.cert_institutes')
+    .then(r => r.json())
+    .then(p => _applyPermUI(p));
+})();
 </script>
 {% endblock %}

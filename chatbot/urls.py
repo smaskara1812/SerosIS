@@ -197,6 +197,15 @@ urlpatterns = [
 
     # ── Manual management ───────────────────────────────────────────────────
     path("api/manuals/", views.manual_list, name="manual_list"),
+    # ── Competency Master ───────────────────────────────────────────────────
+    path("api/me/perms/", views.me_perms_api, name="me_perms"),
+    path("masters/competency/", views.competency_page, name="competency"),
+    path("api/masters/competency/meta/", views.competency_meta_api, name="competency_meta"),
+    path("api/masters/competency/", views.competency_list_api, name="competency_list"),
+    path("api/masters/competency/save/", views.competency_save_api, name="competency_save"),
+    path("api/masters/competency/<int:rec_id>/", views.competency_get_api, name="competency_get"),
+    path("api/masters/competency/<int:rec_id>/delete/", views.competency_delete_api, name="competency_delete"),
+
     path("api/manuals/upload/", views.manual_upload, name="manual_upload"),
     path("api/manuals/ingest/", views.manual_ingest_start, name="manual_ingest_start"),
     path("api/manuals/ingest/status/", views.manual_ingest_status, name="manual_ingest_status"),

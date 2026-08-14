@@ -1,0 +1,497 @@
+{% extends 'chatbot/masters/base.html' %}
+{% block ms_content %}
+<style>
+  /* ── Two-panel shell ── */
+  .cp-shell { display:flex; flex:1; overflow:hidden; height:100%; }
+
+  /* ── Left panel ── */
+  .cp-left {
+    width:420px; min-width:300px; max-width:520px;
+    display:flex; flex-direction:column; overflow:hidden;
+    border-right:1px solid #dde3ee; background:var(--surface);
+  }
+  .cp-left-hdr {
+    padding:14px 16px 10px; border-bottom:1px solid #dde3ee; flex-shrink:0;
+    display:flex; flex-direction:column; gap:8px; background:var(--surface);
+  }
+  .cp-left-hdr h2 { font-size:15px; font-weight:700; color:#1a3f7a; margin:0; }
+  .cp-search-row { display:flex; gap:6px; align-items:center; }
+  .cp-search { flex:1; padding:6px 10px; border:1px solid #dde3ee; border-radius:6px; font-size:13px; }
+  .cp-search:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15); }
+  .cp-filter-row { display:flex; gap:6px; flex-wrap:wrap; }
+  .cp-filter-btn {
+    font-size:11px; font-weight:600; padding:3px 10px; border-radius:20px; border:1px solid #dde3ee;
+    background:#f8faff; color:#64748b; cursor:pointer; transition:all .12s;
+  }
+  .cp-filter-btn.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .cp-filter-btn:hover:not(.active) { background:#eff6ff; color:#2563eb; border-color:#bdd7ff; }
+  .cp-dept-select {
+    padding:5px 10px; border:1px solid #dde3ee; border-radius:6px; font-size:13px;
+    background:#fff; color:#1e293b; cursor:pointer;
+  }
+  .cp-dept-select:focus { outline:none; border-color:#2563eb; }
+
+  /* ── List ── */
+  .table-wrap { flex:1; overflow-y:auto; overflow-x:auto; background:var(--surface); }
+  .table-wrap::-webkit-scrollbar { width:5px; }
+  .table-wrap::-webkit-scrollbar-thumb { background:#dde3ee; border-radius:4px; }
+  table.cp-table { width:100%; border-collapse:collapse; }
+  table.cp-table th {
+    position:sticky; top:0; z-index:1;
+    background:#f1f5fb; font-size:11px; font-weight:700; color:#64748b;
+    text-transform:uppercase; letter-spacing:.06em;
+    padding:8px 14px; border-bottom:1px solid #dde3ee; white-space:nowrap;
+  }
+  table.cp-table td { padding:9px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #f1f5fb; }
+  .cp-row { cursor:pointer; transition:background .1s; }
+  .cp-row:hover { background:#f5f8ff; }
+  .cp-row.selected { background:#eff6ff; }
+  .cp-row.selected td { color:#1a3f7a; }
+  .dept-chip {
+    display:inline-block; font-size:10px; font-weight:600; padding:2px 7px; border-radius:10px;
+    white-space:nowrap;
+  }
+  .dept-hs  { background:#fef2f2; color:#dc2626; }
+  .dept-tec { background:#eff6ff; color:#2563eb; }
+  .dept-hr  { background:#f0fdf4; color:#16a34a; }
+  .status-pill {
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px;
+  }
+  .status-pill.active { background:#f0fdf4; color:#16a34a; }
+  .status-pill.inactive { background:#f8faff; color:#94a3b8; }
+  .status-dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
+
+  /* ── Pagination ── */
+  .cp-pager { display:flex; align-items:center; justify-content:space-between; padding:8px 14px; border-top:1px solid #dde3ee; flex-shrink:0; }
+  .cp-pager-info { font-size:11px; color:#94a3b8; }
+  .cp-pager-btns { display:flex; gap:4px; }
+  .cp-pager-btn { padding:3px 10px; border:1px solid #dde3ee; border-radius:5px; background:#fff; font-size:12px; cursor:pointer; color:#475569; }
+  .cp-pager-btn:disabled { opacity:.4; cursor:default; }
+  .cp-pager-btn:not(:disabled):hover { background:#eff6ff; color:#2563eb; border-color:#bdd7ff; }
+
+  /* ── Right panel ── */
+  .cp-right { flex:1; display:flex; flex-direction:column; overflow:hidden; background:var(--surface); }
+  .cp-placeholder {
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#94a3b8; gap:10px;
+  }
+  .cp-placeholder svg { opacity:.25; }
+  .cp-placeholder p { font-size:13px; }
+
+  /* ── Form area ── */
+  #form-area { display:none; flex-direction:column; height:100%; }
+  .form-hdr {
+    padding:14px 20px 12px; border-bottom:1px solid #dde3ee; flex-shrink:0;
+    display:flex; align-items:center; gap:10px;
+  }
+  .form-hdr-title { font-size:14px; font-weight:700; color:#1a3f7a; flex:1; }
+  .form-body { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
+  .form-body::-webkit-scrollbar { width:5px; }
+  .form-body::-webkit-scrollbar-thumb { background:#dde3ee; border-radius:4px; }
+
+  .field-group { display:flex; flex-direction:column; gap:5px; }
+  .field-label { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.06em; }
+  .field-input {
+    padding:7px 10px; border:1px solid #dde3ee; border-radius:7px; font-size:13px;
+    color:#1e293b; background:#fff; width:100%; box-sizing:border-box;
+  }
+  .field-input:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15); }
+  select.field-input { cursor:pointer; }
+
+  /* active toggle */
+  .tog { display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+  .tog input { display:none; }
+  .tog-track {
+    width:40px; height:22px; border-radius:11px; background:#e2e8f0;
+    position:relative; transition:background .2s; flex-shrink:0;
+  }
+  .tog input:checked ~ .tog-track { background:#2563eb; }
+  .tog-thumb {
+    position:absolute; top:3px; left:3px;
+    width:16px; height:16px; border-radius:50%; background:#fff;
+    box-shadow:0 1px 3px rgba(0,0,0,.2); transition:transform .2s;
+  }
+  .tog input:checked ~ .tog-track .tog-thumb { transform:translateX(18px); }
+  .tog-label { font-size:13px; color:#475569; }
+
+  /* form footer */
+  .form-footer {
+    padding:12px 20px; border-top:1px solid #dde3ee; flex-shrink:0;
+    display:flex; gap:8px; align-items:center;
+  }
+  .btn-save {
+    padding:7px 18px; background:#2563eb; color:#fff; border:none; border-radius:7px;
+    font-size:13px; font-weight:600; cursor:pointer; transition:background .15s;
+  }
+  .btn-save:hover { background:#1d4ed8; }
+  .btn-save.dirty { background:#d97706 !important; box-shadow:0 0 0 3px rgba(217,119,6,.25) !important; }
+  .btn-save.dirty:hover { background:#b45309 !important; }
+  .btn-delete {
+    padding:7px 14px; background:#fff; color:#dc2626; border:1px solid #fecaca;
+    border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; transition:all .15s;
+  }
+  .btn-delete:hover { background:#fef2f2; }
+  .btn-cancel {
+    padding:7px 14px; background:#fff; color:#64748b; border:1px solid #dde3ee;
+    border-radius:7px; font-size:13px; cursor:pointer; margin-left:auto;
+  }
+  .btn-cancel:hover { background:#f8faff; }
+
+  /* ── New modal ── */
+  .modal-bg {
+    display:none; position:fixed; inset:0; background:rgba(15,23,42,.45);
+    z-index:200; align-items:center; justify-content:center;
+  }
+  .modal-bg.open { display:flex; }
+  .modal-card {
+    background:#fff; border-radius:12px; padding:24px; width:400px; max-width:95vw;
+    box-shadow:0 20px 60px rgba(0,0,0,.25); display:flex; flex-direction:column; gap:16px;
+  }
+  .modal-title { font-size:15px; font-weight:700; color:#1a3f7a; }
+  .modal-footer { display:flex; gap:8px; justify-content:flex-end; }
+  .btn-primary { padding:7px 18px; background:#2563eb; color:#fff; border:none; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn-primary:hover { background:#1d4ed8; }
+  .btn-secondary { padding:7px 14px; background:#f1f5fb; color:#475569; border:none; border-radius:7px; font-size:13px; cursor:pointer; }
+  .btn-secondary:hover { background:#e2e8f0; }
+
+  /* ── Toast ── */
+  #toast {
+    position:fixed; bottom:24px; right:24px; z-index:999;
+    padding:10px 18px; border-radius:8px; font-size:13px; font-weight:600;
+    color:#fff; opacity:0; transition:opacity .25s; pointer-events:none;
+  }
+  #toast.success { background:#16a34a; }
+  #toast.error   { background:#dc2626; }
+
+  /* New button */
+  .btn-new {
+    padding:6px 14px; background:#2563eb; color:#fff; border:none; border-radius:7px;
+    font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px;
+  }
+  .btn-new:hover { background:#1d4ed8; }
+</style>
+
+<div class="page-header" style="padding:14px 20px 10px; border-bottom:1px solid #dde3ee; display:flex; align-items:center; gap:10px;">
+  <div style="flex:1">
+    <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#94a3b8;margin-bottom:4px;">
+      <a href="/" style="color:#94a3b8;text-decoration:none;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#94a3b8'">Home</a>
+      <span style="opacity:.45">/</span>
+      <a href="/masters/" style="color:#94a3b8;text-decoration:none;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#94a3b8'">Masters</a>
+      <span style="opacity:.45">/</span>
+      <span>HR</span>
+      <span style="opacity:.45">/</span>
+      <span>Competency</span>
+    </div>
+    <div style="font-size:18px;font-weight:800;color:#1a3f7a;">Competency</div>
+  </div>
+  <button class="btn-new" onclick="openAddModal()">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    New
+  </button>
+</div>
+
+<div class="cp-shell">
+
+  <!-- Left panel -->
+  <div class="cp-left">
+    <div class="cp-left-hdr">
+      <div class="cp-search-row">
+        <input id="search-input" class="cp-search" placeholder="Search competencies…" oninput="debounceLoad()">
+      </div>
+      <div class="cp-filter-row">
+        <select id="dept-filter" class="cp-dept-select" onchange="loadRecords(1)">
+          <option value="">All Departments</option>
+        </select>
+        <button class="cp-filter-btn active" data-active="" onclick="setActiveFilter(this,'')">All</button>
+        <button class="cp-filter-btn" data-active="Y" onclick="setActiveFilter(this,'Y')">Active</button>
+        <button class="cp-filter-btn" data-active="N" onclick="setActiveFilter(this,'N')">Inactive</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="cp-table">
+        <thead>
+          <tr>
+            <th>Competency Name</th>
+            <th>Department</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="list-body"></tbody>
+      </table>
+    </div>
+
+    <div class="cp-pager">
+      <span class="cp-pager-info" id="pager-info">—</span>
+      <div class="cp-pager-btns">
+        <button class="cp-pager-btn" id="btn-prev" onclick="loadRecords(currentPage-1)" disabled>‹ Prev</button>
+        <button class="cp-pager-btn" id="btn-next" onclick="loadRecords(currentPage+1)" disabled>Next ›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="cp-right">
+    <div class="cp-placeholder" id="placeholder">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      <p>Select a competency to edit</p>
+    </div>
+
+    <div id="form-area">
+      <div class="form-hdr">
+        <div class="form-hdr-title" id="form-title">Edit Competency</div>
+      </div>
+      <div class="form-body">
+        <input type="hidden" id="rec-id">
+        <div class="field-group">
+          <div class="field-label">Competency Name *</div>
+          <input type="text" id="rec-name" class="field-input" maxlength="50" placeholder="Enter competency name">
+        </div>
+        <div class="field-group">
+          <div class="field-label">Department *</div>
+          <select id="rec-dept" class="field-input">
+            <option value="">Select department</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Status</div>
+          <label class="tog">
+            <input type="checkbox" id="rec-active" checked>
+            <div class="tog-track"><div class="tog-thumb"></div></div>
+            <span class="tog-label">Active</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn-save" id="btn-save" onclick="saveRecord()">Save</button>
+        <button class="btn-delete" id="btn-delete" onclick="deleteRecord()">Delete</button>
+        <button class="btn-cancel" onclick="cancelEdit()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New modal -->
+<div class="modal-bg" id="modal-bg" onclick="bgClose(event)">
+  <div class="modal-card">
+    <div class="modal-title">New Competency</div>
+    <div class="field-group">
+      <div class="field-label">Competency Name *</div>
+      <input type="text" id="d-name" class="field-input" maxlength="50" placeholder="Enter competency name">
+    </div>
+    <div class="field-group">
+      <div class="field-label">Department *</div>
+      <select id="d-dept" class="field-input">
+        <option value="">Select department</option>
+      </select>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Status</div>
+      <label class="tog">
+        <input type="checkbox" id="d-active" checked>
+        <div class="tog-track"><div class="tog-thumb"></div></div>
+        <span class="tog-label">Active</span>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeAddModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveNewRecord()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let DEPTS = {};
+const DEPT_CLASS = {35:'dept-hs', 14:'dept-tec', 3:'dept-hr'};
+
+let currentPage = 1;
+let activeFilter = '';
+let debounceTimer = null;
+let selectedId = null;
+
+function debounceLoad() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => loadRecords(1), 280);
+}
+
+function setActiveFilter(btn, val) {
+  activeFilter = val;
+  document.querySelectorAll('.cp-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadRecords(1);
+}
+
+function loadRecords(page) {
+  page = page || 1;
+  currentPage = page;
+  const q       = document.getElementById('search-input').value.trim();
+  const dept_id = document.getElementById('dept-filter').value;
+  const params  = new URLSearchParams({page, q, active: activeFilter, dept_id});
+  fetch('/api/masters/competency/?' + params)
+    .then(r => r.json())
+    .then(data => {
+      const tbody = document.getElementById('list-body');
+      tbody.innerHTML = '';
+      if (!data.records.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">No records found</td></tr>';
+      } else {
+        data.records.forEach(r => {
+          const deptClass = DEPT_CLASS[r.dept_id] || '';
+          const statusHtml = r.active === 'Y'
+            ? '<span class="status-pill active"><span class="status-dot"></span>Active</span>'
+            : '<span class="status-pill inactive"><span class="status-dot"></span>Inactive</span>';
+          const tr = document.createElement('tr');
+          tr.className = 'cp-row' + (r.id === selectedId ? ' selected' : '');
+          tr.dataset.id = r.id;
+          tr.innerHTML = `
+            <td style="font-weight:500">${r.name}</td>
+            <td><span class="dept-chip ${deptClass}">${r.dept}</span></td>
+            <td>${statusHtml}</td>`;
+          tr.onclick = () => selectRow(r.id);
+          tbody.appendChild(tr);
+        });
+      }
+      const total = data.total, size = data.size;
+      const start = (page-1)*size+1, end = Math.min(page*size, total);
+      document.getElementById('pager-info').textContent = total ? `${start}–${end} of ${total}` : '0 records';
+      document.getElementById('btn-prev').disabled = page <= 1;
+      document.getElementById('btn-next').disabled = page * size >= total;
+    });
+}
+
+function selectRow(id) {
+  selectedId = id;
+  document.querySelectorAll('.cp-row').forEach(r => r.classList.toggle('selected', +r.dataset.id === id));
+  fetch(`/api/masters/competency/${id}/`)
+    .then(r => r.json())
+    .then(d => showForm(d));
+}
+
+function showForm(d) {
+  document.getElementById('rec-id').value   = d.id || '';
+  document.getElementById('rec-name').value = d.name || '';
+  document.getElementById('rec-dept').value = d.dept_id || '';
+  document.getElementById('rec-active').checked = d.active !== 'N';
+  document.getElementById('form-title').textContent = d.id ? 'Edit Competency' : 'New Competency';
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('form-area').style.display = 'flex';
+  document.getElementById('btn-delete').style.display = d.id ? '' : 'none';
+  setDirty(false);
+  _applySavePerm(!d.id);
+}
+
+function cancelEdit() {
+  selectedId = null;
+  document.querySelectorAll('.cp-row').forEach(r => r.classList.remove('selected'));
+  document.getElementById('form-area').style.display = 'none';
+  document.getElementById('placeholder').style.display = '';
+  setDirty(false);
+}
+
+function saveRecord() {
+  const id     = document.getElementById('rec-id').value;
+  const name   = document.getElementById('rec-name').value.trim();
+  const dept   = document.getElementById('rec-dept').value;
+  const active = document.getElementById('rec-active').checked ? 'Y' : 'N';
+  if (!name) { showToast('Name is required', 'error'); return; }
+  if (!dept) { showToast('Department is required', 'error'); return; }
+  fetch('/api/masters/competency/save/', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id: id || null, name, dept_id: +dept, active})
+  }).then(r=>r.json()).then(d => {
+    if (d.error) { showToast(d.error, 'error'); return; }
+    showToast(id ? 'Changes saved' : 'Competency created', 'success');
+    setDirty(false);
+    selectedId = d.id;
+    loadRecords(currentPage);
+  });
+}
+
+function deleteRecord() {
+  const id = document.getElementById('rec-id').value;
+  if (!id || !confirm('Delete this competency?')) return;
+  fetch(`/api/masters/competency/${id}/delete/`, {method:'POST'})
+    .then(r=>r.json()).then(d => {
+      if (d.success) { showToast('Deleted', 'success'); cancelEdit(); loadRecords(1); }
+    });
+}
+
+function openAddModal() {
+  document.getElementById('d-name').value = '';
+  document.getElementById('d-dept').value = '';
+  document.getElementById('d-active').checked = true;
+  document.getElementById('modal-bg').classList.add('open');
+  setTimeout(() => document.getElementById('d-name').focus(), 50);
+}
+function closeAddModal() { document.getElementById('modal-bg').classList.remove('open'); }
+function bgClose(e) { if (e.target === document.getElementById('modal-bg')) closeAddModal(); }
+
+function saveNewRecord() {
+  const name   = document.getElementById('d-name').value.trim();
+  const dept   = document.getElementById('d-dept').value;
+  const active = document.getElementById('d-active').checked ? 'Y' : 'N';
+  if (!name) { showToast('Name is required', 'error'); return; }
+  if (!dept) { showToast('Department is required', 'error'); return; }
+  fetch('/api/masters/competency/save/', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, dept_id: +dept, active})
+  }).then(r=>r.json()).then(d => {
+    if (d.error) { showToast(d.error, 'error'); return; }
+    closeAddModal();
+    showToast('Competency created', 'success');
+    selectedId = d.id;
+    loadRecords(1);
+    selectRow(d.id);
+  });
+}
+
+let toastTimer;
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = type;
+  el.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.opacity = '0'; }, 3000);
+}
+
+// ── Dirty-state tracking ────────────────────────────────────────────────────
+let _formDirty = false;
+function setDirty(v) {
+  _formDirty = v;
+  document.querySelectorAll('.btn-save').forEach(b => b.classList.toggle('dirty', v));
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const fa = document.getElementById('form-area');
+  if (fa) {
+    fa.addEventListener('input',  () => setDirty(true));
+    fa.addEventListener('change', () => setDirty(true));
+  }
+
+  fetch('/api/masters/competency/meta/')
+    .then(r => r.json())
+    .then(data => {
+      DEPTS = {};
+      data.depts.forEach(d => { DEPTS[d.id] = d.name; });
+      const opt = d => `<option value="${d.id}">${d.name}</option>`;
+      const opts = data.depts.map(opt).join('');
+      document.getElementById('dept-filter').insertAdjacentHTML('beforeend', opts);
+      document.getElementById('rec-dept').insertAdjacentHTML('beforeend', opts);
+      document.getElementById('d-dept').insertAdjacentHTML('beforeend', opts);
+      loadRecords(1);
+    });
+});
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.competency')
+    .then(r => r.json())
+    .then(p => _applyPermUI(p));
+})();
+</script>
+{% endblock %}

@@ -53,15 +53,8 @@ _NAV_ITEMS = [
         "label": "Masters",
         "url": "/masters/",
         "icon": _ICONS["masters"],
-        "children": [
-            {"id": "masters.rigs",              "label": "Rigs",              "url": "/masters/rigs/"},
-            {"id": "masters.operators",         "label": "Operators",         "url": "/masters/operator/"},
-            {"id": "masters.contractors",       "label": "Contractors",       "url": "/masters/contractor/"},
-            {"id": "masters.cost_centres",      "label": "Cost Centres",      "url": "/masters/cost-centre/"},
-            {"id": "masters.cost_centre_types",          "label": "Cost Centre Types",          "url": "/masters/cost-centre-type/"},
-            {"id": "masters.email_notification_types",   "label": "Email Notification Types",   "url": "/masters/email-notification-types/"},
-            {"id": "masters.cert_institutes",            "label": "Cert Institutes",             "url": "/masters/cert-institutes/"},
-        ],
+        # children populated from masters_registry at runtime (see below)
+        "children": [],
     },
     {
         "id": "manuals",
@@ -100,6 +93,7 @@ def seros_nav(request):
         return {}
 
     from .permissions import get_user_access, can_view
+    from .masters_registry import all_items
 
     access = get_user_access(request)
     path = request.path
@@ -107,6 +101,15 @@ def seros_nav(request):
     base_items = copy.deepcopy(_NAV_ITEMS)
     if access["is_admin"]:
         base_items.append(copy.deepcopy(_ADMIN_NAV_ITEM))
+
+    # Populate the Masters nav children from the registry (single source of truth).
+    for it in base_items:
+        if it["id"] == "masters":
+            it["children"] = [
+                {"id": m["key"], "label": m["label"], "url": m["url"]}
+                for m in all_items()
+            ]
+            break
 
     items = []
     for item in base_items:
@@ -131,8 +134,14 @@ def seros_nav(request):
 
     active_section = next((i for i in items if i.get("is_active")), None)
 
+    # Masters section — everything derived from the single registry.
+    from .masters_registry import build_masters_nav
+    _mv = lambda key: access["is_admin"] or can_view(access, key)
+    masters_nav = build_masters_nav(_mv)
+
     return {
         "nav_items":      items,
         "active_section": active_section,
         "user_access":    access,
+        "masters_nav":    masters_nav,
     }

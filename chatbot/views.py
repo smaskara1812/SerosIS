@@ -15,7 +15,23 @@ from .models import Conversation, Message
 from .rag.chain import get_rag_chain
 from .health import run_all as run_health_checks
 from .analytics.router import route as analytics_route
-from .permissions import require_permission
+from .permissions import require_permission, get_user_access as _get_access
+
+
+def _invalidate_user_perm_cache(user_id):
+    """Remove cached permission data from all live sessions for a given user_id."""
+    from django.contrib.sessions.backends.db import SessionStore
+    from django.contrib.sessions.models import Session
+    from django.utils import timezone
+    target_key = f"_seros_access_{user_id}"
+    for session in Session.objects.filter(expire_date__gt=timezone.now()):
+        try:
+            store = SessionStore(session.session_key)
+            if target_key in store:
+                del store[target_key]
+                store.save()
+        except Exception:
+            pass
 
 _chain = None
 
@@ -828,7 +844,15 @@ def rig_detail_page(request, rig_id):
 # ── Masters ───────────────────────────────────────────────────────────────────
 
 def masters_page(request):
-    return render(request, "chatbot/masters/index.html")
+    from .masters_registry import build_masters_nav
+    access = _get_access(request)
+    is_admin = access["is_admin"]
+    p = access["perms"]
+    cv = lambda key: is_admin or p.get(key, {}).get("view", False)
+    # masters_nav is also provided globally by the context processor, but pass it
+    # explicitly so the index template's meaning is self-contained.
+    return render(request, "chatbot/masters/index.html",
+                  {"masters_nav": build_masters_nav(cv)})
 
 # ── Cost Centre Type Master ───────────────────────────────────────────────────
 
@@ -870,6 +894,16 @@ def cost_centre_type_get_api(request, type_id):
 def cost_centre_type_save_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("Cost_Centre_Type_Id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.cost_centre_types", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     body = json.loads(request.body)
     type_id  = body.get("Cost_Centre_Type_Id") or None
@@ -904,6 +938,9 @@ def cost_centre_type_save_api(request):
 def cost_centre_type_deactivate_api(request, type_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.cost_centre_types", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         cursor.execute("""
@@ -999,6 +1036,16 @@ def cost_centre_get_api(request, cc_id):
 def cost_centre_save_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("Cost_Centre_Id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.cost_centres", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     body = json.loads(request.body)
     cc_id    = body.get("Cost_Centre_Id") or None
@@ -1038,6 +1085,9 @@ def cost_centre_save_api(request):
 def cost_centre_deactivate_api(request, cc_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.cost_centres", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         cursor.execute("""
@@ -1099,6 +1149,16 @@ def operator_get_api(request, op_id):
 def operator_save_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("Operator_Id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.operators", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     body       = json.loads(request.body)
     op_id      = body.get("Operator_Id") or None
@@ -1145,6 +1205,9 @@ def operator_save_api(request):
 def operator_deactivate_api(request, op_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.operators", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         cursor.execute("""
@@ -1192,6 +1255,9 @@ def cost_centre_type_check_delete_api(request, type_id):
 def cost_centre_type_delete_api(request, type_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.cost_centre_types", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         for table, col in [
@@ -1231,6 +1297,9 @@ def cost_centre_check_delete_api(request, cc_id):
 def cost_centre_delete_api(request, cc_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.cost_centres", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         for table, col in [
@@ -1272,6 +1341,9 @@ def operator_check_delete_api(request, op_id):
 def operator_delete_api(request, op_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.operators", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         for table, col in [
@@ -1313,6 +1385,9 @@ def rig_master_check_delete_api(request, rig_id):
 def rig_master_delete_api(request, rig_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.rigs", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         for table, col in [
@@ -1413,6 +1488,16 @@ def rig_master_get_api(request, rig_id):
 def rig_master_save_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("Rig_Id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.rigs", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
 
     from django.db import connections
     body = json.loads(request.body)
@@ -2417,6 +2502,16 @@ def contractor_get_api(request, contractor_id):
 def contractor_save_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("contractor_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.contractors", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     import json
     body            = json.loads(request.body)
@@ -2453,6 +2548,9 @@ def contractor_check_delete_api(request, contractor_id):
 def contractor_delete_api(request, contractor_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.contractors", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         cursor.execute("DELETE FROM eos_Mst_Contractor WHERE Contractor_Id=%s", [contractor_id])
@@ -2501,6 +2599,16 @@ def cert_institute_get_api(request, inst_id):
 def cert_institute_save_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("Cert_Institute_Id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.cert_institutes", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     body     = json.loads(request.body)
     inst_id  = body.get("Cert_Institute_Id") or None
@@ -2555,6 +2663,9 @@ def cert_institute_check_delete_api(request, inst_id):
 def cert_institute_delete_api(request, inst_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.cert_institutes", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         cursor.execute("DELETE FROM eos_Mst_Cert_Institute WHERE Cert_Institute_Id=%s", [inst_id])
@@ -2599,6 +2710,16 @@ def email_notification_type_get_api(request, type_id):
 def email_notification_type_save_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("EN_Type_Id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.email_notification_types", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     body    = json.loads(request.body)
     type_id = body.get("EN_Type_Id") or None
@@ -2634,6 +2755,9 @@ def email_notification_type_save_api(request):
 def email_notification_type_deactivate_api(request, type_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.email_notification_types", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         cursor.execute("""
@@ -2838,6 +2962,9 @@ def admin_user_perms_save_api(request, user_id):
             },
         )
 
+    # Invalidate this user's cached permissions in all live sessions
+    _invalidate_user_perm_cache(user_id)
+
     return JsonResponse({"success": True})
 
 
@@ -2859,6 +2986,7 @@ def admin_user_admin_toggle_api(request, user_id):
     )
     profile.is_app_admin = not profile.is_app_admin
     profile.save()
+    _invalidate_user_perm_cache(user_id)
     return JsonResponse({"is_app_admin": profile.is_app_admin})
 
 
@@ -3305,6 +3433,16 @@ def travel_eligibility_get_api(request, rec_id):
 def travel_eligibility_save_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.travel_eligibility", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
     import json
     data = json.loads(request.body)
     rec_id = data.get("id")
@@ -3353,6 +3491,9 @@ def travel_eligibility_save_api(request):
 def travel_eligibility_delete_api(request, rec_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.travel_eligibility", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         cursor.execute(
@@ -3439,6 +3580,16 @@ def reporting_structure_get_api(request, rec_id):
 def reporting_structure_save_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.reporting_structure", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
     import json as _json
     from django.db import connections
     body = _json.loads(request.body)
@@ -3471,6 +3622,9 @@ def reporting_structure_save_api(request):
 def reporting_structure_delete_api(request, rec_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.reporting_structure", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
         cursor.execute("DELETE FROM eos_Reporting_Structure WHERE Reporting_Structure_Id=%s", [rec_id])
@@ -3573,6 +3727,16 @@ def job_description_get_api(request, hdr_id):
 def job_description_save_hdr_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.job_descriptions", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
     import json as _json
     body        = _json.loads(request.body)
     hdr_id      = body.get("id")
@@ -3608,6 +3772,9 @@ def job_description_save_hdr_api(request):
 def job_description_delete_hdr_api(request, hdr_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.job_descriptions", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cur:
         cur.execute("DELETE FROM eos_Job_Description_Dtl WHERE JD_Hdr_Id=%s", [hdr_id])
@@ -3619,6 +3786,16 @@ def job_description_delete_hdr_api(request, hdr_id):
 def job_description_save_dtl_api(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.job_descriptions", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
     import json as _json
     body        = _json.loads(request.body)
     dtl_id      = body.get("id")
@@ -3653,7 +3830,169 @@ def job_description_save_dtl_api(request):
 def job_description_delete_dtl_api(request, dtl_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.job_descriptions", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cur:
         cur.execute("DELETE FROM eos_Job_Description_Dtl WHERE JD_Dtl_Id=%s", [dtl_id])
     return JsonResponse({"success": True})
+
+
+# ── Competency Master ────────────────────────────────────────────────────────
+
+COMPETENCY_DEPT_IDS = (3, 14, 35)
+
+def _get_competency_depts(cur):
+    cur.execute(
+        "SELECT Dept_Id, Dept_Name FROM Mst_Department WHERE Dept_Id IN %s ORDER BY Dept_Name",
+        [COMPETENCY_DEPT_IDS],
+    )
+    return [{"id": r[0], "name": r[1]} for r in cur.fetchall()]
+
+
+@require_permission("masters.competency", "view")
+def competency_page(request):
+    return render(request, "chatbot/masters/competency.html")
+
+
+@require_GET
+def competency_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        depts = _get_competency_depts(cur)
+    return JsonResponse({"depts": depts})
+
+
+@require_GET
+def competency_list_api(request):
+    dept_id = request.GET.get("dept_id", "")
+    q       = request.GET.get("q", "").strip()
+    active  = request.GET.get("active", "")
+    page    = max(1, int(request.GET.get("page", 1)))
+    size    = 25
+
+    where, params = ["1=1"], []
+    if dept_id:
+        where.append("Dept_Id = %s"); params.append(dept_id)
+    if q:
+        where.append("Competency_Name LIKE %s"); params.append(f"%{q}%")
+    if active in ("Y", "N"):
+        where.append("Active = %s"); params.append(active)
+
+    clause = " AND ".join(where)
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        cur.execute(f"SELECT COUNT(*) FROM eos_Mst_Competency WHERE {clause}", params)
+        total = cur.fetchone()[0]
+        cur.execute(
+            f"SELECT Competency_Id, Competency_Name, Dept_Id, Active FROM eos_Mst_Competency WHERE {clause} ORDER BY Dept_Id, Competency_Name LIMIT %s OFFSET %s",
+            params + [size, (page - 1) * size],
+        )
+        rows = cur.fetchall()
+        dept_map = {d["id"]: d["name"] for d in _get_competency_depts(cur)}
+    records = [
+        {"id": r[0], "name": r[1], "dept_id": r[2], "dept": dept_map.get(r[2], str(r[2])), "active": r[3]}
+        for r in rows
+    ]
+    return JsonResponse({"records": records, "total": total, "page": page, "size": size})
+
+
+@require_GET
+def competency_get_api(request, rec_id):
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        cur.execute(
+            "SELECT Competency_Id, Competency_Name, Dept_Id, Active FROM eos_Mst_Competency WHERE Competency_Id=%s",
+            [rec_id],
+        )
+        row = cur.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse({"id": row[0], "name": row[1], "dept_id": row[2], "active": row[3]})
+
+
+@csrf_exempt
+def competency_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.competency", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    data      = json.loads(request.body)
+    rec_id    = data.get("id")
+    name      = data.get("name", "").strip()[:50]
+    dept_id   = int(data.get("dept_id", 0))
+    active    = "Y" if data.get("active") == "Y" else "N"
+    user_id   = request.user.id or 1
+
+    if not name or not dept_id:
+        return JsonResponse({"error": "Name and department are required"}, status=400)
+
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        if rec_id:
+            cur.execute(
+                "UPDATE eos_Mst_Competency SET Competency_Name=%s, Dept_Id=%s, Active=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE Competency_Id=%s",
+                [name, dept_id, active, user_id, rec_id],
+            )
+            new_id = rec_id
+        else:
+            cur.execute("SELECT COALESCE(MAX(Competency_Id), 0) + 1 FROM eos_Mst_Competency")
+            new_id = cur.fetchone()[0]
+            cur.execute(
+                "INSERT INTO eos_Mst_Competency (Competency_Id, Competency_Name, Dept_Id, Active, Cr_User_Id, Cr_Dt) VALUES (%s,%s,%s,%s,%s,NOW())",
+                [new_id, name, dept_id, active, user_id],
+            )
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def competency_delete_api(request, rec_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.competency", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cur:
+        cur.execute("DELETE FROM eos_Mst_Competency WHERE Competency_Id=%s", [rec_id])
+    return JsonResponse({"success": True})
+
+
+# ── User permission self-query ───────────────────────────────────────────────
+
+@require_GET
+def me_perms_api(request):
+    """Return the current user's permissions for one or all menu keys.
+    ?key=masters.rigs  → single key dict
+    (no param)         → full perms dict
+    """
+    access = _get_access(request)
+    if access["is_admin"]:
+        # Admin sees everything as fully granted
+        key = request.GET.get("key")
+        full = {"view": True, "add": True, "edit": True, "delete": True, "export": True}
+        if key:
+            return JsonResponse({"is_admin": True, **full})
+        return JsonResponse({"is_admin": True, "perms": {}})
+
+    key = request.GET.get("key")
+    if key:
+        p = access["perms"].get(key, {})
+        return JsonResponse({
+            "is_admin": False,
+            "can_view":   bool(p.get("view")),
+            "can_add":    bool(p.get("add")),
+            "can_edit":   bool(p.get("edit")),
+            "can_delete": bool(p.get("delete")),
+            "can_export": bool(p.get("export")),
+        })
+    return JsonResponse({"is_admin": False, "perms": access["perms"]})
