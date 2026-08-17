@@ -253,6 +253,29 @@ def _translate_eos_tables(sql: str) -> str:
     return re.sub(r"\beos_(?=[A-Z])", "eos.", sql)
 
 
+# Legacy tables the app references with no `eos_` prefix — all live in the `dbo`
+# schema per database/script_mssql.sql. Listed explicitly rather than matched by a
+# casing pattern (like the eos_ rule above) because casing here is inconsistent —
+# e.g. `Mst_user` is lowercase after the prefix, unlike the PascalCase eos_ tables —
+# so a pattern-based rule would silently miss exactly the most-used one.
+# NOTE: if the app starts querying another bare Mst_*/Mstx_* table, add it here too.
+_DBO_TABLES = (
+    "Mst_Cert", "Mst_Company", "Mst_Country", "Mst_Department", "Mst_Emp_Type",
+    "Mst_Fs_Category", "Mst_Location", "Mst_Rank", "Mst_Rig_Subtype", "Mst_Rig_Type",
+    "Mst_user",
+    "Mstx_Incident_Type", "Mstx_Vendor", "Mstx_Work_Location",
+)
+_DBO_TABLES_RE = re.compile(
+    r"(?<!\.)\b(" + "|".join(re.escape(t) for t in sorted(_DBO_TABLES, key=len, reverse=True)) + r")\b"
+)
+
+
+def _translate_dbo_tables(sql: str) -> str:
+    """`Mst_user` → `dbo.Mst_user` (explicit table list — see _DBO_TABLES above).
+    Makes the app independent of the SQL Server login's default schema."""
+    return _DBO_TABLES_RE.sub(r"dbo.\1", sql)
+
+
 def _translate_cast_char(sql: str) -> str:
     """`CAST(x AS CHAR)`  →  `CAST(x AS VARCHAR(50))`"""
     return re.sub(r"\bAS\s+CHAR\s*\)", "AS VARCHAR(50))", sql, flags=re.IGNORECASE)
@@ -372,6 +395,7 @@ def translate_mssql(sql: str, params: tuple) -> tuple[str, tuple]:
     sql = _translate_cast_char(sql)
     sql = _translate_reserved_aliases(sql)
     sql = _translate_eos_tables(sql)
+    sql = _translate_dbo_tables(sql)
     sql = _translate_bool_is_null(sql)
 
     # 5. LIMIT clauses (may consume trailing params).
@@ -385,3 +409,19 @@ def maybe_translate(sql: str, params: tuple) -> tuple[str, tuple]:
     if USE_MSSQL:
         return translate_mssql(sql, params)
     return sql, params
+
+
+def dbq(cursor, sql, params=None):
+    """Execute raw SQL through the dialect translator. Use this instead of
+    cursor.execute() for every raw query in the app (masters, listings, auth, …)
+    — it is a no-op on MySQL and adapts table names/date functions/LIMIT/etc. on
+    SQL Server. Mirrors cursor.execute()'s own calling convention: call with no
+    `params` (not even an empty list) when the original call took none, so we
+    never accidentally trigger %-substitution on SQL containing a literal '%'
+    (e.g. DATE_FORMAT format strings) that isn't a bind placeholder.
+    """
+    if params is None:
+        sql, _ = maybe_translate(sql, ())
+        return cursor.execute(sql)
+    sql, params = maybe_translate(sql, tuple(params))
+    return cursor.execute(sql, params)

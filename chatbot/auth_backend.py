@@ -5,6 +5,7 @@ import logging
 import requests
 from django.contrib.auth import get_user_model
 from django.db import connections, OperationalError
+from .db.sql import dbq
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ def _fetch_mst_users(login_id: str):
     """
     try:
         with connections["default"].cursor() as cursor:
-            cursor.execute(
+            dbq(cursor, 
                 "SELECT USER_ID, USER_LOGIN_ID, USER_NAME, USER_EMAIL, USER_ACTIVE "
                 "FROM Mst_user WHERE UPPER(USER_LOGIN_ID) = UPPER(%s)",
                 [login_id],

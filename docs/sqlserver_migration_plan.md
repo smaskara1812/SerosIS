@@ -1,6 +1,6 @@
 # SQL Server Migration Plan
 
-**Status:** planning · **Owner:** _TBD_ · **Last updated:** 2026-08-14
+**Status:** Phase 1 & 4 done, Phase 2 mostly done · **Owner:** _TBD_ · **Last updated:** 2026-08-14
 
 > MySQL is the temporary development database. **Production runs on SQL Server.**
 > Authoritative table/schema names live in [`database/script_mssql.sql`](../database/script_mssql.sql).
@@ -38,26 +38,28 @@ So this is a **two-schema** problem, not six.
 `USE_MSSQL=true`, and is a **pass-through on MySQL**. It already handles:
 
 - `eos_TableName → eos.TableName` (rule: `\beos_(?=[A-Z])`)
+- `Mst_TableName / Mstx_TableName → dbo.Mst_TableName / dbo.Mstx_TableName`
+  (explicit table list — **added 2026-08-14**, see Phase 2)
 - `CURDATE()/NOW() → CAST(GETDATE() AS DATE)/GETDATE()`
 - `DATE(x)`, `DATE_FORMAT(...)`, `DATE_SUB/ADD → DATEADD`, `DATEDIFF` arg flip
 - `IF() → IIF()`, `col IS [NOT] NULL → CASE …`, `CAST(x AS CHAR) → VARCHAR(50)`
 - reserved-word aliases `AS open/type/key → AS [open]/…`
 - `LIMIT n` / `LIMIT %s [OFFSET %s]` → `OFFSET … ROWS FETCH NEXT … ROWS ONLY`
 
-### 2.3 The gap (the actual landmine)
-Only the **analytics layer** routes through the translator
-(`chatbot/analytics/tools.py`, 1 call site).
-Everything else runs **raw** and bypasses it:
+### 2.3 The gap (the actual landmine) — ✅ closed 2026-08-14
+Previously only the **analytics layer** routed through the translator; everything
+else ran raw SQL that bypassed it. **Fixed in Phase 1** — every raw query now goes
+through `dbq()` (which calls `maybe_translate` internally):
 
 | Module | raw `.execute(` calls | routed through translator? |
 |---|---|---|
-| `chatbot/views.py` | **183** | ❌ no |
-| `chatbot/auth_backend.py` | 1 | ❌ no |
-| `chatbot/health.py` | 1 | ❌ no |
-| `chatbot/analytics/tools.py` | 1 | ✅ yes |
+| `chatbot/views.py` | 183 | ✅ yes (via `dbq()`) |
+| `chatbot/auth_backend.py` | 1 | ✅ yes (via `dbq()`) |
+| `chatbot/audit.py` | 1 | ✅ yes (via `dbq()`) |
+| `chatbot/analytics/tools.py` | 1 | ✅ yes (via its own `_query()`, pre-existing) |
+| `chatbot/health.py` / `chatbot/db/connection.py` | 2 | N/A — SQLAlchemy `text()` pings, not dialect-sensitive |
 
-On SQL Server these 185 statements would run MySQL SQL unchanged → `eos_X` names
-never become `eos.X`, `NOW()`/`LIMIT` never adapt, etc.
+`tests/test_no_raw_sql.py` now enforces this stays true (see Phase 4).
 
 ### 2.4 What is already migration-ready
 - **Audit trail** (`chatbot/audit.py`): its only raw SQL (`snap()`) already routes
@@ -72,16 +74,22 @@ never become `eos.X`, `NOW()`/`LIMIT` never adapt, etc.
 
 ## 3. Strategy
 
-**One choke point.** Introduce a thin helper and funnel *all* raw SQL through it:
+**One choke point.** Introduce a thin helper and funnel *all* raw SQL through it —
+**implemented** in `chatbot/db/sql.py`:
 
 ```python
-# chatbot/db/sql.py (or chatbot/db/__init__.py)
-def dbq(cursor, sql, params=()):
-    """Execute raw SQL through the dialect translator.
-    No-op on MySQL; adapts to SQL Server when USE_MSSQL=true."""
-    sql, params = maybe_translate(sql, tuple(params or ()))
+def dbq(cursor, sql, params=None):
+    if params is None:                    # preserve execute(sql)'s no-params path —
+        sql, _ = maybe_translate(sql, ())  # avoids %-substitution on literal '%'
+        return cursor.execute(sql)         # (e.g. DATE_FORMAT format strings)
+    sql, params = maybe_translate(sql, tuple(params))
     return cursor.execute(sql, params)
 ```
+
+(The `params is None` branch matters: 37 of the 184 call sites pass no params at
+all, and some raw SQL contains literal `%` that isn't a bind placeholder — routing
+those through `cursor.execute(sql, ())` instead of `cursor.execute(sql)` risks
+Python's %-formatting choking on them.)
 
 Then replace `cursor.execute(sql, params)` → `dbq(cursor, sql, params)` app-wide.
 - **Today (MySQL):** identical behaviour (pure pass-through).
@@ -102,29 +110,49 @@ Each phase is independently shippable and verified on MySQL (no behaviour change
 
 ### Phase 0 — Prep & baseline (½ day)
 - [ ] Stand up a SQL Server instance (staging) from `database/script_mssql.sql`.
-- [ ] Confirm the app login's **default schema is `dbo`** (so bare `Mst_*`/`Mstx_*`
-      resolve). If not, note it for Phase 2.
+- [x] Confirmed which schema the app's `Mst_*`/`Mstx_*` tables live in
+      (`dbo`, verified against `script_mssql.sql`) — handled explicitly in Phase 2,
+      so the app no longer *depends on* the login's default schema at all.
 - [ ] Get `tests/test_mssql_connections.py` green against staging.
 - [ ] Snapshot current behaviour: capture a few masters/listings API responses on
       MySQL to diff against later.
 
-### Phase 1 — Introduce the choke point (1 day)
-- [ ] Add `dbq(cursor, sql, params)` to `chatbot/db/sql.py`.
-- [ ] Mechanically convert `chatbot/views.py` (183 sites), `auth_backend.py` (1),
-      `health.py` (1) from `*.execute(` → `dbq(*, …)`. Scriptable (function-scoped
-      string transform + `ast.parse` validation), the same technique used to wire the
-      audit trail.
-- [ ] **Verify on MySQL:** full smoke test of masters + listings + login + health +
-      audit. Zero behaviour change expected.
+### Phase 1 — Introduce the choke point (1 day) ✅ done 2026-08-14
+- [x] Added `dbq(cursor, sql, params=None)` to `chatbot/db/sql.py`.
+- [x] Converted `chatbot/views.py` (183 sites: 160 `cursor.execute(` + 23
+      `cur.execute(`) and `chatbot/auth_backend.py` (1 site) from raw `.execute(` →
+      `dbq(...)`. `chatbot/health.py`'s `conn.execute(text(...))` and
+      `chatbot/db/connection.py`'s equivalent are **out of scope** — they're
+      SQLAlchemy connectivity pings (`SELECT 1`), a different API shape with no
+      dialect-sensitive SQL, not DB-API cursors.
+- [x] `chatbot/audit.py :: snap()` also switched to `dbq()` (was calling
+      `maybe_translate` + `cursor.execute()` manually — same effect, now consistent
+      with the rest of the app).
+- [x] **Verified on MySQL:** logged in (exercises the converted `auth_backend.py`
+      path), full create→edit→delete round-trips on multiple masters, listings
+      list APIs, a listings export, and the audit trail's own `snap()` — all
+      produced identical results to before. Zero behaviour change, as expected.
 
-### Phase 2 — Complete the translator rules (½ day)
-- [ ] If the login default schema is **not** `dbo`: add a rule so `Mst_`/`Mstx_`
-      (and any other bare legacy prefixes the app uses) → `dbo.Mst_`/`dbo.Mstx_`.
-- [ ] Audit `script_mssql.sql` for every table the app references (see §2.1) and
-      confirm each is reachable under the translator's rules.
+### Phase 2 — Complete the translator rules (½ day) — mostly done 2026-08-14
+- [x] Added an **explicit `Mst_`/`Mstx_` → `dbo.Mst_`/`dbo.Mstx_` rule**
+      (`_DBO_TABLES` in `chatbot/db/sql.py`), rather than relying on / verifying the
+      login's default schema. Deliberately **not** a casing-based pattern like the
+      `eos_` rule — `Mst_user` is lowercase after the prefix (unlike the PascalCase
+      `eos_` tables), so a pattern rule would have silently missed exactly the
+      most-used table. Instead the 14 exact `Mst_*`/`Mstx_*` table names the app
+      references are listed explicitly and matched as whole tokens.
+      **If a new bare `Mst_*`/`Mstx_*` table gets queried later, add it to
+      `_DBO_TABLES` — it will NOT auto-translate otherwise.**
+- [x] Confirmed all 14 against `database/script_mssql.sql` — every one is `[dbo]`.
+- [x] Verified translation output directly (no SQL Server connection needed —
+      `translate_mssql()` is pure and testable standalone): `Mst_user →
+      dbo.Mst_user`, `eos_Mst_Rig → eos.Mst_Rig`, `Mst_Rig_Subtype →
+      dbo.Mst_Rig_Subtype` (confirmed no collision with the `eos_Mst_Rig` rule),
+      and a mixed query (JOIN across both schemas + LIMIT/OFFSET) — all correct.
 - [ ] Add unit tests in `tests/` for `maybe_translate` covering each app table name
       and each dialect feature actually used (grep shows ~64 uses of
-      `LIMIT/NOW/CURDATE/DATE_FORMAT/DATEDIFF/COALESCE` in views alone).
+      `LIMIT/NOW/CURDATE/DATE_FORMAT/DATEDIFF/COALESCE` in views alone). The ad-hoc
+      verification above should become a real test file.
 
 ### Phase 3 — Run the app on SQL Server (1–2 days)
 - [ ] Point `USE_MSSQL=true` at staging; run the masters CRUD, listings, exports,
@@ -135,9 +163,14 @@ Each phase is independently shippable and verified on MySQL (no behaviour change
       but `travel_eligibility`/`reporting_structure` use `lastrowid`).
 - [ ] Re-run the Phase 0 response diffs — MySQL vs SQL Server outputs should match.
 
-### Phase 4 — Guard rails (½ day)
-- [ ] Add a test that **fails if any app module outside `chatbot/db/` contains a raw
-      `\.execute\(` not going through `dbq`** (regex scan). Prevents drift.
+### Phase 4 — Guard rails (½ day) ✅ done 2026-08-14
+- [x] `tests/test_no_raw_sql.py` — AST-based scan that **fails if any app module
+      outside the translator's own choke points contains a raw `<name>.execute(...)`
+      DB-API call**. Run: `python tests/test_no_raw_sql.py`. Correctly allows
+      `chatbot/db/sql.py::dbq()` and `chatbot/analytics/tools.py::_query()` (the two
+      legitimate choke points), and SQLAlchemy's `conn.execute(text(...))` pings
+      (structurally different API, no dialect-sensitive SQL). Currently passes clean.
+- [ ] Wire this into CI once one exists.
 - [ ] Document the rule in `CLAUDE.md` / contributing notes: "all raw SQL goes through
       `dbq()`; new masters keep using the audit helpers (already translator-aware)."
 

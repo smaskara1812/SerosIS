@@ -17,6 +17,7 @@ from .health import run_all as run_health_checks
 from .analytics.router import route as analytics_route
 from .permissions import require_permission, get_user_access as _get_access
 from . import audit as _audit
+from .db.sql import dbq
 
 
 def _invalidate_user_perm_cache(user_id):
@@ -865,7 +866,7 @@ def cost_centre_type_page(request):
 def cost_centre_type_list_api(request):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Cost_Centre_Type_Id, Cost_Centre_Type_Name,
                    Cost_Centre_Type_Shortname, Cost_Centre_Type_Active
             FROM eos_Mst_Cost_Centre_Type
@@ -879,7 +880,7 @@ def cost_centre_type_list_api(request):
 def cost_centre_type_get_api(request, type_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Cost_Centre_Type_Id, Cost_Centre_Type_Name,
                    Cost_Centre_Type_Shortname, Cost_Centre_Type_Active
             FROM eos_Mst_Cost_Centre_Type
@@ -918,7 +919,7 @@ def cost_centre_type_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.cost_centre_types", type_id)
         if type_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Cost_Centre_Type
                 SET Cost_Centre_Type_Name=%s, Cost_Centre_Type_Shortname=%s,
                     Cost_Centre_Type_Active=%s, Mod_User_Id=%s, Mod_Dt=%s
@@ -927,9 +928,9 @@ def cost_centre_type_save_api(request):
             _audit.record_save(request, cursor, "masters.cost_centre_types", type_id, _before)
             return JsonResponse({"success": True, "Cost_Centre_Type_Id": type_id, "action": "updated"})
         else:
-            cursor.execute("SELECT COALESCE(MAX(Cost_Centre_Type_Id), 0) + 1 FROM eos_Mst_Cost_Centre_Type")
+            dbq(cursor, "SELECT COALESCE(MAX(Cost_Centre_Type_Id), 0) + 1 FROM eos_Mst_Cost_Centre_Type")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Cost_Centre_Type
                     (Cost_Centre_Type_Id, Cost_Centre_Type_Name, Cost_Centre_Type_Shortname,
                      Cost_Centre_Type_Active, Cr_User_Id, Cr_Dt)
@@ -948,7 +949,7 @@ def cost_centre_type_deactivate_api(request, type_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.cost_centre_types", type_id)
-        cursor.execute("""
+        dbq(cursor, """
             UPDATE eos_Mst_Cost_Centre_Type
             SET Cost_Centre_Type_Active='N', Mod_User_Id=%s, Mod_Dt=%s
             WHERE Cost_Centre_Type_Id=%s
@@ -966,7 +967,7 @@ def cost_centre_page(request):
 def cost_centre_meta_api(request):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Cost_Centre_Type_Id, Cost_Centre_Type_Name
             FROM eos_Mst_Cost_Centre_Type
             WHERE Cost_Centre_Type_Active = 'Y'
@@ -991,7 +992,7 @@ def cost_centre_locations_search_api(request):
             params.append(country_id)
         sql += " ORDER BY Location_Name LIMIT %s OFFSET %s"
         params.extend([limit, offset])
-        cursor.execute(sql, params)
+        dbq(cursor, sql, params)
         cols = [c[0] for c in cursor.description]
         rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
     return JsonResponse({"results": rows})
@@ -1000,7 +1001,7 @@ def cost_centre_locations_search_api(request):
 def cost_centre_list_api(request):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT cc.Cost_Centre_Id, cc.Cost_Centre_Name, cc.Old_Cost_Centre_Name,
                    cc.Cost_Centre_Type_Id, cct.Cost_Centre_Type_Name,
                    cc.Rig_Id, r.Rig_Name,
@@ -1020,7 +1021,7 @@ def cost_centre_list_api(request):
 def cost_centre_get_api(request, cc_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT cc.Cost_Centre_Id, cc.Cost_Centre_Name, cc.Old_Cost_Centre_Name,
                    cc.Cost_Centre_Type_Id, cct.Cost_Centre_Type_Name,
                    cc.Rig_Id, r.Rig_Name,
@@ -1068,7 +1069,7 @@ def cost_centre_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.cost_centres", cc_id)
         if cc_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Cost_Centre
                 SET Cost_Centre_Name=%s, Old_Cost_Centre_Name=%s, Cost_Centre_Type_Id=%s,
                     Rig_Id=%s, Location_Id=%s, Cost_Centre_Active=%s,
@@ -1078,9 +1079,9 @@ def cost_centre_save_api(request):
             _audit.record_save(request, cursor, "masters.cost_centres", cc_id, _before)
             return JsonResponse({"success": True, "Cost_Centre_Id": cc_id, "action": "updated"})
         else:
-            cursor.execute("SELECT COALESCE(MAX(Cost_Centre_Id), 0) + 1 FROM eos_Mst_Cost_Centre")
+            dbq(cursor, "SELECT COALESCE(MAX(Cost_Centre_Id), 0) + 1 FROM eos_Mst_Cost_Centre")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Cost_Centre
                     (Cost_Centre_Id, Cost_Centre_Name, Old_Cost_Centre_Name,
                      Cost_Centre_Type_Id, Rig_Id, Location_Id,
@@ -1100,7 +1101,7 @@ def cost_centre_deactivate_api(request, cc_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.cost_centres", cc_id)
-        cursor.execute("""
+        dbq(cursor, """
             UPDATE eos_Mst_Cost_Centre
             SET Cost_Centre_Active='N', Mod_User_Id=%s, Mod_Dt=%s
             WHERE Cost_Centre_Id=%s
@@ -1118,7 +1119,7 @@ def operator_master_page(request):
 def operator_list_api(request):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT o.Operator_Id, o.Operator_Name, o.Operator_Short_Name,
                    o.Operator_SAP_Code, o.WBS_Client_Code,
                    o.Country_Id, c.country_name,
@@ -1138,7 +1139,7 @@ def operator_list_api(request):
 def operator_get_api(request, op_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT o.Operator_Id, o.Operator_Name, o.Operator_Short_Name,
                    o.Operator_SAP_Code, o.WBS_Client_Code,
                    o.Country_Id, c.country_name,
@@ -1190,7 +1191,7 @@ def operator_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.operators", op_id)
         if op_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Operator
                 SET Operator_Name=%s, Operator_Short_Name=%s, Operator_SAP_Code=%s,
                     WBS_Client_Code=%s, Country_Id=%s, Location_Id=%s,
@@ -1202,9 +1203,9 @@ def operator_save_api(request):
             _audit.record_save(request, cursor, "masters.operators", op_id, _before)
             return JsonResponse({"success": True, "Operator_Id": op_id, "action": "updated"})
         else:
-            cursor.execute("SELECT COALESCE(MAX(Operator_Id), 0) + 1 FROM eos_Mst_Operator")
+            dbq(cursor, "SELECT COALESCE(MAX(Operator_Id), 0) + 1 FROM eos_Mst_Operator")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Operator
                     (Operator_Id, Operator_Name, Operator_Short_Name, Operator_SAP_Code,
                      WBS_Client_Code, Country_Id, Location_Id, Contact_Person,
@@ -1225,7 +1226,7 @@ def operator_deactivate_api(request, op_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.operators", op_id)
-        cursor.execute("""
+        dbq(cursor, """
             UPDATE eos_Mst_Operator
             SET Operator_Active='N', Mod_User_Id=%s, Mod_Dt=%s
             WHERE Operator_Id=%s
@@ -1240,7 +1241,7 @@ def operator_countries_search_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(50, max(1, int(request.GET.get("limit", 20))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT country_id, country_name FROM Mst_Country
             WHERE country_active = 'Y' AND country_name LIKE %s
             ORDER BY country_name LIMIT %s OFFSET %s
@@ -1260,7 +1261,7 @@ def cost_centre_type_check_delete_api(request, type_id):
             ("eos_Mst_Cost_Centre", "Cost_Centre_Type_Id", "Cost Centres"),
             ("eos_Mst_HSE_Manhours_Party", "Cost_Centre_Type_Id", "HSE Manhours Parties"),
         ]:
-            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [type_id])
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [type_id])
             count = cursor.fetchone()[0]
             if count > 0:
                 refs.append({"label": label, "count": count})
@@ -1281,10 +1282,10 @@ def cost_centre_type_delete_api(request, type_id):
             ("eos_Mst_Cost_Centre", "Cost_Centre_Type_Id"),
             ("eos_Mst_HSE_Manhours_Party", "Cost_Centre_Type_Id"),
         ]:
-            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [type_id])
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [type_id])
             if cursor.fetchone()[0] > 0:
                 return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
-        cursor.execute("DELETE FROM eos_Mst_Cost_Centre_Type WHERE Cost_Centre_Type_Id=%s", [type_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Cost_Centre_Type WHERE Cost_Centre_Type_Id=%s", [type_id])
     _audit.record_delete(request, "masters.cost_centre_types", type_id, _before)
     return JsonResponse({"success": True})
 
@@ -1304,7 +1305,7 @@ def cost_centre_check_delete_api(request, cc_id):
             ("eos_Fs_Emp_To_CC_Mapping", "Cost_Centre_Id", "Employee Mappings"),
             ("eos_Proj_To_Cost_Centre_Mapping", "Cost_Centre_Id", "Project Mappings"),
         ]:
-            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [cc_id])
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [cc_id])
             count = cursor.fetchone()[0]
             if count > 0:
                 refs.append({"label": label, "count": count})
@@ -1329,10 +1330,10 @@ def cost_centre_delete_api(request, cc_id):
             ("eos_Fs_Emp_To_CC_Mapping", "Cost_Centre_Id"),
             ("eos_Proj_To_Cost_Centre_Mapping", "Cost_Centre_Id"),
         ]:
-            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [cc_id])
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [cc_id])
             if cursor.fetchone()[0] > 0:
                 return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
-        cursor.execute("DELETE FROM eos_Mst_Cost_Centre WHERE Cost_Centre_Id=%s", [cc_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Cost_Centre WHERE Cost_Centre_Id=%s", [cc_id])
     _audit.record_delete(request, "masters.cost_centres", cc_id, _before)
     return JsonResponse({"success": True})
 
@@ -1350,7 +1351,7 @@ def operator_check_delete_api(request, op_id):
             ("eos_Tender_Dtl", "Operator_Id", "Tenders"),
             ("eos_Competitor_Contract_Dtl", "Operator_Id", "Competitor Contracts"),
         ]:
-            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [op_id])
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [op_id])
             count = cursor.fetchone()[0]
             if count > 0:
                 refs.append({"label": label, "count": count})
@@ -1373,10 +1374,10 @@ def operator_delete_api(request, op_id):
             ("eos_Tender_Dtl", "Operator_Id"),
             ("eos_Competitor_Contract_Dtl", "Operator_Id"),
         ]:
-            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [op_id])
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [op_id])
             if cursor.fetchone()[0] > 0:
                 return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
-        cursor.execute("DELETE FROM eos_Mst_Operator WHERE Operator_Id=%s", [op_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Operator WHERE Operator_Id=%s", [op_id])
     _audit.record_delete(request, "masters.operators", op_id, _before)
     return JsonResponse({"success": True})
 
@@ -1396,7 +1397,7 @@ def rig_master_check_delete_api(request, rig_id):
             ("eos_Crew_Grp_Dtl", "Rig_Id", "Crew Group Records"),
             ("eos_Mst_Crew_Grp", "Rig_Id", "Crew Groups"),
         ]:
-            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [rig_id])
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [rig_id])
             count = cursor.fetchone()[0]
             if count > 0:
                 refs.append({"label": label, "count": count})
@@ -1421,10 +1422,10 @@ def rig_master_delete_api(request, rig_id):
             ("eos_Crew_Grp_Dtl", "Rig_Id"),
             ("eos_Mst_Crew_Grp", "Rig_Id"),
         ]:
-            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [rig_id])
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [rig_id])
             if cursor.fetchone()[0] > 0:
                 return JsonResponse({"error": "Record is still referenced and cannot be deleted."}, status=409)
-        cursor.execute("DELETE FROM eos_Mst_Rig WHERE Rig_Id=%s", [rig_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Rig WHERE Rig_Id=%s", [rig_id])
     _audit.record_delete(request, "masters.rigs", rig_id, _before)
     return JsonResponse({"success": True})
 
@@ -1440,7 +1441,7 @@ def rig_master_page(request):
 def rig_master_meta_api(request):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT rs.Rig_Subtype_Id, rs.Rig_Subtype_Name, rs.Rig_Type_Id, rt.Rig_Type_Name
             FROM Mst_Rig_Subtype rs
             JOIN Mst_Rig_Type rt ON rs.Rig_Type_Id = rt.Rig_Type_Id
@@ -1449,7 +1450,7 @@ def rig_master_meta_api(request):
         cols = [c[0] for c in cursor.description]
         subtypes = [dict(zip(cols, row)) for row in cursor.fetchall()]
 
-        cursor.execute("SELECT Rig_Type_Id, Rig_Type_Name FROM Mst_Rig_Type ORDER BY Rig_Type_Name")
+        dbq(cursor, "SELECT Rig_Type_Id, Rig_Type_Name FROM Mst_Rig_Type ORDER BY Rig_Type_Name")
         cols = [c[0] for c in cursor.description]
         types = [dict(zip(cols, row)) for row in cursor.fetchall()]
 
@@ -1462,7 +1463,7 @@ def rig_master_search_api(request):
     q = request.GET.get("q", "").strip()
     with connections["default"].cursor() as cursor:
         if q:
-            cursor.execute("""
+            dbq(cursor, """
                 SELECT r.Rig_Id, r.Rig_Name, r.Rig_Short_Name,
                        rs.Rig_Subtype_Name, rt.Rig_Type_Name, r.Rig_Active
                 FROM eos_Mst_Rig r
@@ -1473,7 +1474,7 @@ def rig_master_search_api(request):
                 LIMIT 20
             """, [f"%{q}%", f"%{q}%"])
         else:
-            cursor.execute("""
+            dbq(cursor, """
                 SELECT r.Rig_Id, r.Rig_Name, r.Rig_Short_Name,
                        rs.Rig_Subtype_Name, rt.Rig_Type_Name, r.Rig_Active
                 FROM eos_Mst_Rig r
@@ -1490,7 +1491,7 @@ def rig_master_search_api(request):
 def rig_master_get_api(request, rig_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Rig_Id, Rig_Name, Rig_Short_Name, Old_Rig_Name,
                    Rig_Subtype_Id, Rig_Type_Id, Rig_Built_Dt,
                    Rig_Tel_No, Rig_Fax_No, Rig_Email_Id,
@@ -1541,7 +1542,7 @@ def rig_master_save_api(request):
             rig_active = body.get("Rig_Active", "Y")
             if rig_active not in ("Y", "N"):
                 rig_active = "Y"
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Rig SET
                     Rig_Name=%s, Rig_Short_Name=%s, Old_Rig_Name=%s,
                     Rig_Subtype_Id=%s, Rig_Type_Id=%s, Rig_Built_Dt=%s,
@@ -1560,9 +1561,9 @@ def rig_master_save_api(request):
             _audit.record_save(request, cursor, "masters.rigs", rig_id, _before)
             return JsonResponse({"success": True, "Rig_Id": rig_id, "action": "updated"})
         else:
-            cursor.execute("SELECT COALESCE(MAX(Rig_Id), 0) + 1 FROM eos_Mst_Rig")
+            dbq(cursor, "SELECT COALESCE(MAX(Rig_Id), 0) + 1 FROM eos_Mst_Rig")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Rig (
                     Rig_Id, Rig_Name, Rig_Short_Name, Old_Rig_Name,
                     Rig_Subtype_Id, Rig_Type_Id, Rig_Built_Dt,
@@ -2127,9 +2128,9 @@ def listings_users_api(request):
     from django.db import connections
     import math
     with connections["default"].cursor() as cursor:
-        cursor.execute(sql_count, params)
+        dbq(cursor, sql_count, params)
         total = cursor.fetchone()[0]
-        cursor.execute(sql_rows, params + [per_page, offset])
+        dbq(cursor, sql_rows, params + [per_page, offset])
         rows = cursor.fetchall()
 
     return JsonResponse({
@@ -2195,7 +2196,7 @@ def listings_users_export(request):
         ORDER BY {sort_col} {sort_dir}
     """
     with connections["default"].cursor() as cursor:
-        cursor.execute(sql, params)
+        dbq(cursor, sql, params)
         rows = [
             {
                 "user_id": r[0], "name": r[1] or "", "login_id": r[2] or "",
@@ -2505,7 +2506,7 @@ def contractor_list_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(200, max(1, int(request.GET.get("limit", 200))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Contractor_Id, Contractor_Name
             FROM eos_Mst_Contractor
             WHERE Contractor_Name LIKE %s
@@ -2521,7 +2522,7 @@ def contractor_list_api(request):
 def contractor_get_api(request, contractor_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Contractor_Id, Contractor_Name
             FROM eos_Mst_Contractor
             WHERE Contractor_Id=%s
@@ -2559,15 +2560,15 @@ def contractor_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.contractors", contractor_id)
         if contractor_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Contractor
                 SET Contractor_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Contractor_Id=%s
             """, [contractor_name, _uid, now, contractor_id])
         else:
-            cursor.execute("SELECT COALESCE(MAX(Contractor_Id),0)+1 FROM eos_Mst_Contractor")
+            dbq(cursor, "SELECT COALESCE(MAX(Contractor_Id),0)+1 FROM eos_Mst_Contractor")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Contractor
                     (Contractor_Id, Contractor_Name, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s)
@@ -2592,7 +2593,7 @@ def contractor_delete_api(request, contractor_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.contractors", contractor_id)
-        cursor.execute("DELETE FROM eos_Mst_Contractor WHERE Contractor_Id=%s", [contractor_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Contractor WHERE Contractor_Id=%s", [contractor_id])
     _audit.record_delete(request, "masters.contractors", contractor_id, _before)
     return JsonResponse({"success": True})
 
@@ -2611,7 +2612,7 @@ def rig_operation_list_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(200, max(1, int(request.GET.get("limit", 200))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Rig_Operation_Id, Rig_Operation_Name
             FROM eos_Mst_Rig_Operation
             WHERE Rig_Operation_Name LIKE %s
@@ -2627,7 +2628,7 @@ def rig_operation_list_api(request):
 def rig_operation_get_api(request, op_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Rig_Operation_Id, Rig_Operation_Name
             FROM eos_Mst_Rig_Operation
             WHERE Rig_Operation_Id=%s
@@ -2665,15 +2666,15 @@ def rig_operation_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.rig_operations", op_id)
         if op_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Rig_Operation
                 SET Rig_Operation_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Rig_Operation_Id=%s
             """, [op_name, _uid, now, op_id])
         else:
-            cursor.execute("SELECT COALESCE(MAX(Rig_Operation_Id),0)+1 FROM eos_Mst_Rig_Operation")
+            dbq(cursor, "SELECT COALESCE(MAX(Rig_Operation_Id),0)+1 FROM eos_Mst_Rig_Operation")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Rig_Operation
                     (Rig_Operation_Id, Rig_Operation_Name, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s)
@@ -2698,7 +2699,7 @@ def rig_operation_delete_api(request, op_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.rig_operations", op_id)
-        cursor.execute("DELETE FROM eos_Mst_Rig_Operation WHERE Rig_Operation_Id=%s", [op_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Rig_Operation WHERE Rig_Operation_Id=%s", [op_id])
     _audit.record_delete(request, "masters.rig_operations", op_id, _before)
     return JsonResponse({"success": True})
 
@@ -2717,7 +2718,7 @@ def contact_exposure_type_list_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(200, max(1, int(request.GET.get("limit", 200))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Contact_Expo_Type_Id, Contact_Expo_Type_Name
             FROM eos_Mst_Contact_Exposure_Type
             WHERE Contact_Expo_Type_Name LIKE %s
@@ -2733,7 +2734,7 @@ def contact_exposure_type_list_api(request):
 def contact_exposure_type_get_api(request, type_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Contact_Expo_Type_Id, Contact_Expo_Type_Name
             FROM eos_Mst_Contact_Exposure_Type
             WHERE Contact_Expo_Type_Id=%s
@@ -2771,15 +2772,15 @@ def contact_exposure_type_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.contact_exposure_types", type_id)
         if type_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Contact_Exposure_Type
                 SET Contact_Expo_Type_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Contact_Expo_Type_Id=%s
             """, [type_name, _uid, now, type_id])
         else:
-            cursor.execute("SELECT COALESCE(MAX(Contact_Expo_Type_Id),0)+1 FROM eos_Mst_Contact_Exposure_Type")
+            dbq(cursor, "SELECT COALESCE(MAX(Contact_Expo_Type_Id),0)+1 FROM eos_Mst_Contact_Exposure_Type")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Contact_Exposure_Type
                     (Contact_Expo_Type_Id, Contact_Expo_Type_Name, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s)
@@ -2804,7 +2805,7 @@ def contact_exposure_type_delete_api(request, type_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.contact_exposure_types", type_id)
-        cursor.execute("DELETE FROM eos_Mst_Contact_Exposure_Type WHERE Contact_Expo_Type_Id=%s", [type_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Contact_Exposure_Type WHERE Contact_Expo_Type_Id=%s", [type_id])
     _audit.record_delete(request, "masters.contact_exposure_types", type_id, _before)
     return JsonResponse({"success": True})
 
@@ -2826,7 +2827,7 @@ def indicator_type_list_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(200, max(1, int(request.GET.get("limit", 200))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Indicator_Type_Id, Indicator_Type_Name, Report_Type, Indicator_Type_Order
             FROM eos_Mst_Indicator_Type
             WHERE Indicator_Type_Name LIKE %s
@@ -2842,7 +2843,7 @@ def indicator_type_list_api(request):
 def indicator_type_get_api(request, type_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Indicator_Type_Id, Indicator_Type_Name, Report_Type, Indicator_Type_Order
             FROM eos_Mst_Indicator_Type
             WHERE Indicator_Type_Id=%s
@@ -2883,18 +2884,18 @@ def indicator_type_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.indicator_types", type_id)
         if type_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Indicator_Type
                 SET Indicator_Type_Name=%s, Report_Type=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Indicator_Type_Id=%s
             """, [type_name, report_type, _uid, now, type_id])
         else:
-            cursor.execute("SELECT COALESCE(MAX(Indicator_Type_Id),0)+1 FROM eos_Mst_Indicator_Type")
+            dbq(cursor, "SELECT COALESCE(MAX(Indicator_Type_Id),0)+1 FROM eos_Mst_Indicator_Type")
             new_id = cursor.fetchone()[0]
             # Order is a per-Report_Type sequence.
-            cursor.execute("SELECT COALESCE(MAX(Indicator_Type_Order),0)+1 FROM eos_Mst_Indicator_Type WHERE Report_Type=%s", [report_type])
+            dbq(cursor, "SELECT COALESCE(MAX(Indicator_Type_Order),0)+1 FROM eos_Mst_Indicator_Type WHERE Report_Type=%s", [report_type])
             new_order = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Indicator_Type
                     (Indicator_Type_Id, Indicator_Type_Name, Indicator_Type_Order, Report_Type, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s, %s, %s)
@@ -2908,7 +2909,7 @@ def indicator_type_save_api(request):
 def indicator_type_check_delete_api(request, type_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) FROM eos_Mst_Indicator_Subtype WHERE Indicator_Type_Id=%s", [type_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_Mst_Indicator_Subtype WHERE Indicator_Type_Id=%s", [type_id])
         n = cursor.fetchone()[0]
     if n:
         return JsonResponse({"can_delete": False, "references": [{"count": n, "label": "Indicator Subtype(s)"}]})
@@ -2924,11 +2925,11 @@ def indicator_type_delete_api(request, type_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) FROM eos_Mst_Indicator_Subtype WHERE Indicator_Type_Id=%s", [type_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_Mst_Indicator_Subtype WHERE Indicator_Type_Id=%s", [type_id])
         if cursor.fetchone()[0]:
             return JsonResponse({"error": "Cannot delete: referenced by Indicator Subtypes"}, status=409)
         _before = _audit.snap(cursor, "masters.indicator_types", type_id)
-        cursor.execute("DELETE FROM eos_Mst_Indicator_Type WHERE Indicator_Type_Id=%s", [type_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Indicator_Type WHERE Indicator_Type_Id=%s", [type_id])
     _audit.record_delete(request, "masters.indicator_types", type_id, _before)
     return JsonResponse({"success": True})
 
@@ -2945,7 +2946,7 @@ def indicator_subtype_meta_api(request):
     """Indicator Type options for the dropdown."""
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Indicator_Type_Id, Indicator_Type_Name, Report_Type
             FROM eos_Mst_Indicator_Type
             ORDER BY Report_Type, Indicator_Type_Order
@@ -2962,7 +2963,7 @@ def indicator_subtype_list_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(200, max(1, int(request.GET.get("limit", 200))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT s.Indicator_Subtype_Id, s.Indicator_Type_Id, t.Indicator_Type_Name,
                    t.Report_Type, s.Indicator_Subtype_Name, s.Indicator_Subtype_Order
             FROM eos_Mst_Indicator_Subtype s
@@ -2980,7 +2981,7 @@ def indicator_subtype_list_api(request):
 def indicator_subtype_get_api(request, subtype_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Indicator_Subtype_Id, Indicator_Type_Id, Indicator_Subtype_Name, Indicator_Subtype_Order
             FROM eos_Mst_Indicator_Subtype
             WHERE Indicator_Subtype_Id=%s
@@ -3019,23 +3020,23 @@ def indicator_subtype_save_api(request):
     _uid = _audit.ops_user_id(request)
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.indicator_subtypes", subtype_id)
-        cursor.execute("SELECT COUNT(*) FROM eos_Mst_Indicator_Type WHERE Indicator_Type_Id=%s", [type_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_Mst_Indicator_Type WHERE Indicator_Type_Id=%s", [type_id])
         if not cursor.fetchone()[0]:
             return JsonResponse({"error": "Selected indicator type does not exist"}, status=400)
         now = datetime.now()
         if subtype_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Indicator_Subtype
                 SET Indicator_Subtype_Name=%s, Indicator_Type_Id=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Indicator_Subtype_Id=%s
             """, [subtype_name, type_id, _uid, now, subtype_id])
         else:
-            cursor.execute("SELECT COALESCE(MAX(Indicator_Subtype_Id),0)+1 FROM eos_Mst_Indicator_Subtype")
+            dbq(cursor, "SELECT COALESCE(MAX(Indicator_Subtype_Id),0)+1 FROM eos_Mst_Indicator_Subtype")
             new_id = cursor.fetchone()[0]
             # Order is a per-Indicator_Type sequence.
-            cursor.execute("SELECT COALESCE(MAX(Indicator_Subtype_Order),0)+1 FROM eos_Mst_Indicator_Subtype WHERE Indicator_Type_Id=%s", [type_id])
+            dbq(cursor, "SELECT COALESCE(MAX(Indicator_Subtype_Order),0)+1 FROM eos_Mst_Indicator_Subtype WHERE Indicator_Type_Id=%s", [type_id])
             new_order = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Indicator_Subtype
                     (Indicator_Subtype_Id, Indicator_Type_Id, Indicator_Subtype_Name, Indicator_Subtype_Order, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s, %s, %s)
@@ -3050,11 +3051,11 @@ def indicator_subtype_check_delete_api(request, subtype_id):
     from django.db import connections
     refs = []
     with connections["default"].cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) FROM eos_Leading_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_Leading_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
         n = cursor.fetchone()[0]
         if n:
             refs.append({"count": n, "label": "Leading Indicator record(s)"})
-        cursor.execute("SELECT COUNT(*) FROM eos_Lagging_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_Lagging_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
         n = cursor.fetchone()[0]
         if n:
             refs.append({"count": n, "label": "Lagging Indicator record(s)"})
@@ -3070,14 +3071,14 @@ def indicator_subtype_delete_api(request, subtype_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) FROM eos_Leading_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_Leading_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
         leading = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM eos_Lagging_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_Lagging_Indicators_Dtl WHERE Indicator_Subtype_Id=%s", [subtype_id])
         lagging = cursor.fetchone()[0]
         if leading or lagging:
             return JsonResponse({"error": "Cannot delete: referenced by Indicator records"}, status=409)
         _before = _audit.snap(cursor, "masters.indicator_subtypes", subtype_id)
-        cursor.execute("DELETE FROM eos_Mst_Indicator_Subtype WHERE Indicator_Subtype_Id=%s", [subtype_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Indicator_Subtype WHERE Indicator_Subtype_Id=%s", [subtype_id])
     _audit.record_delete(request, "masters.indicator_subtypes", subtype_id, _before)
     return JsonResponse({"success": True})
 
@@ -3096,7 +3097,7 @@ def parts_of_body_list_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(200, max(1, int(request.GET.get("limit", 200))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Part_Of_Body_Id, Part_Of_Body_Name
             FROM eos_Mst_Parts_Of_Body
             WHERE Part_Of_Body_Name LIKE %s
@@ -3112,7 +3113,7 @@ def parts_of_body_list_api(request):
 def parts_of_body_get_api(request, part_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Part_Of_Body_Id, Part_Of_Body_Name
             FROM eos_Mst_Parts_Of_Body
             WHERE Part_Of_Body_Id=%s
@@ -3150,15 +3151,15 @@ def parts_of_body_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.parts_of_body", part_id)
         if part_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Parts_Of_Body
                 SET Part_Of_Body_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Part_Of_Body_Id=%s
             """, [part_name, _uid, now, part_id])
         else:
-            cursor.execute("SELECT COALESCE(MAX(Part_Of_Body_Id),0)+1 FROM eos_Mst_Parts_Of_Body")
+            dbq(cursor, "SELECT COALESCE(MAX(Part_Of_Body_Id),0)+1 FROM eos_Mst_Parts_Of_Body")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Parts_Of_Body
                     (Part_Of_Body_Id, Part_Of_Body_Name, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s)
@@ -3182,7 +3183,7 @@ def qhse_category_list_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(200, max(1, int(request.GET.get("limit", 200))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT QHSE_Category_Id, QHSE_Category_Name
             FROM eos_Mst_QHSE_Category
             WHERE QHSE_Category_Name LIKE %s
@@ -3198,7 +3199,7 @@ def qhse_category_list_api(request):
 def qhse_category_get_api(request, cat_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT QHSE_Category_Id, QHSE_Category_Name
             FROM eos_Mst_QHSE_Category
             WHERE QHSE_Category_Id=%s
@@ -3236,15 +3237,15 @@ def qhse_category_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.qhse_categories", cat_id)
         if cat_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_QHSE_Category
                 SET QHSE_Category_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE QHSE_Category_Id=%s
             """, [cat_name, _uid, now, cat_id])
         else:
-            cursor.execute("SELECT COALESCE(MAX(QHSE_Category_Id),0)+1 FROM eos_Mst_QHSE_Category")
+            dbq(cursor, "SELECT COALESCE(MAX(QHSE_Category_Id),0)+1 FROM eos_Mst_QHSE_Category")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_QHSE_Category
                     (QHSE_Category_Id, QHSE_Category_Name, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s)
@@ -3272,7 +3273,7 @@ def hse_activity_list_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(200, max(1, int(request.GET.get("limit", 200))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT HSE_Activity_Id, HSE_Activity_Name, HSE_Activity_Type
             FROM eos_Mst_HSE_Activity
             WHERE HSE_Activity_Name LIKE %s
@@ -3288,7 +3289,7 @@ def hse_activity_list_api(request):
 def hse_activity_get_api(request, act_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT HSE_Activity_Id, HSE_Activity_Name, HSE_Activity_Type
             FROM eos_Mst_HSE_Activity
             WHERE HSE_Activity_Id=%s
@@ -3329,15 +3330,15 @@ def hse_activity_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.hse_activities", act_id)
         if act_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_HSE_Activity
                 SET HSE_Activity_Name=%s, HSE_Activity_Type=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE HSE_Activity_Id=%s
             """, [act_name, act_type, _uid, now, act_id])
         else:
-            cursor.execute("SELECT COALESCE(MAX(HSE_Activity_Id),0)+1 FROM eos_Mst_HSE_Activity")
+            dbq(cursor, "SELECT COALESCE(MAX(HSE_Activity_Id),0)+1 FROM eos_Mst_HSE_Activity")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_HSE_Activity
                     (HSE_Activity_Id, HSE_Activity_Name, HSE_Activity_Type, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s, %s)
@@ -3351,7 +3352,7 @@ def hse_activity_save_api(request):
 def hse_activity_check_delete_api(request, act_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Activities WHERE HSE_Activity_Id=%s", [act_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Activities WHERE HSE_Activity_Id=%s", [act_id])
         n = cursor.fetchone()[0]
     if n:
         return JsonResponse({"can_delete": False, "references": [{"count": n, "label": "Monthly HSE Activity record(s)"}]})
@@ -3367,11 +3368,11 @@ def hse_activity_delete_api(request, act_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Activities WHERE HSE_Activity_Id=%s", [act_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Activities WHERE HSE_Activity_Id=%s", [act_id])
         if cursor.fetchone()[0]:
             return JsonResponse({"error": "Cannot delete: referenced by Monthly HSE Activity records"}, status=409)
         _before = _audit.snap(cursor, "masters.hse_activities", act_id)
-        cursor.execute("DELETE FROM eos_Mst_HSE_Activity WHERE HSE_Activity_Id=%s", [act_id])
+        dbq(cursor, "DELETE FROM eos_Mst_HSE_Activity WHERE HSE_Activity_Id=%s", [act_id])
     _audit.record_delete(request, "masters.hse_activities", act_id, _before)
     return JsonResponse({"success": True})
 
@@ -3390,7 +3391,7 @@ def hse_consumable_list_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(200, max(1, int(request.GET.get("limit", 200))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT HSE_Consumable_Id, HSE_Consumable_Name, HSE_Consumption_Unit
             FROM eos_Mst_HSE_Consumable
             WHERE HSE_Consumable_Name LIKE %s
@@ -3406,7 +3407,7 @@ def hse_consumable_list_api(request):
 def hse_consumable_get_api(request, con_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT HSE_Consumable_Id, HSE_Consumable_Name, HSE_Consumption_Unit
             FROM eos_Mst_HSE_Consumable
             WHERE HSE_Consumable_Id=%s
@@ -3447,15 +3448,15 @@ def hse_consumable_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.hse_consumables", con_id)
         if con_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_HSE_Consumable
                 SET HSE_Consumable_Name=%s, HSE_Consumption_Unit=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE HSE_Consumable_Id=%s
             """, [con_name, con_unit, _uid, now, con_id])
         else:
-            cursor.execute("SELECT COALESCE(MAX(HSE_Consumable_Id),0)+1 FROM eos_Mst_HSE_Consumable")
+            dbq(cursor, "SELECT COALESCE(MAX(HSE_Consumable_Id),0)+1 FROM eos_Mst_HSE_Consumable")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_HSE_Consumable
                     (HSE_Consumable_Id, HSE_Consumable_Name, HSE_Consumption_Unit, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, %s, %s)
@@ -3469,7 +3470,7 @@ def hse_consumable_save_api(request):
 def hse_consumable_check_delete_api(request, con_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Environment WHERE HSE_Consumable_Id=%s", [con_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Environment WHERE HSE_Consumable_Id=%s", [con_id])
         n = cursor.fetchone()[0]
     if n:
         return JsonResponse({"can_delete": False, "references": [{"count": n, "label": "Monthly HSE Environment record(s)"}]})
@@ -3485,11 +3486,11 @@ def hse_consumable_delete_api(request, con_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Environment WHERE HSE_Consumable_Id=%s", [con_id])
+        dbq(cursor, "SELECT COUNT(*) FROM eos_MIS_Monthly_HSE_Environment WHERE HSE_Consumable_Id=%s", [con_id])
         if cursor.fetchone()[0]:
             return JsonResponse({"error": "Cannot delete: referenced by Monthly HSE Environment records"}, status=409)
         _before = _audit.snap(cursor, "masters.hse_consumables", con_id)
-        cursor.execute("DELETE FROM eos_Mst_HSE_Consumable WHERE HSE_Consumable_Id=%s", [con_id])
+        dbq(cursor, "DELETE FROM eos_Mst_HSE_Consumable WHERE HSE_Consumable_Id=%s", [con_id])
     _audit.record_delete(request, "masters.hse_consumables", con_id, _before)
     return JsonResponse({"success": True})
 
@@ -3518,7 +3519,7 @@ def hazard_type_list_api(request):
     offset = max(0, int(request.GET.get("offset", 0)))
     limit  = min(200, max(1, int(request.GET.get("limit", 200))))
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Haz_Type_Id, Haz_Type_Name, Haz_Type_Class
             FROM eos_Mst_Hazard_Type
             WHERE Haz_Type_Name LIKE %s
@@ -3534,7 +3535,7 @@ def hazard_type_list_api(request):
 def hazard_type_get_api(request, haz_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT Haz_Type_Id, Haz_Type_Name, Haz_Type_Class
             FROM eos_Mst_Hazard_Type
             WHERE Haz_Type_Id=%s
@@ -3575,15 +3576,15 @@ def hazard_type_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.hazard_types", haz_id)
         if haz_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Hazard_Type
                 SET Haz_Type_Name=%s, Haz_Type_Class=%s, Mod_User_Id=%s, Mod_Dt=%s
                 WHERE Haz_Type_Id=%s
             """, [haz_name, haz_class, _uid, now, haz_id])
         else:
-            cursor.execute("SELECT COALESCE(MAX(Haz_Type_Id),0)+1 FROM eos_Mst_Hazard_Type")
+            dbq(cursor, "SELECT COALESCE(MAX(Haz_Type_Id),0)+1 FROM eos_Mst_Hazard_Type")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Hazard_Type
                     (Haz_Type_Id, Haz_Type_Name, Haz_Type_Class, Haz_Type_Active, Cr_User_Id, Cr_Dt)
                 VALUES (%s, %s, %s, 'Y', %s, %s)
@@ -3599,7 +3600,7 @@ def hazard_type_check_delete_api(request, haz_id):
     refs = []
     with connections["default"].cursor() as cursor:
         for table, label in _HAZARD_REF_TABLES:
-            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE Haz_Type_Id=%s", [haz_id])
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Haz_Type_Id=%s", [haz_id])
             n = cursor.fetchone()[0]
             if n:
                 refs.append({"count": n, "label": label})
@@ -3616,11 +3617,11 @@ def hazard_type_delete_api(request, haz_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         for table, _label in _HAZARD_REF_TABLES:
-            cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE Haz_Type_Id=%s", [haz_id])
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Haz_Type_Id=%s", [haz_id])
             if cursor.fetchone()[0]:
                 return JsonResponse({"error": "Cannot delete: referenced by Hazard ID Card records"}, status=409)
         _before = _audit.snap(cursor, "masters.hazard_types", haz_id)
-        cursor.execute("DELETE FROM eos_Mst_Hazard_Type WHERE Haz_Type_Id=%s", [haz_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Hazard_Type WHERE Haz_Type_Id=%s", [haz_id])
     _audit.record_delete(request, "masters.hazard_types", haz_id, _before)
     return JsonResponse({"success": True})
 
@@ -3635,7 +3636,7 @@ def cert_institute_page(request):
 def cert_institute_list_api(request):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT ci.Cert_Institute_Id, ci.Cert_Institute_Name, ci.Cert_Institute_Shortname,
                    ci.Cert_Institute_Address, ci.Location_Id, l.Location_Name, ci.Tel_No
             FROM eos_Mst_Cert_Institute ci
@@ -3650,7 +3651,7 @@ def cert_institute_list_api(request):
 def cert_institute_get_api(request, inst_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT ci.Cert_Institute_Id, ci.Cert_Institute_Name, ci.Cert_Institute_Shortname,
                    ci.Cert_Institute_Address, ci.Location_Id, l.Location_Name, ci.Tel_No
             FROM eos_Mst_Cert_Institute ci
@@ -3692,7 +3693,7 @@ def cert_institute_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.cert_institutes", inst_id)
         if inst_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Mst_Cert_Institute
                 SET Cert_Institute_Name=%s, Cert_Institute_Shortname=%s,
                     Cert_Institute_Address=%s, Location_Id=%s, Tel_No=%s,
@@ -3702,9 +3703,9 @@ def cert_institute_save_api(request):
             _audit.record_save(request, cursor, "masters.cert_institutes", inst_id, _before)
             return JsonResponse({"success": True, "Cert_Institute_Id": inst_id, "action": "updated"})
         else:
-            cursor.execute("SELECT COALESCE(MAX(Cert_Institute_Id), 0) + 1 FROM eos_Mst_Cert_Institute")
+            dbq(cursor, "SELECT COALESCE(MAX(Cert_Institute_Id), 0) + 1 FROM eos_Mst_Cert_Institute")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Mst_Cert_Institute
                     (Cert_Institute_Id, Cert_Institute_Name, Cert_Institute_Shortname,
                      Cert_Institute_Address, Location_Id, Tel_No, Cr_User_Id, Cr_Dt)
@@ -3722,7 +3723,7 @@ def cert_institute_check_delete_api(request, inst_id):
             ("eos_Emp_Certificate", "Cert_Institute_Id", "Employee Certificates"),
         ]:
             try:
-                cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [inst_id])
+                dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE {col}=%s", [inst_id])
                 count = cursor.fetchone()[0]
                 if count > 0:
                     refs.append({"label": label, "count": count})
@@ -3740,7 +3741,7 @@ def cert_institute_delete_api(request, inst_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.cert_institutes", inst_id)
-        cursor.execute("DELETE FROM eos_Mst_Cert_Institute WHERE Cert_Institute_Id=%s", [inst_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Cert_Institute WHERE Cert_Institute_Id=%s", [inst_id])
     _audit.record_delete(request, "masters.cert_institutes", inst_id, _before)
     return JsonResponse({"success": True})
 
@@ -3755,7 +3756,7 @@ def email_notification_type_page(request):
 def email_notification_type_list_api(request):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT EN_Type_Id, EN_Type_Name, EN_Type_Subject, EN_Type_Active
             FROM eos_Email_Notification_Type
             ORDER BY EN_Type_Name
@@ -3768,7 +3769,7 @@ def email_notification_type_list_api(request):
 def email_notification_type_get_api(request, type_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("""
+        dbq(cursor, """
             SELECT EN_Type_Id, EN_Type_Name, EN_Type_Subject, EN_Description, EN_Type_Active
             FROM eos_Email_Notification_Type
             WHERE EN_Type_Id = %s
@@ -3807,7 +3808,7 @@ def email_notification_type_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.email_notification_types", type_id)
         if type_id:
-            cursor.execute("""
+            dbq(cursor, """
                 UPDATE eos_Email_Notification_Type
                 SET EN_Type_Name=%s, EN_Type_Subject=%s, EN_Description=%s,
                     EN_Type_Active=%s, Mod_User_Id=%s, Mod_Dt=%s
@@ -3816,9 +3817,9 @@ def email_notification_type_save_api(request):
             _audit.record_save(request, cursor, "masters.email_notification_types", type_id, _before)
             return JsonResponse({"success": True, "EN_Type_Id": type_id, "action": "updated"})
         else:
-            cursor.execute("SELECT COALESCE(MAX(EN_Type_Id), 0) + 1 FROM eos_Email_Notification_Type")
+            dbq(cursor, "SELECT COALESCE(MAX(EN_Type_Id), 0) + 1 FROM eos_Email_Notification_Type")
             new_id = cursor.fetchone()[0]
-            cursor.execute("""
+            dbq(cursor, """
                 INSERT INTO eos_Email_Notification_Type
                     (EN_Type_Id, EN_Type_Name, EN_Type_Subject, EN_Description,
                      EN_Type_Active, Cr_User_Id, Cr_Dt)
@@ -3837,7 +3838,7 @@ def email_notification_type_deactivate_api(request, type_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.email_notification_types", type_id)
-        cursor.execute("""
+        dbq(cursor, """
             UPDATE eos_Email_Notification_Type
             SET EN_Type_Active='N', Mod_User_Id=%s, Mod_Dt=%s
             WHERE EN_Type_Id=%s
@@ -3929,12 +3930,12 @@ def admin_users_api(request):
     )
 
     with _conn["default"].cursor() as cursor:
-        cursor.execute(sql_counts, params_base)
+        dbq(cursor, sql_counts, params_base)
         counts_row     = cursor.fetchone()
         total          = counts_row[0]
         active_count   = int(counts_row[1] or 0)
         inactive_count = int(counts_row[2] or 0)
-        cursor.execute(sql_rows, params_base + [limit, offset])
+        dbq(cursor, sql_rows, params_base + [limit, offset])
         rows = cursor.fetchall()
 
     users = [
@@ -4206,12 +4207,12 @@ def admin_user_management_list_api(request):
     )
 
     with _conn["default"].cursor() as cursor:
-        cursor.execute(sql_counts, params_base)
+        dbq(cursor, sql_counts, params_base)
         cr = cursor.fetchone()
         total          = int(cr[0] or 0)
         active_count   = int(cr[1] or 0)
         inactive_count = int(cr[2] or 0)
-        cursor.execute(sql_rows, params_base + [limit, offset])
+        dbq(cursor, sql_rows, params_base + [limit, offset])
         rows = cursor.fetchall()
 
     # Mark auth_type for the returned page
@@ -4244,7 +4245,7 @@ def admin_user_management_get_api(request, user_id):
     from .models import CbMstUserPassword
 
     with _conn["default"].cursor() as cursor:
-        cursor.execute(
+        dbq(cursor, 
             "SELECT u.USER_ID, u.USER_LOGIN_ID, u.USER_NAME, u.USER_EMAIL, u.USER_ACTIVE, "
             "u.USER_TYPE_ID, u.DEPT_ID, u.USER_FROM, u.USER_TO, u.EMP_ID, u.NONEMP_ID, "
             "u.CR_DT, u.MOD_DT, d.Dept_Dispname "
@@ -4287,7 +4288,7 @@ def admin_user_management_get_api(request, user_id):
 def admin_user_management_meta_api(request):
     from django.db import connections as _conn
     with _conn["default"].cursor() as cursor:
-        cursor.execute("SELECT Dept_Id, Dept_Dispname FROM Mst_Department ORDER BY Dept_Dispname")
+        dbq(cursor, "SELECT Dept_Id, Dept_Dispname FROM Mst_Department ORDER BY Dept_Dispname")
         depts = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
     return JsonResponse({"departments": depts})
 
@@ -4324,11 +4325,11 @@ def admin_user_management_update_api(request, user_id):
         mod_user_id = 1
 
     with _conn["default"].cursor() as cursor:
-        cursor.execute("SELECT USER_ID FROM Mst_user WHERE USER_ID = %s", [user_id])
+        dbq(cursor, "SELECT USER_ID FROM Mst_user WHERE USER_ID = %s", [user_id])
         if not cursor.fetchone():
             return JsonResponse({"error": "User not found"}, status=404)
 
-        cursor.execute(
+        dbq(cursor, 
             "UPDATE Mst_user SET USER_NAME=%s, USER_EMAIL=%s, DEPT_ID=%s, "
             "USER_TYPE_ID=%s, USER_FROM=%s, USER_TO=%s, MOD_USER_ID=%s, MOD_DT=NOW() "
             "WHERE USER_ID=%s",
@@ -4369,14 +4370,14 @@ def admin_user_management_create_api(request):
     from .models import CbMstUserPassword
 
     with _conn["default"].cursor() as cursor:
-        cursor.execute(
+        dbq(cursor, 
             "SELECT COUNT(*) FROM Mst_user WHERE UPPER(USER_LOGIN_ID) = UPPER(%s)",
             [login_id],
         )
         if cursor.fetchone()[0] > 0:
             return JsonResponse({"error": "Login ID already exists"}, status=400)
 
-        cursor.execute("SELECT COALESCE(MAX(USER_ID), 0) + 1 FROM Mst_user")
+        dbq(cursor, "SELECT COALESCE(MAX(USER_ID), 0) + 1 FROM Mst_user")
         new_user_id = cursor.fetchone()[0]
 
         from .models import UserProfile
@@ -4387,7 +4388,7 @@ def admin_user_management_create_api(request):
             cr_user_id = 1
 
         from_expr = "%s" if user_from else "CURDATE()"
-        cursor.execute(
+        dbq(cursor, 
             "INSERT INTO Mst_user "
             "(USER_ID, USER_LOGIN_ID, USER_NAME, USER_EMAIL, USER_ACTIVE, "
             f" USER_TYPE_ID, DEPT_ID, USER_FROM, USER_TO, CR_USER_ID, CR_DT) "
@@ -4453,14 +4454,14 @@ def admin_user_management_toggle_active_api(request, user_id):
 
     from django.db import connections as _conn
     with _conn["default"].cursor() as cursor:
-        cursor.execute(
+        dbq(cursor, 
             "SELECT USER_ACTIVE FROM Mst_user WHERE USER_ID = %s", [user_id]
         )
         row = cursor.fetchone()
         if not row:
             return JsonResponse({"error": "User not found"}, status=404)
         new_active = "N" if row[0] == "Y" else "Y"
-        cursor.execute(
+        dbq(cursor, 
             "UPDATE Mst_user SET USER_ACTIVE = %s WHERE USER_ID = %s",
             [new_active, user_id],
         )
@@ -4480,11 +4481,11 @@ def travel_eligibility_page(request):
 def travel_eligibility_meta_api(request):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute(
+        dbq(cursor, 
             "SELECT fs_category_id, fs_category_name FROM Mst_Fs_Category ORDER BY fs_category_name"
         )
         categories = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
-        cursor.execute(
+        dbq(cursor, 
             "SELECT rank_id, rank_name, rank_abrv, fs_category_id FROM Mst_Rank ORDER BY fs_category_id, rank_order, rank_name"
         )
         ranks = [{"id": r[0], "name": r[1], "abrv": r[2], "category_id": r[3]} for r in cursor.fetchall()]
@@ -4523,7 +4524,7 @@ def travel_eligibility_list_api(request):
     offset = (page - 1) * page_size
 
     with connections["default"].cursor() as cursor:
-        cursor.execute(
+        dbq(cursor, 
             f"""
             SELECT COUNT(*) FROM eos_Travel_Eligibility te {where}
             """,
@@ -4531,7 +4532,7 @@ def travel_eligibility_list_api(request):
         )
         total = cursor.fetchone()[0]
 
-        cursor.execute(
+        dbq(cursor, 
             f"""
             SELECT te.Travel_Eligibility_Id, c.fs_category_name, r.rank_name, r.rank_abrv,
                    te.Travel_Mode, te.Travel_Class, te.Travel_Preference,
@@ -4569,7 +4570,7 @@ def travel_eligibility_list_api(request):
 def travel_eligibility_get_api(request, rec_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute(
+        dbq(cursor, 
             """
             SELECT Travel_Eligibility_Id, Fs_Category_Id, Rank_Id,
                    Travel_Mode, Travel_Class, Travel_Preference,
@@ -4628,7 +4629,7 @@ def travel_eligibility_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.travel_eligibility", rec_id)
         if rec_id:
-            cursor.execute(
+            dbq(cursor, 
                 """UPDATE eos_Travel_Eligibility
                    SET Fs_Category_Id=%s, Rank_Id=%s, Travel_Mode=%s,
                        Travel_Class=%s, Travel_Preference=%s,
@@ -4640,7 +4641,7 @@ def travel_eligibility_save_api(request):
             )
             new_id = rec_id
         else:
-            cursor.execute(
+            dbq(cursor, 
                 """INSERT INTO eos_Travel_Eligibility
                    (Fs_Category_Id, Rank_Id, Travel_Mode, Travel_Class,
                     Travel_Preference, Eligible_From, Eligible_To, Cr_User_Id, Cr_Dt)
@@ -4663,7 +4664,7 @@ def travel_eligibility_delete_api(request, rec_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.travel_eligibility", rec_id)
-        cursor.execute(
+        dbq(cursor, 
             "DELETE FROM eos_Travel_Eligibility WHERE Travel_Eligibility_Id=%s", [rec_id]
         )
     _audit.record_delete(request, "masters.travel_eligibility", rec_id, _before)
@@ -4681,9 +4682,9 @@ def reporting_structure_page(request):
 def reporting_structure_meta_api(request):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute("SELECT Fs_Category_Id, Fs_Category_Name FROM Mst_Fs_Category ORDER BY Fs_Category_Name")
+        dbq(cursor, "SELECT Fs_Category_Id, Fs_Category_Name FROM Mst_Fs_Category ORDER BY Fs_Category_Name")
         cats = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
-        cursor.execute("SELECT Rank_Id, Rank_Name, Rank_Abrv, Fs_Category_Id FROM Mst_Rank ORDER BY Rank_Name")
+        dbq(cursor, "SELECT Rank_Id, Rank_Name, Rank_Abrv, Fs_Category_Id FROM Mst_Rank ORDER BY Rank_Name")
         ranks = [{"id": r[0], "name": r[1], "abrv": r[2], "category_id": r[3]} for r in cursor.fetchall()]
     return JsonResponse({"categories": cats, "ranks": ranks})
 
@@ -4714,9 +4715,9 @@ def reporting_structure_list_api(request):
         WHERE """ + " AND ".join(where)
 
     with connections["default"].cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) " + sql_base, params)
+        dbq(cursor, "SELECT COUNT(*) " + sql_base, params)
         total = cursor.fetchone()[0]
-        cursor.execute(
+        dbq(cursor, 
             "SELECT rs.Reporting_Structure_Id, c.Fs_Category_Name, r.Rank_Name, r.Rank_Abrv, rr.Rank_Name, rr.Rank_Abrv "
             + sql_base + " ORDER BY c.Fs_Category_Name, r.Rank_Name LIMIT %s OFFSET %s",
             params + [page_size, offset],
@@ -4734,7 +4735,7 @@ def reporting_structure_list_api(request):
 def reporting_structure_get_api(request, rec_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
-        cursor.execute(
+        dbq(cursor, 
             "SELECT Reporting_Structure_Id, Fs_Category_Id, Rank_Id, Reporting_Rank_Id "
             "FROM eos_Reporting_Structure WHERE Reporting_Structure_Id=%s", [rec_id]
         )
@@ -4773,13 +4774,13 @@ def reporting_structure_save_api(request):
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.reporting_structure", rec_id)
         if rec_id:
-            cursor.execute(
+            dbq(cursor, 
                 "UPDATE eos_Reporting_Structure SET Fs_Category_Id=%s, Rank_Id=%s, Reporting_Rank_Id=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE Reporting_Structure_Id=%s",
                 [category_id, rank_id, rep_rank_id, user_id, rec_id],
             )
             new_id = rec_id
         else:
-            cursor.execute(
+            dbq(cursor, 
                 "INSERT INTO eos_Reporting_Structure (Fs_Category_Id, Rank_Id, Reporting_Rank_Id, Cr_User_Id, Cr_Dt) VALUES (%s, %s, %s, %s, NOW())",
                 [category_id, rank_id, rep_rank_id, user_id],
             )
@@ -4798,7 +4799,7 @@ def reporting_structure_delete_api(request, rec_id):
     from django.db import connections
     with connections["default"].cursor() as cursor:
         _before = _audit.snap(cursor, "masters.reporting_structure", rec_id)
-        cursor.execute("DELETE FROM eos_Reporting_Structure WHERE Reporting_Structure_Id=%s", [rec_id])
+        dbq(cursor, "DELETE FROM eos_Reporting_Structure WHERE Reporting_Structure_Id=%s", [rec_id])
     _audit.record_delete(request, "masters.reporting_structure", rec_id, _before)
     return JsonResponse({"success": True})
 
@@ -4814,9 +4815,9 @@ def job_description_page(request):
 def job_description_meta_api(request):
     from django.db import connections
     with connections["default"].cursor() as cur:
-        cur.execute("SELECT Fs_Category_Id, Fs_Category_Name FROM Mst_Fs_Category ORDER BY Fs_Category_Name")
+        dbq(cur, "SELECT Fs_Category_Id, Fs_Category_Name FROM Mst_Fs_Category ORDER BY Fs_Category_Name")
         cats = [{"id": r[0], "name": r[1]} for r in cur.fetchall()]
-        cur.execute("SELECT Rank_Id, Rank_Name, Rank_Abrv, Fs_Category_Id FROM Mst_Rank ORDER BY Rank_Name")
+        dbq(cur, "SELECT Rank_Id, Rank_Name, Rank_Abrv, Fs_Category_Id FROM Mst_Rank ORDER BY Rank_Name")
         ranks = [{"id": r[0], "name": r[1], "abrv": r[2], "category_id": r[3]} for r in cur.fetchall()]
     return JsonResponse({"categories": cats, "ranks": ranks})
 
@@ -4851,10 +4852,10 @@ def job_description_list_api(request):
         {where_sql}
     """
     with connections["default"].cursor() as cur:
-        cur.execute(f"SELECT COUNT(*) {base}", params)
+        dbq(cur, f"SELECT COUNT(*) {base}", params)
         total = cur.fetchone()[0]
         offset = (page - 1) * page_size
-        cur.execute(
+        dbq(cur, 
             f"SELECT h.JD_Hdr_Id, c.Fs_Category_Name, r.Rank_Name, r.Rank_Abrv, h.JD_Hdr_Description, h.JD_Hdr_Order, h.JD_Hdr_Active {base} ORDER BY h.Fs_Category_Id, h.Rank_Id, h.JD_Hdr_Order LIMIT %s OFFSET %s",
             params + [page_size, offset],
         )
@@ -4871,7 +4872,7 @@ def job_description_list_api(request):
 def job_description_get_api(request, hdr_id):
     from django.db import connections
     with connections["default"].cursor() as cur:
-        cur.execute(
+        dbq(cur, 
             "SELECT h.JD_Hdr_Id, h.Fs_Category_Id, c.Fs_Category_Name, h.Rank_Id, r.Rank_Name, r.Rank_Abrv, h.JD_Hdr_Description, h.JD_Hdr_Order, h.JD_Hdr_Active "
             "FROM eos_Job_Description_Hdr h "
             "JOIN Mst_Fs_Category c ON c.Fs_Category_Id = h.Fs_Category_Id "
@@ -4882,7 +4883,7 @@ def job_description_get_api(request, hdr_id):
         h = cur.fetchone()
         if not h:
             return JsonResponse({"error": "Not found"}, status=404)
-        cur.execute(
+        dbq(cur, 
             "SELECT JD_Dtl_Id, JD_Dtl_Description, JD_Dtl_Order, JD_Dtl_Active FROM eos_Job_Description_Dtl WHERE JD_Hdr_Id = %s ORDER BY JD_Dtl_Order",
             [hdr_id],
         )
@@ -4926,15 +4927,15 @@ def job_description_save_hdr_api(request):
     with connections["default"].cursor() as cur:
         _before = _audit.snap(cur, "masters.job_descriptions", hdr_id)
         if hdr_id:
-            cur.execute(
+            dbq(cur, 
                 "UPDATE eos_Job_Description_Hdr SET Fs_Category_Id=%s, Rank_Id=%s, JD_Hdr_Description=%s, JD_Hdr_Order=%s, JD_Hdr_Active=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE JD_Hdr_Id=%s",
                 [category_id, rank_id, description, order, active, user_id, hdr_id],
             )
             new_id = hdr_id
         else:
-            cur.execute("SELECT COALESCE(MAX(JD_Hdr_Id), 0) + 1 FROM eos_Job_Description_Hdr")
+            dbq(cur, "SELECT COALESCE(MAX(JD_Hdr_Id), 0) + 1 FROM eos_Job_Description_Hdr")
             new_id = cur.fetchone()[0]
-            cur.execute(
+            dbq(cur, 
                 "INSERT INTO eos_Job_Description_Hdr (JD_Hdr_Id, Fs_Category_Id, Rank_Id, JD_Hdr_Description, JD_Hdr_Order, JD_Hdr_Active, Cr_User_Id, Cr_Dt) VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())",
                 [new_id, category_id, rank_id, description, order, active, user_id],
             )
@@ -4952,8 +4953,8 @@ def job_description_delete_hdr_api(request, hdr_id):
     from django.db import connections
     with connections["default"].cursor() as cur:
         _before = _audit.snap(cur, "masters.job_descriptions", hdr_id)
-        cur.execute("DELETE FROM eos_Job_Description_Dtl WHERE JD_Hdr_Id=%s", [hdr_id])
-        cur.execute("DELETE FROM eos_Job_Description_Hdr WHERE JD_Hdr_Id=%s", [hdr_id])
+        dbq(cur, "DELETE FROM eos_Job_Description_Dtl WHERE JD_Hdr_Id=%s", [hdr_id])
+        dbq(cur, "DELETE FROM eos_Job_Description_Hdr WHERE JD_Hdr_Id=%s", [hdr_id])
     _audit.record_delete(request, "masters.job_descriptions", hdr_id, _before)
     return JsonResponse({"success": True})
 
@@ -4987,15 +4988,15 @@ def job_description_save_dtl_api(request):
     from django.db import connections
     with connections["default"].cursor() as cur:
         if dtl_id:
-            cur.execute(
+            dbq(cur, 
                 "UPDATE eos_Job_Description_Dtl SET JD_Dtl_Description=%s, JD_Dtl_Order=%s, JD_Dtl_Active=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE JD_Dtl_Id=%s",
                 [description, order, active, user_id, dtl_id],
             )
             new_id = dtl_id
         else:
-            cur.execute("SELECT COALESCE(MAX(JD_Dtl_Id), 0) + 1 FROM eos_Job_Description_Dtl")
+            dbq(cur, "SELECT COALESCE(MAX(JD_Dtl_Id), 0) + 1 FROM eos_Job_Description_Dtl")
             new_id = cur.fetchone()[0]
-            cur.execute(
+            dbq(cur, 
                 "INSERT INTO eos_Job_Description_Dtl (JD_Dtl_Id, JD_Hdr_Id, JD_Dtl_Description, JD_Dtl_Order, JD_Dtl_Active, Cr_User_Id, Cr_Dt) VALUES (%s,%s,%s,%s,%s,%s,NOW())",
                 [new_id, hdr_id, description, order, active, user_id],
             )
@@ -5014,7 +5015,7 @@ def job_description_delete_dtl_api(request, dtl_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cur:
-        cur.execute("DELETE FROM eos_Job_Description_Dtl WHERE JD_Dtl_Id=%s", [dtl_id])
+        dbq(cur, "DELETE FROM eos_Job_Description_Dtl WHERE JD_Dtl_Id=%s", [dtl_id])
     _audit.record_action(request, "delete", "masters.job_descriptions", dtl_id,
                          "Detail line #%s" % dtl_id, None)
     return JsonResponse({"success": True})
@@ -5025,7 +5026,7 @@ def job_description_delete_dtl_api(request, dtl_id):
 COMPETENCY_DEPT_IDS = (3, 14, 35)
 
 def _get_competency_depts(cur):
-    cur.execute(
+    dbq(cur, 
         "SELECT Dept_Id, Dept_Name FROM Mst_Department WHERE Dept_Id IN %s ORDER BY Dept_Name",
         [COMPETENCY_DEPT_IDS],
     )
@@ -5064,9 +5065,9 @@ def competency_list_api(request):
     clause = " AND ".join(where)
     from django.db import connections
     with connections["default"].cursor() as cur:
-        cur.execute(f"SELECT COUNT(*) FROM eos_Mst_Competency WHERE {clause}", params)
+        dbq(cur, f"SELECT COUNT(*) FROM eos_Mst_Competency WHERE {clause}", params)
         total = cur.fetchone()[0]
-        cur.execute(
+        dbq(cur, 
             f"SELECT Competency_Id, Competency_Name, Dept_Id, Active FROM eos_Mst_Competency WHERE {clause} ORDER BY Dept_Id, Competency_Name LIMIT %s OFFSET %s",
             params + [size, (page - 1) * size],
         )
@@ -5083,7 +5084,7 @@ def competency_list_api(request):
 def competency_get_api(request, rec_id):
     from django.db import connections
     with connections["default"].cursor() as cur:
-        cur.execute(
+        dbq(cur, 
             "SELECT Competency_Id, Competency_Name, Dept_Id, Active FROM eos_Mst_Competency WHERE Competency_Id=%s",
             [rec_id],
         )
@@ -5121,15 +5122,15 @@ def competency_save_api(request):
     with connections["default"].cursor() as cur:
         _before = _audit.snap(cur, "masters.competency", rec_id)
         if rec_id:
-            cur.execute(
+            dbq(cur, 
                 "UPDATE eos_Mst_Competency SET Competency_Name=%s, Dept_Id=%s, Active=%s, Mod_User_Id=%s, Mod_Dt=NOW() WHERE Competency_Id=%s",
                 [name, dept_id, active, user_id, rec_id],
             )
             new_id = rec_id
         else:
-            cur.execute("SELECT COALESCE(MAX(Competency_Id), 0) + 1 FROM eos_Mst_Competency")
+            dbq(cur, "SELECT COALESCE(MAX(Competency_Id), 0) + 1 FROM eos_Mst_Competency")
             new_id = cur.fetchone()[0]
-            cur.execute(
+            dbq(cur, 
                 "INSERT INTO eos_Mst_Competency (Competency_Id, Competency_Name, Dept_Id, Active, Cr_User_Id, Cr_Dt) VALUES (%s,%s,%s,%s,%s,NOW())",
                 [new_id, name, dept_id, active, user_id],
             )
@@ -5147,7 +5148,7 @@ def competency_delete_api(request, rec_id):
     from django.db import connections
     with connections["default"].cursor() as cur:
         _before = _audit.snap(cur, "masters.competency", rec_id)
-        cur.execute("DELETE FROM eos_Mst_Competency WHERE Competency_Id=%s", [rec_id])
+        dbq(cur, "DELETE FROM eos_Mst_Competency WHERE Competency_Id=%s", [rec_id])
     _audit.record_delete(request, "masters.competency", rec_id, _before)
     return JsonResponse({"success": True})
 

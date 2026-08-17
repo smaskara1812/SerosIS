@@ -138,12 +138,12 @@ def snap(cursor, entity, pk_val):
         return None
     table, pk_col, _label = meta
     try:
-        # Route through the dialect translator (eos_X → eos.X etc. on SQL Server;
-        # a pass-through on MySQL), same as the analytics layer. Audit WRITES use
-        # the Django ORM, which is already backend-correct.
-        from .db.sql import maybe_translate
-        sql, params = maybe_translate(f"SELECT * FROM {table} WHERE {pk_col}=%s", (pk_val,))
-        cursor.execute(sql, params)
+        # dbq() routes through the dialect translator (eos_X → eos.X, Mst_X →
+        # dbo.Mst_X, etc. on SQL Server; a pass-through on MySQL), same choke
+        # point every other raw query in the app uses. Audit WRITES use the
+        # Django ORM, which is already backend-correct.
+        from .db.sql import dbq
+        dbq(cursor, f"SELECT * FROM {table} WHERE {pk_col}=%s", (pk_val,))
         row = cursor.fetchone()
         if not row:
             return None
