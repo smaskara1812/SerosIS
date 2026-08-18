@@ -1,0 +1,674 @@
+{% extends 'chatbot/masters/base.html' %}
+{% load static %}
+
+{% block title %}Document To Sign Mapping — Seros{% endblock %}
+
+{% block styles %}
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #F2F4F8; --surface: #fff; --border: #E4E8EF;
+    --primary: #1a3f7a; --accent: #2563eb; --accent-light: #EEF3FF;
+    --text: #111827; --text-2: #4B5563; --text-3: #9CA3AF;
+    --success: #059669; --success-bg: #D1FAE5;
+    --danger: #DC2626; --danger-bg: #FEE2E2;
+    --row-hover: rgba(37,99,235,0.035); --row-sel: #EEF3FF; --row-sel-b: #2563eb;
+    --radius: 12px; --radius-sm: 6px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
+  body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; -webkit-font-smoothing: antialiased; }
+
+  .page-header { flex-shrink: 0; padding: 16px 24px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 0.74rem; color: var(--text-3); margin-bottom: 7px; }
+  .breadcrumb a { color: var(--text-3); text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .breadcrumb-sep { opacity: 0.45; }
+  .page-title-row { display: flex; align-items: center; justify-content: space-between; }
+  .page-title { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+  .page-stats { display: flex; gap: 8px; align-items: center; }
+  .stat-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+  .stat-chip.total { background: #F1F5F9; color: #475569; }
+  .sdot-sm { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .btn-new { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 6px; background: #1a3f7a; color: #fff; border: none; font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: background .15s; letter-spacing: .02em; }
+  .btn-new:hover { background: #2563eb; }
+
+  .main-layout { flex: 1; display: grid; grid-template-columns: 1fr 380px; overflow: hidden; }
+
+  /* List panel */
+  .records-panel { display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+  .panel-controls { flex-shrink: 0; background: var(--surface); padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--border); }
+  .search-wrap { position: relative; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+  .search-input { width: 100%; padding: 7px 12px 7px 32px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.83rem; color: var(--text); background: var(--bg); outline: none; transition: border-color .15s, box-shadow .15s; }
+  .search-input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .search-input::placeholder { color: var(--text-3); }
+  .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filter-select { flex: 1; min-width: 110px; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.82rem; color: var(--text); background: var(--bg); outline: none; cursor: pointer; transition: border-color .15s; }
+  .filter-select:focus { border-color: var(--accent); background: var(--surface); }
+
+  /* Table */
+  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; background: var(--surface); }
+  .table-wrap::-webkit-scrollbar { width: 5px; height: 5px; }
+  .table-wrap::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead { position: sticky; top: 0; z-index: 2; }
+  thead th { background: #f8faff; border-bottom: 2px solid var(--border); padding: 9px 12px; text-align: left; font-size: 0.7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid #f3f4f6; cursor: pointer; transition: background .1s; }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr.selected { background: var(--row-sel); border-left: 3px solid var(--row-sel-b); }
+  tbody td { padding: 9px 12px; color: var(--text-2); vertical-align: middle; }
+  .td-primary { color: var(--text) !important; font-weight: 600; }
+  .doc-chip { font-family: 'SF Mono', monospace; font-size: 0.7rem; background: #F1F5F9; color: #475569; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+  .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+  .status-badge.active { background: var(--success-bg); color: var(--success); }
+  .status-badge.ended { background: #F1F5F9; color: #64748B; }
+  .empty-state { padding: 48px 24px; text-align: center; color: var(--text-3); font-size: 0.85rem; }
+
+  .pagination { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid var(--border); background: var(--surface); font-size: 0.78rem; color: var(--text-2); }
+  .pag-btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-family: inherit; font-size: 0.78rem; cursor: pointer; color: var(--text-2); }
+  .pag-btn:hover:not(:disabled) { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+  .pag-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* Detail panel */
+  .detail-panel { display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }
+  .detail-head { flex-shrink: 0; padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .detail-head-title { font-size: 1rem; font-weight: 700; color: var(--primary); }
+  .detail-head-sub { font-size: 0.75rem; color: var(--text-3); margin-top: 2px; }
+  .detail-body { flex: 1; overflow-y: auto; padding: 24px; }
+  .detail-body::-webkit-scrollbar { width: 5px; }
+  .detail-body::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
+
+  /* Form */
+  .form-group { margin-bottom: 18px; }
+  .form-row { display: flex; gap: 12px; }
+  .form-row .form-group { flex: 1; }
+  .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--text-2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .form-label .req { color: var(--danger); margin-left: 2px; }
+  .form-input, .form-select { width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.88rem; color: var(--text); background: var(--bg); outline: none; transition: border-color .15s, box-shadow .15s; }
+  .form-input:focus, .form-select:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .form-hint { font-size: 0.72rem; color: var(--text-3); margin-top: 5px; }
+
+  /* Combobox */
+  .combo-wrap { position: relative; }
+  .combo-input { width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.88rem; color: var(--text); background: var(--bg); outline: none; transition: border-color .15s, box-shadow .15s; }
+  .combo-input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .combo-dd { position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: var(--surface); border: 1.5px solid var(--accent); border-radius: var(--radius-sm); box-shadow: var(--shadow); z-index: 100; max-height: 200px; overflow-y: auto; display: none; }
+  .combo-dd.combo-dd-tall { max-height: 320px; }
+  .combo-loading-row { padding: 9px 12px; font-size: 0.78rem; color: var(--text-3); text-align: center; border-top: 1px solid var(--border); }
+  .combo-dd.open { display: block; }
+  .combo-opt { padding: 8px 12px; font-size: 0.85rem; cursor: pointer; color: var(--text-2); }
+  .combo-opt:hover, .combo-opt.highlighted { background: var(--accent-light); color: var(--accent); }
+  .combo-empty { padding: 10px 12px; font-size: 0.82rem; color: var(--text-3); font-style: italic; }
+
+  /* Detail footer */
+  .detail-footer { flex-shrink: 0; padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+  .btn-save { flex: 1; padding: 10px 16px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: background .15s; }
+  .btn-save:hover { background: #1d4ed8; }
+  .btn-cancel { padding: 10px 16px; background: var(--bg); color: var(--text-2); border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+  .btn-cancel:hover { background: #e5e7eb; }
+  .btn-delete { padding: 10px; background: var(--bg); color: var(--danger); border: 1.5px solid #fecaca; border-radius: var(--radius-sm); cursor: pointer; transition: background .15s; display: flex; align-items: center; }
+  .btn-delete:hover { background: var(--danger-bg); }
+
+  /* Placeholder */
+  .placeholder-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; color: var(--text-3); text-align: center; padding: 40px; }
+  .placeholder-state svg { opacity: .35; }
+  .placeholder-state h3 { font-size: 1rem; font-weight: 700; color: var(--text-2); }
+  .placeholder-state p { font-size: 0.82rem; }
+
+  /* Modal */
+  @keyframes mIn { from { opacity:0; transform:scale(.93) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+  .overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.55); backdrop-filter: blur(3px); z-index: 500; display: none; align-items: center; justify-content: center; }
+  .overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.22); width: 580px; max-width: 95vw; max-height: 92vh; display: flex; flex-direction: column; animation: mIn 0.28s cubic-bezier(0.34,1.4,0.64,1); overflow: hidden; }
+  .modal-head { flex-shrink: 0; padding: 18px 24px 16px; background: linear-gradient(150deg, #0d2147 0%, #1d4a8c 100%); display: flex; align-items: flex-start; justify-content: space-between; }
+  .modal-head-title { font-size: 1rem; font-weight: 700; color: #fff; }
+  .modal-head-sub { font-size: 0.73rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .modal-close { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.8); width: 30px; height: 30px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: inherit; transition: background 0.15s; }
+  .modal-close:hover { background: rgba(255,255,255,0.24); }
+  .modal-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  .modal-body .form-group { margin-bottom: 16px; }
+  .modal-foot { flex-shrink: 0; padding: 14px 24px; border-top: 1px solid var(--border); background: #FAFBFD; display: flex; justify-content: flex-end; gap: 10px; }
+  .btn { padding: 9px 20px; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; border: none; transition: background .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-ghost { background: transparent; color: var(--text-2); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { background: var(--bg); }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 9999; transform: translateY(20px); opacity: 0; transition: all .25s ease; pointer-events: none; }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { background: var(--success); }
+  #toast.error { background: var(--danger); }
+  /* Dirty-state save button */
+  #btn-save.dirty, .btn-save.dirty { background: #d97706 !important; box-shadow: 0 0 0 3px rgba(217,119,6,0.25) !important; }
+  #btn-save.dirty:hover, .btn-save.dirty:hover { background: #b45309 !important; }
+</style>
+{% endblock %}
+
+{% block ms_content %}
+<div class="page-header">
+  <div class="breadcrumb">
+    <a href="/">Home</a><span class="breadcrumb-sep">/</span>
+    <a href="/masters/">Masters</a><span class="breadcrumb-sep">/</span>
+    <span>Mapping</span><span class="breadcrumb-sep">/</span>
+    <span>Document To Sign Mapping</span>
+  </div>
+  <div class="page-title-row">
+    <div class="page-title">Document To Sign Mapping</div>
+    <div class="page-stats">
+      <span class="stat-chip total"><span class="sdot-sm"></span><span id="total-count">—</span> records</span>
+      <button class="btn-new" onclick="openAddModal()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="main-layout">
+
+  <!-- List -->
+  <div class="records-panel">
+    <div class="panel-controls">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search-input" id="search-input" type="text" placeholder="Search document or employee…" oninput="debounceSearch()">
+      </div>
+      <div class="filter-row">
+        <select class="filter-select" id="filter-doc" onchange="applyFilters()">
+          <option value="">All Documents</option>
+        </select>
+        <select class="filter-select" id="filter-status" onchange="applyFilters()">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="ended">Ended</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Document</th>
+            <th>Employee</th>
+            <th>From</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="records-body">
+          <tr><td colspan="4" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <button class="pag-btn" id="prev-btn" onclick="changePage(-1)" disabled>← Prev</button>
+      <span id="page-info">—</span>
+      <button class="pag-btn" id="next-btn" onclick="changePage(1)" disabled>Next →</button>
+    </div>
+  </div>
+
+  <!-- Detail / Edit -->
+  <div class="detail-panel" id="detail-panel">
+    <div class="placeholder-state" id="placeholder">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 16s1.5-2 4-2 4 2 4 2"/></svg>
+      <h3>No record selected</h3>
+      <p>Click a row to view or edit, or click New to add a mapping.</p>
+    </div>
+
+    <div id="form-area" style="display:none; flex-direction:column; height:100%;">
+      <div class="detail-head">
+        <div>
+          <div class="detail-head-title" id="form-title">Edit Mapping</div>
+          <div class="detail-head-sub" id="form-sub"></div>
+        </div>
+      </div>
+
+      <div class="detail-body">
+        <input type="hidden" id="rec-id">
+
+        <div class="form-group">
+          <label class="form-label">Document <span class="req">*</span></label>
+          <div class="combo-wrap">
+            <input class="combo-input" id="doc-text" type="text" placeholder="Search document…" autocomplete="off">
+            <input type="hidden" id="doc-name">
+            <div class="combo-dd" id="doc-dd"></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Employee <span class="req">*</span></label>
+          <div class="combo-wrap">
+            <input class="combo-input" id="emp-text" type="text" placeholder="Search employee by name…" autocomplete="off">
+            <input type="hidden" id="emp-id">
+            <div class="combo-dd combo-dd-tall" id="emp-dd"></div>
+          </div>
+          <div class="form-hint">Type to search, or scroll the list for more employees.</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Sign Path</label>
+          <input class="form-input" id="sign-path" type="text" placeholder="/Images/Signatures/...">
+          <div class="form-hint">Auto-filled from the employee's signature file; edit if needed.</div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">From <span class="req">*</span></label>
+            <input class="form-input" id="date-from" type="date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">To</label>
+            <input class="form-input" id="date-to" type="date">
+            <div class="form-hint">Leave blank for an open-ended (active) mapping.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-footer">
+        <button class="btn-delete" id="btn-delete" onclick="deleteRecord()" title="Delete" style="display:none">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+        <button class="btn-cancel" onclick="cancelEdit()">Cancel</button>
+        <button class="btn-save" onclick="saveRecord()">Save Record</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- New Record Modal -->
+<div class="overlay" id="add-modal" onclick="bgClose(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">New Document To Sign Mapping</div>
+        <div class="modal-head-sub">Assign the signatory for a document type</div>
+      </div>
+      <button class="modal-close" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Document <span class="req">*</span></label>
+        <div class="combo-wrap">
+          <input class="combo-input" id="d-doc-text" type="text" placeholder="Search document…" autocomplete="off">
+          <input type="hidden" id="d-doc-name">
+          <div class="combo-dd" id="d-doc-dd"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Employee <span class="req">*</span></label>
+        <div class="combo-wrap">
+          <input class="combo-input" id="d-emp-text" type="text" placeholder="Search employee by name…" autocomplete="off">
+          <input type="hidden" id="d-emp-id">
+          <div class="combo-dd combo-dd-tall" id="d-emp-dd"></div>
+        </div>
+        <div class="form-hint">Type to search, or scroll the list for more employees.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sign Path</label>
+        <input class="form-input" id="d-sign-path" type="text" placeholder="/Images/Signatures/...">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">From <span class="req">*</span></label>
+          <input class="form-input" id="d-date-from" type="date">
+        </div>
+        <div class="form-group">
+          <label class="form-label">To</label>
+          <input class="form-input" id="d-date-to" type="date">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewRecord()">Create Record</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let allDocNames = [], currentPage = 1, totalRecords = 0;
+const PAGE_SIZE = 25;
+let docCombo, empCombo, modalDocCombo, modalEmpCombo;
+
+(async function init() {
+  await loadMeta();
+  await loadRecords();
+})();
+
+async function loadMeta() {
+  const res = await fetch('/api/masters/doc-to-sign-mapping/meta/');
+  const data = await res.json();
+  allDocNames = data.doc_names;
+
+  const docFilter = document.getElementById('filter-doc');
+  allDocNames.forEach(d => docFilter.insertAdjacentHTML('beforeend', `<option value="${d}">${d}</option>`));
+
+  docCombo      = makeStaticCombo('doc-text', 'doc-name', 'doc-dd', () => allDocNames.map(d => ({ id: d, label: d })));
+  empCombo      = makeEmployeeCombo('emp-text', 'emp-id', 'emp-dd', onEmployeePicked);
+  modalDocCombo = makeStaticCombo('d-doc-text', 'd-doc-name', 'd-doc-dd', () => allDocNames.map(d => ({ id: d, label: d })));
+  modalEmpCombo = makeEmployeeCombo('d-emp-text', 'd-emp-id', 'd-emp-dd', onModalEmployeePicked);
+}
+
+function onEmployeePicked(empId) {
+  if (empId) document.getElementById('sign-path').value = `/Images/Signatures/${empId}.jpg`;
+}
+function onModalEmployeePicked(empId) {
+  if (empId) document.getElementById('d-sign-path').value = `/Images/Signatures/${empId}.jpg`;
+}
+
+let searchTimer;
+function debounceSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(() => applyFilters(), 300); }
+function applyFilters() { loadRecords(1); }
+function changePage(dir) { loadRecords(currentPage + dir); }
+
+async function loadRecords(page = currentPage) {
+  currentPage = page;
+  const docName = document.getElementById('filter-doc').value;
+  const status  = document.getElementById('filter-status').value;
+  const q       = document.getElementById('search-input').value.trim();
+  const params = new URLSearchParams({ page, page_size: PAGE_SIZE });
+  if (docName) params.set('doc_name', docName);
+  if (status)  params.set('status', status);
+  if (q)       params.set('q', q);
+
+  const res  = await fetch('/api/masters/doc-to-sign-mapping/?' + params);
+  const data = await res.json();
+  totalRecords = data.total;
+  document.getElementById('total-count').textContent = totalRecords.toLocaleString();
+
+  const tbody = document.getElementById('records-body');
+  if (!data.records.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No records found</td></tr>';
+  } else {
+    tbody.innerHTML = data.records.map(r => `
+      <tr onclick="selectRow(${r.id})" data-id="${r.id}">
+        <td class="td-primary"><span class="doc-chip">${r.doc_name}</span></td>
+        <td>${r.emp_name}</td>
+        <td>${r.date_from || '—'}</td>
+        <td>${r.date_to ? `<span class="status-badge ended">Ended ${r.date_to}</span>` : `<span class="status-badge active">Active</span>`}</td>
+      </tr>`).join('');
+  }
+
+  const totalPages = Math.ceil(totalRecords / PAGE_SIZE);
+  document.getElementById('page-info').textContent = `${currentPage} / ${totalPages || 1}`;
+  document.getElementById('prev-btn').disabled = currentPage <= 1;
+  document.getElementById('next-btn').disabled = currentPage >= totalPages;
+}
+
+async function selectRow(id) {
+  document.querySelectorAll('#records-body tr').forEach(tr =>
+    tr.classList.toggle('selected', +tr.dataset.id === id));
+  const res  = await fetch(`/api/masters/doc-to-sign-mapping/${id}/`);
+  const data = await res.json();
+  showForm(data);
+}
+
+function showForm(data) {
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('form-area').style.display = 'flex';
+  setDirty(false);
+  document.getElementById('form-title').textContent = 'Edit Mapping';
+  document.getElementById('form-sub').textContent = `ID #${data.id}`;
+  document.getElementById('btn-delete').style.display = 'flex';
+  document.getElementById('rec-id').value = data.id;
+
+  docCombo.set(data.doc_name);
+  empCombo.set(data.emp_id, data.emp_name);
+  document.getElementById('sign-path').value = data.sign_path || '';
+  document.getElementById('date-from').value = data.date_from || '';
+  document.getElementById('date-to').value = data.date_to || '';
+  _applySavePerm(false);
+}
+
+function cancelEdit() {
+  setDirty(false);
+  document.getElementById('placeholder').style.display = '';
+  document.getElementById('form-area').style.display = 'none';
+  document.querySelectorAll('#records-body tr').forEach(tr => tr.classList.remove('selected'));
+}
+
+async function saveRecord() {
+  const id       = document.getElementById('rec-id').value;
+  const docName  = document.getElementById('doc-name').value;
+  const empId    = document.getElementById('emp-id').value;
+  const signPath = document.getElementById('sign-path').value;
+  const dateFrom = document.getElementById('date-from').value;
+  const dateTo   = document.getElementById('date-to').value;
+
+  if (!docName || !empId || !dateFrom) {
+    showToast('Please fill all required fields', 'error'); return;
+  }
+  const res = await fetch('/api/masters/doc-to-sign-mapping/save/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+    body: JSON.stringify({ id, doc_name: docName, emp_id: empId, sign_path: signPath || null, date_from: dateFrom, date_to: dateTo || null }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showToast('Record updated', 'success'); setDirty(false);
+    await loadRecords();
+    selectRow(data.id);
+  } else {
+    showToast(data.error || 'Save failed', 'error');
+  }
+}
+
+async function deleteRecord() {
+  const id = document.getElementById('rec-id').value;
+  if (!id || !confirm('Delete this document-to-sign mapping?')) return;
+  const res = await fetch(`/api/masters/doc-to-sign-mapping/${id}/delete/`, {
+    method: 'POST', headers: { 'X-CSRFToken': getCsrf() },
+  });
+  const data = await res.json();
+  if (data.success) { showToast('Deleted', 'success'); cancelEdit(); loadRecords(); }
+  else showToast(data.error || 'Delete failed', 'error');
+}
+
+// Modal
+function openAddModal() {
+  document.querySelectorAll('#records-body tr').forEach(tr => tr.classList.remove('selected'));
+  modalDocCombo.reset();
+  modalEmpCombo.reset();
+  document.getElementById('d-sign-path').value = '';
+  document.getElementById('d-date-from').value = '';
+  document.getElementById('d-date-to').value = '';
+  document.getElementById('add-modal').classList.add('open');
+  setTimeout(() => document.getElementById('d-doc-text').focus(), 80);
+}
+
+function closeAddModal() { document.getElementById('add-modal').classList.remove('open'); }
+function bgClose(e) { if (e.target.id === 'add-modal') closeAddModal(); }
+
+async function saveNewRecord() {
+  const docName  = document.getElementById('d-doc-name').value;
+  const empId    = document.getElementById('d-emp-id').value;
+  const signPath = document.getElementById('d-sign-path').value;
+  const dateFrom = document.getElementById('d-date-from').value;
+  const dateTo   = document.getElementById('d-date-to').value;
+
+  if (!docName || !empId || !dateFrom) {
+    showToast('Please fill all required fields', 'error'); return;
+  }
+  const res = await fetch('/api/masters/doc-to-sign-mapping/save/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+    body: JSON.stringify({ id: null, doc_name: docName, emp_id: empId, sign_path: signPath || null, date_from: dateFrom, date_to: dateTo || null }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showToast('Record created', 'success'); setDirty(false);
+    closeAddModal();
+    await loadRecords();
+    selectRow(data.id);
+  } else {
+    showToast(data.error || 'Save failed', 'error');
+  }
+}
+
+// ── Comboboxes ──────────────────────────────────────────────────────────────
+function makeStaticCombo(textId, hiddenId, ddId, getOptions) {
+  const inp = document.getElementById(textId);
+  const hid = document.getElementById(hiddenId);
+  const dd  = document.getElementById(ddId);
+  let hi = -1;
+
+  function renderDd(q) {
+    const opts = getOptions().filter(o => !q || o.label.toLowerCase().includes(q.toLowerCase()));
+    dd.innerHTML = opts.length
+      ? opts.map((o, i) => `<div class="combo-opt" data-id="${o.id}" data-idx="${i}">${o.label}</div>`).join('')
+      : '<div class="combo-empty">No results</div>';
+    dd.querySelectorAll('.combo-opt').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault(); inp.value = el.textContent; hid.value = el.dataset.id;
+        dd.classList.remove('open'); hi = -1;
+        if (typeof setDirty === 'function') setDirty(true);
+      });
+    });
+    dd.classList.add('open'); hi = -1;
+  }
+
+  inp.addEventListener('focus', () => renderDd(inp.value));
+  inp.addEventListener('input', () => renderDd(inp.value));
+  inp.addEventListener('blur',  () => setTimeout(() => dd.classList.remove('open'), 150));
+  inp.addEventListener('keydown', e => {
+    const opts = dd.querySelectorAll('.combo-opt');
+    if (e.key === 'ArrowDown') { hi = Math.min(hi+1, opts.length-1); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { hi = Math.max(hi-1, 0); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); e.preventDefault(); }
+    else if (e.key === 'Enter' && hi >= 0) {
+      const sel = opts[hi]; inp.value = sel.textContent; hid.value = sel.dataset.id;
+      dd.classList.remove('open'); hi = -1; e.preventDefault();
+    } else if (e.key === 'Escape') dd.classList.remove('open');
+  });
+
+  return {
+    set(id) { const opt = getOptions().find(o => o.id == id); inp.value = opt ? opt.label : ''; hid.value = id || ''; },
+    reset() { inp.value = ''; hid.value = ''; },
+    getValue() { return hid.value; }
+  };
+}
+
+function makeEmployeeCombo(textId, hiddenId, ddId, onPick) {
+  const inp = document.getElementById(textId);
+  const hid = document.getElementById(hiddenId);
+  const dd  = document.getElementById(ddId);
+  const PAGE = 20;
+  let hi = -1, debTimer;
+  let query = '', offset = 0, loading = false, hasMore = false, loaded = [];
+
+  function bindOptionClicks() {
+    dd.querySelectorAll('.combo-opt').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault(); inp.value = el.dataset.label; hid.value = el.dataset.id;
+        dd.classList.remove('open'); hi = -1;
+        if (typeof setDirty === 'function') setDirty(true);
+        if (onPick) onPick(el.dataset.id);
+      });
+    });
+  }
+
+  function render() {
+    if (!loaded.length) {
+      dd.innerHTML = loading
+        ? '<div class="combo-empty">Searching…</div>'
+        : '<div class="combo-empty">No employees found</div>';
+      return;
+    }
+    dd.innerHTML = loaded.map((o, i) =>
+      `<div class="combo-opt" data-id="${o.id}" data-idx="${i}" data-label="${o.name}">${o.name}</div>`
+    ).join('') + (
+      loading ? '<div class="combo-loading-row">Loading more…</div>'
+      : hasMore ? '<div class="combo-loading-row">Scroll for more</div>'
+      : ''
+    );
+    bindOptionClicks();
+  }
+
+  async function search(q) {
+    query = q; offset = 0; loaded = []; loading = true; hasMore = false;
+    dd.classList.add('open');
+    render();
+    const res = await fetch(`/api/masters/employees-search/?q=${encodeURIComponent(q || '')}&offset=0&limit=${PAGE}`);
+    const data = await res.json();
+    loading = false;
+    loaded = data.results || [];
+    hasMore = !!data.has_more;
+    offset = loaded.length;
+    render();
+  }
+
+  async function loadMore() {
+    if (loading || !hasMore) return;
+    loading = true;
+    render();
+    const res = await fetch(`/api/masters/employees-search/?q=${encodeURIComponent(query || '')}&offset=${offset}&limit=${PAGE}`);
+    const data = await res.json();
+    loading = false;
+    loaded = loaded.concat(data.results || []);
+    hasMore = !!data.has_more;
+    offset = loaded.length;
+    render();
+  }
+
+  inp.addEventListener('focus', () => search(inp.value));
+  inp.addEventListener('input', () => { clearTimeout(debTimer); debTimer = setTimeout(() => search(inp.value), 250); });
+  inp.addEventListener('blur',  () => setTimeout(() => dd.classList.remove('open'), 150));
+  dd.addEventListener('scroll', () => {
+    if (hasMore && !loading && dd.scrollTop + dd.clientHeight >= dd.scrollHeight - 40) loadMore();
+  });
+  inp.addEventListener('keydown', e => {
+    const opts = dd.querySelectorAll('.combo-opt');
+    if (e.key === 'ArrowDown') { hi = Math.min(hi+1, opts.length-1); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { hi = Math.max(hi-1, 0); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); e.preventDefault(); }
+    else if (e.key === 'Enter' && hi >= 0) {
+      const sel = opts[hi]; inp.value = sel.dataset.label; hid.value = sel.dataset.id;
+      dd.classList.remove('open'); hi = -1; e.preventDefault();
+      if (onPick) onPick(sel.dataset.id);
+    } else if (e.key === 'Escape') dd.classList.remove('open');
+  });
+
+  return {
+    set(id, label) { inp.value = label || ''; hid.value = id || ''; },
+    reset() { inp.value = ''; hid.value = ''; },
+    getValue() { return hid.value; }
+  };
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function getCsrf() {
+  return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
+
+let toastTimer;
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+// ── Dirty-state tracking ──────────────────────────────────────────────────
+let _formDirty = false;
+function setDirty(v) {
+  _formDirty = v;
+  document.querySelectorAll('.btn-save').forEach(b => b.classList.toggle('dirty', v));
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const fa = document.getElementById('form-area');
+  if (!fa) return;
+  fa.addEventListener('input',  () => setDirty(true));
+  fa.addEventListener('change', () => setDirty(true));
+});
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.doc_to_sign_mapping')
+    .then(r => r.json())
+    .then(p => _applyPermUI(p));
+})();
+</script>
+{% endblock %}

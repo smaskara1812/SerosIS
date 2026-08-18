@@ -4641,15 +4641,16 @@ def travel_eligibility_save_api(request):
             )
             new_id = rec_id
         else:
-            dbq(cursor, 
+            dbq(cursor, "SELECT COALESCE(MAX(Travel_Eligibility_Id), 0) + 1 FROM eos_Travel_Eligibility")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor,
                 """INSERT INTO eos_Travel_Eligibility
-                   (Fs_Category_Id, Rank_Id, Travel_Mode, Travel_Class,
+                   (Travel_Eligibility_Id, Fs_Category_Id, Rank_Id, Travel_Mode, Travel_Class,
                     Travel_Preference, Eligible_From, Eligible_To, Cr_User_Id, Cr_Dt)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())""",
-                [category_id, rank_id, mode, travel_class, preference,
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())""",
+                [new_id, category_id, rank_id, mode, travel_class, preference,
                  eligible_from, eligible_to, user_id],
             )
-            new_id = cursor.lastrowid
         _audit.record_save(request, cursor, "masters.travel_eligibility", new_id, _before)
     return JsonResponse({"success": True, "id": new_id})
 
@@ -4780,11 +4781,12 @@ def reporting_structure_save_api(request):
             )
             new_id = rec_id
         else:
-            dbq(cursor, 
-                "INSERT INTO eos_Reporting_Structure (Fs_Category_Id, Rank_Id, Reporting_Rank_Id, Cr_User_Id, Cr_Dt) VALUES (%s, %s, %s, %s, NOW())",
-                [category_id, rank_id, rep_rank_id, user_id],
+            dbq(cursor, "SELECT COALESCE(MAX(Reporting_Structure_Id), 0) + 1 FROM eos_Reporting_Structure")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor,
+                "INSERT INTO eos_Reporting_Structure (Reporting_Structure_Id, Fs_Category_Id, Rank_Id, Reporting_Rank_Id, Cr_User_Id, Cr_Dt) VALUES (%s, %s, %s, %s, %s, NOW())",
+                [new_id, category_id, rank_id, rep_rank_id, user_id],
             )
-            new_id = cursor.lastrowid
         _audit.record_save(request, cursor, "masters.reporting_structure", new_id, _before)
     return JsonResponse({"success": True, "id": new_id})
 
@@ -5150,6 +5152,1262 @@ def competency_delete_api(request, rec_id):
         _before = _audit.snap(cur, "masters.competency", rec_id)
         dbq(cur, "DELETE FROM eos_Mst_Competency WHERE Competency_Id=%s", [rec_id])
     _audit.record_delete(request, "masters.competency", rec_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Shared: live user search (used by both mapping masters below) ─────────────
+
+@require_GET
+def mapping_users_search_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0) or 0))
+    limit  = min(50, max(1, int(request.GET.get("limit", 20) or 20)))
+    with connections["default"].cursor() as cursor:
+        params = [f"%{q}%", f"%{q}%"]
+        sql = (
+            "SELECT USER_ID, USER_NAME, USER_LOGIN_ID FROM Mst_user "
+            "WHERE (USER_NAME LIKE %s OR USER_LOGIN_ID LIKE %s)"
+            " ORDER BY USER_NAME LIMIT %s OFFSET %s"
+        )
+        params += [limit + 1, offset]
+        dbq(cursor, sql, params)
+        rows = cursor.fetchall()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    results = [{"id": r[0], "name": r[1], "login_id": r[2]} for r in rows]
+    return JsonResponse({"results": results, "has_more": has_more})
+
+
+# ── User Rig Mapping ──────────────────────────────────────────────────────────
+
+@require_permission("masters.user_rig_mapping", "view")
+def user_rig_mapping_page(request):
+    return render(request, "chatbot/masters/user_rig_mapping.html")
+
+
+@require_GET
+def user_rig_mapping_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT Rig_Id, Rig_Name FROM eos_Mst_Rig WHERE Rig_Active = 'Y' ORDER BY Rig_Name")
+        rigs = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+    return JsonResponse({"rigs": rigs})
+
+
+@require_GET
+def user_rig_mapping_list_api(request):
+    from django.db import connections
+    _ps = request.GET.get("page_size", "25")
+    page_size = int(_ps) if _ps and _ps.isdigit() and int(_ps) in (25, 50, 75, 100) else 25
+    page = max(int(request.GET.get("page", 1)), 1)
+    offset = (page - 1) * page_size
+    rig_id  = request.GET.get("rig_id", "")
+    status  = request.GET.get("status", "")
+    q       = request.GET.get("q", "").strip()
+
+    where, params = ["1=1"], []
+    if rig_id:
+        where.append("m.Rig_Id = %s"); params.append(rig_id)
+    if status == "active":
+        where.append("m.User_Rig_Mapping_To IS NULL")
+    elif status == "ended":
+        where.append("m.User_Rig_Mapping_To IS NOT NULL")
+    if q:
+        like = f"%{q}%"
+        where.append("(u.USER_NAME LIKE %s OR u.USER_LOGIN_ID LIKE %s OR r.Rig_Name LIKE %s)")
+        params += [like, like, like]
+
+    sql_base = """
+        FROM eos_Mst_User_Rig_Mapping m
+        JOIN Mst_user u  ON u.USER_ID = m.User_Id
+        JOIN eos_Mst_Rig r ON r.Rig_Id = m.Rig_Id
+        WHERE """ + " AND ".join(where)
+
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT COUNT(*) " + sql_base, params)
+        total = cursor.fetchone()[0]
+        dbq(cursor,
+            "SELECT m.User_Rig_Mapping_Id, u.USER_NAME, u.USER_LOGIN_ID, r.Rig_Name, "
+            "m.User_Rig_Mapping_From, m.User_Rig_Mapping_To "
+            + sql_base + " ORDER BY u.USER_NAME, r.Rig_Name LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        rows = [
+            {"id": row[0], "user_name": row[1], "user_login": row[2], "rig_name": row[3],
+             "date_from": row[4].isoformat() if row[4] else None,
+             "date_to": row[5].isoformat() if row[5] else None}
+            for row in cursor.fetchall()
+        ]
+    return JsonResponse({"records": rows, "total": total, "page": page, "page_size": page_size})
+
+
+@require_GET
+def user_rig_mapping_get_api(request, rec_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor,
+            "SELECT m.User_Rig_Mapping_Id, m.User_Id, u.USER_NAME, u.USER_LOGIN_ID, "
+            "m.Rig_Id, m.User_Rig_Mapping_From, m.User_Rig_Mapping_To "
+            "FROM eos_Mst_User_Rig_Mapping m JOIN Mst_user u ON u.USER_ID = m.User_Id "
+            "WHERE m.User_Rig_Mapping_Id=%s", [rec_id]
+        )
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse({
+        "id": row[0], "user_id": row[1], "user_name": row[2], "user_login": row[3],
+        "rig_id": row[4],
+        "date_from": row[5].isoformat() if row[5] else None,
+        "date_to": row[6].isoformat() if row[6] else None,
+    })
+
+
+@csrf_exempt
+def user_rig_mapping_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.user_rig_mapping", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    import json as _json
+    from django.db import connections
+    body        = _json.loads(request.body)
+    rec_id      = body.get("id")
+    user_id     = body.get("user_id")
+    rig_id      = body.get("rig_id")
+    date_from   = body.get("date_from")
+    date_to     = body.get("date_to") or None
+    op_user_id  = _audit.ops_user_id(request)
+
+    if not all([user_id, rig_id, date_from]):
+        return JsonResponse({"error": "user_id, rig_id and date_from are required"}, status=400)
+
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.user_rig_mapping", rec_id)
+        if rec_id:
+            dbq(cursor,
+                "UPDATE eos_Mst_User_Rig_Mapping SET User_Id=%s, Rig_Id=%s, "
+                "User_Rig_Mapping_From=%s, User_Rig_Mapping_To=%s, Mod_User_Id=%s, Mod_Dt=NOW() "
+                "WHERE User_Rig_Mapping_Id=%s",
+                [user_id, rig_id, date_from, date_to, op_user_id, rec_id],
+            )
+            new_id = rec_id
+        else:
+            dbq(cursor, "SELECT COALESCE(MAX(User_Rig_Mapping_Id), 0) + 1 FROM eos_Mst_User_Rig_Mapping")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor,
+                "INSERT INTO eos_Mst_User_Rig_Mapping "
+                "(User_Rig_Mapping_Id, User_Id, Rig_Id, User_Rig_Mapping_From, User_Rig_Mapping_To, Cr_User_Id, Cr_Dt) "
+                "VALUES (%s, %s, %s, %s, %s, %s, NOW())",
+                [new_id, user_id, rig_id, date_from, date_to, op_user_id],
+            )
+        _audit.record_save(request, cursor, "masters.user_rig_mapping", new_id, _before)
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def user_rig_mapping_delete_api(request, rec_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.user_rig_mapping", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.user_rig_mapping", rec_id)
+        dbq(cursor, "DELETE FROM eos_Mst_User_Rig_Mapping WHERE User_Rig_Mapping_Id=%s", [rec_id])
+    _audit.record_delete(request, "masters.user_rig_mapping", rec_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── User Category Mapping ────────────────────────────────────────────────────
+
+@require_permission("masters.user_category_mapping", "view")
+def user_category_mapping_page(request):
+    return render(request, "chatbot/masters/user_category_mapping.html")
+
+
+@require_GET
+def user_category_mapping_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT Fs_Category_Id, Fs_Category_Name FROM Mst_Fs_Category ORDER BY Fs_Category_Name")
+        cats = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+    return JsonResponse({"categories": cats})
+
+
+@require_GET
+def user_category_mapping_list_api(request):
+    from django.db import connections
+    _ps = request.GET.get("page_size", "25")
+    page_size = int(_ps) if _ps and _ps.isdigit() and int(_ps) in (25, 50, 75, 100) else 25
+    page = max(int(request.GET.get("page", 1)), 1)
+    offset = (page - 1) * page_size
+    cat_id  = request.GET.get("category_id", "")
+    status  = request.GET.get("status", "")
+    q       = request.GET.get("q", "").strip()
+
+    where, params = ["1=1"], []
+    if cat_id:
+        where.append("m.Fs_Category_Id = %s"); params.append(cat_id)
+    if status == "active":
+        where.append("m.User_Fs_Catg_Mapping_To IS NULL")
+    elif status == "ended":
+        where.append("m.User_Fs_Catg_Mapping_To IS NOT NULL")
+    if q:
+        like = f"%{q}%"
+        where.append("(u.USER_NAME LIKE %s OR u.USER_LOGIN_ID LIKE %s OR c.Fs_Category_Name LIKE %s)")
+        params += [like, like, like]
+
+    sql_base = """
+        FROM eos_Mst_User_Fs_Catg_Mapping m
+        JOIN Mst_user u        ON u.USER_ID = m.User_Id
+        JOIN Mst_Fs_Category c ON c.Fs_Category_Id = m.Fs_Category_Id
+        WHERE """ + " AND ".join(where)
+
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT COUNT(*) " + sql_base, params)
+        total = cursor.fetchone()[0]
+        dbq(cursor,
+            "SELECT m.User_Fs_Catg_Mapping_Id, u.USER_NAME, u.USER_LOGIN_ID, c.Fs_Category_Name, "
+            "m.User_Fs_Catg_Mapping_From, m.User_Fs_Catg_Mapping_To "
+            + sql_base + " ORDER BY u.USER_NAME, c.Fs_Category_Name LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        rows = [
+            {"id": row[0], "user_name": row[1], "user_login": row[2], "category_name": row[3],
+             "date_from": row[4].isoformat() if row[4] else None,
+             "date_to": row[5].isoformat() if row[5] else None}
+            for row in cursor.fetchall()
+        ]
+    return JsonResponse({"records": rows, "total": total, "page": page, "page_size": page_size})
+
+
+@require_GET
+def user_category_mapping_get_api(request, rec_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor,
+            "SELECT m.User_Fs_Catg_Mapping_Id, m.User_Id, u.USER_NAME, u.USER_LOGIN_ID, "
+            "m.Fs_Category_Id, m.User_Fs_Catg_Mapping_From, m.User_Fs_Catg_Mapping_To "
+            "FROM eos_Mst_User_Fs_Catg_Mapping m JOIN Mst_user u ON u.USER_ID = m.User_Id "
+            "WHERE m.User_Fs_Catg_Mapping_Id=%s", [rec_id]
+        )
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse({
+        "id": row[0], "user_id": row[1], "user_name": row[2], "user_login": row[3],
+        "category_id": row[4],
+        "date_from": row[5].isoformat() if row[5] else None,
+        "date_to": row[6].isoformat() if row[6] else None,
+    })
+
+
+@csrf_exempt
+def user_category_mapping_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.user_category_mapping", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    import json as _json
+    from django.db import connections
+    body        = _json.loads(request.body)
+    rec_id      = body.get("id")
+    user_id     = body.get("user_id")
+    category_id = body.get("category_id")
+    date_from   = body.get("date_from")
+    date_to     = body.get("date_to") or None
+    op_user_id  = _audit.ops_user_id(request)
+
+    if not all([user_id, category_id, date_from]):
+        return JsonResponse({"error": "user_id, category_id and date_from are required"}, status=400)
+
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.user_category_mapping", rec_id)
+        if rec_id:
+            dbq(cursor,
+                "UPDATE eos_Mst_User_Fs_Catg_Mapping SET User_Id=%s, Fs_Category_Id=%s, "
+                "User_Fs_Catg_Mapping_From=%s, User_Fs_Catg_Mapping_To=%s, Mod_User_Id=%s, Mod_Dt=NOW() "
+                "WHERE User_Fs_Catg_Mapping_Id=%s",
+                [user_id, category_id, date_from, date_to, op_user_id, rec_id],
+            )
+            new_id = rec_id
+        else:
+            dbq(cursor, "SELECT COALESCE(MAX(User_Fs_Catg_Mapping_Id), 0) + 1 FROM eos_Mst_User_Fs_Catg_Mapping")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor,
+                "INSERT INTO eos_Mst_User_Fs_Catg_Mapping "
+                "(User_Fs_Catg_Mapping_Id, User_Id, Fs_Category_Id, User_Fs_Catg_Mapping_From, User_Fs_Catg_Mapping_To, Cr_User_Id, Cr_Dt) "
+                "VALUES (%s, %s, %s, %s, %s, %s, NOW())",
+                [new_id, user_id, category_id, date_from, date_to, op_user_id],
+            )
+        _audit.record_save(request, cursor, "masters.user_category_mapping", new_id, _before)
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def user_category_mapping_delete_api(request, rec_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.user_category_mapping", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.user_category_mapping", rec_id)
+        dbq(cursor, "DELETE FROM eos_Mst_User_Fs_Catg_Mapping WHERE User_Fs_Catg_Mapping_Id=%s", [rec_id])
+    _audit.record_delete(request, "masters.user_category_mapping", rec_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Rig To Email Mapping ──────────────────────────────────────────────────────
+
+@require_permission("masters.rig_to_email_mapping", "view")
+def rig_to_email_mapping_page(request):
+    return render(request, "chatbot/masters/rig_to_email_mapping.html")
+
+
+@require_GET
+def rig_to_email_mapping_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT Rig_Id, Rig_Name FROM eos_Mst_Rig WHERE Rig_Active = 'Y' ORDER BY Rig_Name")
+        rigs = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+        dbq(cursor, "SELECT COMPANY_ID, Company_Name FROM Mst_Company WHERE Company_Active = 'Y' ORDER BY Company_Name")
+        companies = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+        dbq(cursor, "SELECT Alert_Id, Alert_Name FROM Mail_Alert_Dtl WHERE Alert_Active = 'Y' ORDER BY Alert_Name")
+        alerts = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+    return JsonResponse({"rigs": rigs, "companies": companies, "alerts": alerts})
+
+
+@require_GET
+def rig_to_email_mapping_list_api(request):
+    from django.db import connections
+    _ps = request.GET.get("page_size", "25")
+    page_size = int(_ps) if _ps and _ps.isdigit() and int(_ps) in (25, 50, 75, 100) else 25
+    page = max(int(request.GET.get("page", 1)), 1)
+    offset = (page - 1) * page_size
+    rig_id     = request.GET.get("rig_id", "")
+    company_id = request.GET.get("company_id", "")
+    status     = request.GET.get("status", "")
+    q          = request.GET.get("q", "").strip()
+
+    where, params = ["1=1"], []
+    if rig_id:
+        where.append("m.Rig_Id = %s"); params.append(rig_id)
+    if company_id:
+        where.append("m.Company_Id = %s"); params.append(company_id)
+    if status == "active":
+        where.append("m.To_Dt IS NULL")
+    elif status == "ended":
+        where.append("m.To_Dt IS NOT NULL")
+    if q:
+        like = f"%{q}%"
+        where.append("(u.USER_NAME LIKE %s OR u.USER_LOGIN_ID LIKE %s OR r.Rig_Name LIKE %s OR c.Company_Name LIKE %s OR al.Alert_Name LIKE %s)")
+        params += [like, like, like, like, like]
+
+    sql_base = """
+        FROM eos_Rig_To_Email_Mapping m
+        JOIN Mst_user u        ON u.USER_ID = m.User_Id
+        LEFT JOIN eos_Mst_Rig r ON r.Rig_Id = m.Rig_Id
+        LEFT JOIN Mst_Company c ON c.COMPANY_ID = m.Company_Id
+        LEFT JOIN Mail_Alert_Dtl al ON al.Alert_Id = m.Alert_Id
+        WHERE """ + " AND ".join(where)
+
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT COUNT(*) " + sql_base, params)
+        total = cursor.fetchone()[0]
+        dbq(cursor,
+            "SELECT m.Rig_To_Email_Mapping_Id, u.USER_NAME, u.USER_LOGIN_ID, r.Rig_Name, "
+            "c.Company_Name, al.Alert_Name, m.Addressee_Type, m.From_Dt, m.To_Dt "
+            + sql_base + " ORDER BY u.USER_NAME LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        rows = [
+            {"id": row[0], "user_name": row[1], "user_login": row[2], "rig_name": row[3],
+             "company_name": row[4], "alert_name": row[5], "addressee_type": row[6],
+             "date_from": row[7].isoformat() if row[7] else None,
+             "date_to": row[8].isoformat() if row[8] else None}
+            for row in cursor.fetchall()
+        ]
+    return JsonResponse({"records": rows, "total": total, "page": page, "page_size": page_size})
+
+
+@require_GET
+def rig_to_email_mapping_get_api(request, rec_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor,
+            "SELECT m.Rig_To_Email_Mapping_Id, m.User_Id, u.USER_NAME, u.USER_LOGIN_ID, "
+            "m.Rig_Id, m.Company_Id, m.Alert_Id, m.Addressee_Type, m.From_Dt, m.To_Dt "
+            "FROM eos_Rig_To_Email_Mapping m JOIN Mst_user u ON u.USER_ID = m.User_Id "
+            "WHERE m.Rig_To_Email_Mapping_Id=%s", [rec_id]
+        )
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse({
+        "id": row[0], "user_id": row[1], "user_name": row[2], "user_login": row[3],
+        "rig_id": row[4], "company_id": row[5], "alert_id": row[6], "addressee_type": row[7],
+        "date_from": row[8].isoformat() if row[8] else None,
+        "date_to": row[9].isoformat() if row[9] else None,
+    })
+
+
+@csrf_exempt
+def rig_to_email_mapping_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.rig_to_email_mapping", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    import json as _json
+    from django.db import connections
+    body           = _json.loads(request.body)
+    rec_id         = body.get("id")
+    user_id        = body.get("user_id")
+    rig_id         = body.get("rig_id") or None
+    company_id     = body.get("company_id") or None
+    alert_id       = body.get("alert_id") or None
+    addressee_type = body.get("addressee_type") or None
+    date_from      = body.get("date_from")
+    date_to        = body.get("date_to") or None
+    op_user_id     = _audit.ops_user_id(request)
+
+    if not all([user_id, date_from]):
+        return JsonResponse({"error": "user_id and date_from are required"}, status=400)
+
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.rig_to_email_mapping", rec_id)
+        if rec_id:
+            dbq(cursor,
+                "UPDATE eos_Rig_To_Email_Mapping SET User_Id=%s, Rig_Id=%s, Company_Id=%s, Alert_Id=%s, "
+                "Addressee_Type=%s, From_Dt=%s, To_Dt=%s, Mod_User_Id=%s, Mod_Dt=NOW() "
+                "WHERE Rig_To_Email_Mapping_Id=%s",
+                [user_id, rig_id, company_id, alert_id, addressee_type, date_from, date_to, op_user_id, rec_id],
+            )
+            new_id = rec_id
+        else:
+            dbq(cursor, "SELECT COALESCE(MAX(Rig_To_Email_Mapping_Id), 0) + 1 FROM eos_Rig_To_Email_Mapping")
+            new_id = cursor.fetchone()[0]
+            if new_id > 127:
+                # MySQL dev only: this column is a signed tinyint here (-128..127),
+                # while the real SQL Server column is unsigned tinyint (0..255) —
+                # the same data isn't actually at capacity there. Just avoiding a
+                # raw SQL range-error crash in this dev environment.
+                return JsonResponse({
+                    "error": "Rig_To_Email_Mapping_Id has hit this MySQL dev database's tinyint "
+                             "range (127). Not a production issue — SQL Server's tinyint goes to 255.",
+                }, status=409)
+            dbq(cursor,
+                "INSERT INTO eos_Rig_To_Email_Mapping "
+                "(Rig_To_Email_Mapping_Id, User_Id, Rig_Id, Company_Id, Alert_Id, Addressee_Type, From_Dt, To_Dt, Cr_User_Id, Cr_Dt) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())",
+                [new_id, user_id, rig_id, company_id, alert_id, addressee_type, date_from, date_to, op_user_id],
+            )
+        _audit.record_save(request, cursor, "masters.rig_to_email_mapping", new_id, _before)
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def rig_to_email_mapping_delete_api(request, rec_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.rig_to_email_mapping", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.rig_to_email_mapping", rec_id)
+        dbq(cursor, "DELETE FROM eos_Rig_To_Email_Mapping WHERE Rig_To_Email_Mapping_Id=%s", [rec_id])
+    _audit.record_delete(request, "masters.rig_to_email_mapping", rec_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Document To Sign Mapping ──────────────────────────────────────────────────
+
+# Canonical document types (legacy ENUM); unioned with whatever's actually in
+# the data so historical/extra values (e.g. Material_Requisition) still show.
+_DOC_TO_SIGN_TYPES = (
+    "Increment_Ltr_Onshore", "Increment_Ltr_Offshore",
+    "Promotion_Ltr_Onshore", "Promotion_Ltr_Offshore",
+    "Warning_Ltr_Onshore", "Warning_Ltr_Offshore",
+    "Termination_Ltr_Onshore", "Termination_Ltr_Offshore",
+    "Experience_Ltr_Onshore", "Experience_Ltr_Offshore",
+    "Contract_Extension_Ltr_Onshore", "Contract_Extension_Ltr_Offshore",
+    "User_Defined_Resume_Onshore", "User_Defined_Resume_Offshore",
+    "Offer_Ltr_Onshore", "Offer_Ltr_Offshore",
+    "Salary_Correction_Ltr_Onshore", "Salary_Correction_Ltr_Offshore",
+    "Joining_Contracts_Onshore", "Joining_Contracts_Offshore",
+    "Conformation_Ltr_Onshore", "Conformation_Ltr_Offshore",
+    "Appreciation_Ltr_Onshore", "Appreciation_Ltr_Offshore",
+)
+
+
+@require_permission("masters.doc_to_sign_mapping", "view")
+def doc_to_sign_mapping_page(request):
+    return render(request, "chatbot/masters/doc_to_sign_mapping.html")
+
+
+@require_GET
+def doc_to_sign_mapping_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT DISTINCT Doc_Name FROM eos_Doc_To_Sign_Mapping")
+        existing = {r[0] for r in cursor.fetchall()}
+    doc_names = sorted(set(_DOC_TO_SIGN_TYPES) | existing)
+    return JsonResponse({"doc_names": doc_names})
+
+
+@require_GET
+def mapping_employees_search_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0) or 0))
+    limit  = min(50, max(1, int(request.GET.get("limit", 20) or 20)))
+    with connections["default"].cursor() as cursor:
+        params = [f"%{q}%", f"%{q}%", f"%{q}%"]
+        sql = (
+            "SELECT EMP_ID, CONCAT_WS(' ', Emp_Fname, NULLIF(Emp_Mname, ''), Emp_Sname) "
+            "FROM Mst_Employee "
+            "WHERE (Emp_Fname LIKE %s OR Emp_Mname LIKE %s OR Emp_Sname LIKE %s)"
+            " ORDER BY Emp_Sname, Emp_Fname LIMIT %s OFFSET %s"
+        )
+        params += [limit + 1, offset]
+        dbq(cursor, sql, params)
+        rows = cursor.fetchall()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    results = [{"id": r[0], "name": r[1]} for r in rows]
+    return JsonResponse({"results": results, "has_more": has_more})
+
+
+@require_GET
+def doc_to_sign_mapping_list_api(request):
+    from django.db import connections
+    _ps = request.GET.get("page_size", "25")
+    page_size = int(_ps) if _ps and _ps.isdigit() and int(_ps) in (25, 50, 75, 100) else 25
+    page = max(int(request.GET.get("page", 1)), 1)
+    offset = (page - 1) * page_size
+    doc_name = request.GET.get("doc_name", "")
+    status   = request.GET.get("status", "")
+    q        = request.GET.get("q", "").strip()
+
+    where, params = ["1=1"], []
+    if doc_name:
+        where.append("m.Doc_Name = %s"); params.append(doc_name)
+    if status == "active":
+        where.append("m.Sign_To IS NULL")
+    elif status == "ended":
+        where.append("m.Sign_To IS NOT NULL")
+    if q:
+        like = f"%{q}%"
+        where.append("(m.Doc_Name LIKE %s OR e.Emp_Fname LIKE %s OR e.Emp_Mname LIKE %s OR e.Emp_Sname LIKE %s)")
+        params += [like, like, like, like]
+
+    sql_base = """
+        FROM eos_Doc_To_Sign_Mapping m
+        JOIN Mst_Employee e ON e.EMP_ID = m.Emp_Id
+        WHERE """ + " AND ".join(where)
+
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT COUNT(*) " + sql_base, params)
+        total = cursor.fetchone()[0]
+        dbq(cursor,
+            "SELECT m.Doc_To_Sign_Id, m.Doc_Name, e.EMP_ID, "
+            "CONCAT_WS(' ', e.Emp_Fname, NULLIF(e.Emp_Mname, ''), e.Emp_Sname), "
+            "m.Sign_From, m.Sign_To "
+            + sql_base + " ORDER BY m.Doc_Name LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        rows = [
+            {"id": row[0], "doc_name": row[1], "emp_id": row[2], "emp_name": row[3],
+             "date_from": row[4].isoformat() if row[4] else None,
+             "date_to": row[5].isoformat() if row[5] else None}
+            for row in cursor.fetchall()
+        ]
+    return JsonResponse({"records": rows, "total": total, "page": page, "page_size": page_size})
+
+
+@require_GET
+def doc_to_sign_mapping_get_api(request, rec_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor,
+            "SELECT m.Doc_To_Sign_Id, m.Doc_Name, m.Emp_Id, "
+            "CONCAT_WS(' ', e.Emp_Fname, NULLIF(e.Emp_Mname, ''), e.Emp_Sname), "
+            "m.Sign_Path, m.Sign_From, m.Sign_To "
+            "FROM eos_Doc_To_Sign_Mapping m JOIN Mst_Employee e ON e.EMP_ID = m.Emp_Id "
+            "WHERE m.Doc_To_Sign_Id=%s", [rec_id]
+        )
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse({
+        "id": row[0], "doc_name": row[1], "emp_id": row[2], "emp_name": row[3],
+        "sign_path": row[4],
+        "date_from": row[5].isoformat() if row[5] else None,
+        "date_to": row[6].isoformat() if row[6] else None,
+    })
+
+
+@csrf_exempt
+def doc_to_sign_mapping_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.doc_to_sign_mapping", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    import json as _json
+    from django.db import connections
+    body       = _json.loads(request.body)
+    rec_id     = body.get("id")
+    doc_name   = body.get("doc_name")
+    emp_id     = body.get("emp_id")
+    sign_path  = body.get("sign_path") or None
+    date_from  = body.get("date_from")
+    date_to    = body.get("date_to") or None
+    op_user_id = _audit.ops_user_id(request)
+
+    if not all([doc_name, emp_id, date_from]):
+        return JsonResponse({"error": "doc_name, emp_id and date_from are required"}, status=400)
+
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.doc_to_sign_mapping", rec_id)
+        if rec_id:
+            dbq(cursor,
+                "UPDATE eos_Doc_To_Sign_Mapping SET Doc_Name=%s, Emp_Id=%s, Sign_Path=%s, "
+                "Sign_From=%s, Sign_To=%s, Mod_User_Id=%s, Mod_Dt=NOW() "
+                "WHERE Doc_To_Sign_Id=%s",
+                [doc_name, emp_id, sign_path, date_from, date_to, op_user_id, rec_id],
+            )
+            new_id = rec_id
+        else:
+            dbq(cursor, "SELECT COALESCE(MAX(Doc_To_Sign_Id), 0) + 1 FROM eos_Doc_To_Sign_Mapping")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor,
+                "INSERT INTO eos_Doc_To_Sign_Mapping "
+                "(Doc_To_Sign_Id, Doc_Name, Emp_Id, Sign_Path, Sign_From, Sign_To, Cr_User_Id, Cr_Dt) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())",
+                [new_id, doc_name, emp_id, sign_path, date_from, date_to, op_user_id],
+            )
+        _audit.record_save(request, cursor, "masters.doc_to_sign_mapping", new_id, _before)
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def doc_to_sign_mapping_delete_api(request, rec_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.doc_to_sign_mapping", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.doc_to_sign_mapping", rec_id)
+        dbq(cursor, "DELETE FROM eos_Doc_To_Sign_Mapping WHERE Doc_To_Sign_Id=%s", [rec_id])
+    _audit.record_delete(request, "masters.doc_to_sign_mapping", rec_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Department To Interviewer Mapping ─────────────────────────────────────────
+
+# Confirmed against live Mst_Department (2026-08-18): the legacy screenshot's
+# "Value=73 HR" was a misread — Dept_Id 73 is actually "Electrical". Real HR
+# is Dept_Id 3, which existing eos_Mst_Interviewer rows already use.
+_INTERVIEWER_DEPT_IDS = (3, 14, 35)
+
+_INTERVIEWER_SIGN_ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".pdf"}
+_INTERVIEWER_SIGN_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+@require_permission("masters.interviewer_mapping", "view")
+def interviewer_mapping_page(request):
+    return render(request, "chatbot/masters/interviewer_mapping.html")
+
+
+@require_GET
+def interviewer_mapping_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        placeholders = ",".join(["%s"] * len(_INTERVIEWER_DEPT_IDS))
+        dbq(cursor,
+            f"SELECT Dept_Id, Dept_Name FROM Mst_Department WHERE Dept_Id IN ({placeholders}) ORDER BY Dept_Name",
+            list(_INTERVIEWER_DEPT_IDS),
+        )
+        depts = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+    return JsonResponse({"departments": depts})
+
+
+@csrf_exempt
+@require_POST
+def interviewer_sign_upload_api(request):
+    from .rag.config import INTERVIEWER_SIGN_DIR
+    f = request.FILES.get("file")
+    if not f:
+        return JsonResponse({"error": "No file provided"}, status=400)
+    ext = Path(f.name).suffix.lower()
+    if ext not in _INTERVIEWER_SIGN_ALLOWED_EXT:
+        return JsonResponse({"error": "Only JPG, PNG, or PDF files are allowed"}, status=400)
+    if f.size > _INTERVIEWER_SIGN_MAX_BYTES:
+        return JsonResponse({"error": "File exceeds 5 MB limit"}, status=400)
+
+    INTERVIEWER_SIGN_DIR.mkdir(parents=True, exist_ok=True)
+    saved_name = f"{_uuid_mod.uuid4().hex}{ext}"
+    dest = INTERVIEWER_SIGN_DIR / saved_name
+    with open(dest, "wb") as out:
+        for chunk in f.chunks():
+            out.write(chunk)
+
+    return JsonResponse({"path": f"interviewer_signatures/{saved_name}", "filename": f.name})
+
+
+@require_GET
+def interviewer_mapping_list_api(request):
+    from django.db import connections
+    _ps = request.GET.get("page_size", "25")
+    page_size = int(_ps) if _ps and _ps.isdigit() and int(_ps) in (25, 50, 75, 100) else 25
+    page = max(int(request.GET.get("page", 1)), 1)
+    offset = (page - 1) * page_size
+    dept_id = request.GET.get("dept_id", "")
+    status  = request.GET.get("status", "")
+    q       = request.GET.get("q", "").strip()
+
+    where, params = ["1=1"], []
+    if dept_id:
+        where.append("m.Dept_Id = %s"); params.append(dept_id)
+    if status == "active":
+        where.append("m.Active = 'Y'")
+    elif status == "inactive":
+        where.append("m.Active = 'N'")
+    if q:
+        like = f"%{q}%"
+        where.append("(u.USER_NAME LIKE %s OR u.USER_LOGIN_ID LIKE %s OR d.Dept_Name LIKE %s)")
+        params += [like, like, like]
+
+    sql_base = """
+        FROM eos_Mst_Interviewer m
+        JOIN Mst_user u       ON u.USER_ID = m.User_Id
+        JOIN Mst_Department d ON d.Dept_Id = m.Dept_Id
+        WHERE """ + " AND ".join(where)
+
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT COUNT(*) " + sql_base, params)
+        total = cursor.fetchone()[0]
+        dbq(cursor,
+            "SELECT m.Interviewer_Id, u.USER_NAME, u.USER_LOGIN_ID, d.Dept_Name, m.Active "
+            + sql_base + " ORDER BY d.Dept_Name, u.USER_NAME LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        rows = [
+            {"id": row[0], "user_name": row[1], "user_login": row[2], "dept_name": row[3], "active": row[4]}
+            for row in cursor.fetchall()
+        ]
+    return JsonResponse({"records": rows, "total": total, "page": page, "page_size": page_size})
+
+
+@require_GET
+def interviewer_mapping_get_api(request, rec_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor,
+            "SELECT m.Interviewer_Id, m.User_Id, u.USER_NAME, u.USER_LOGIN_ID, "
+            "m.Dept_Id, m.Sign_Path, m.Active "
+            "FROM eos_Mst_Interviewer m JOIN Mst_user u ON u.USER_ID = m.User_Id "
+            "WHERE m.Interviewer_Id=%s", [rec_id]
+        )
+        row = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse({
+        "id": row[0], "user_id": row[1], "user_name": row[2], "user_login": row[3],
+        "dept_id": row[4], "sign_path": row[5], "active": row[6],
+    })
+
+
+@csrf_exempt
+def interviewer_mapping_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.interviewer_mapping", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    import json as _json
+    from django.db import connections
+    body       = _json.loads(request.body)
+    rec_id     = body.get("id")
+    user_id    = body.get("user_id")
+    dept_id    = body.get("dept_id")
+    sign_path  = body.get("sign_path") or None
+    active     = body.get("active") or "Y"
+    op_user_id = _audit.ops_user_id(request)
+
+    if not all([user_id, dept_id]):
+        return JsonResponse({"error": "user_id and dept_id are required"}, status=400)
+    if active not in ("Y", "N"):
+        return JsonResponse({"error": "active must be Y or N"}, status=400)
+
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.interviewer_mapping", rec_id)
+        if rec_id:
+            dbq(cursor,
+                "UPDATE eos_Mst_Interviewer SET User_Id=%s, Dept_Id=%s, Sign_Path=%s, Active=%s, "
+                "Mod_User_Id=%s, Mod_Dt=NOW() WHERE Interviewer_Id=%s",
+                [user_id, dept_id, sign_path, active, op_user_id, rec_id],
+            )
+            new_id = rec_id
+        else:
+            dbq(cursor, "SELECT COALESCE(MAX(Interviewer_Id), 0) + 1 FROM eos_Mst_Interviewer")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor,
+                "INSERT INTO eos_Mst_Interviewer (Interviewer_Id, User_Id, Dept_Id, Sign_Path, Active, Cr_User_Id, Cr_Dt) "
+                "VALUES (%s, %s, %s, %s, %s, %s, NOW())",
+                [new_id, user_id, dept_id, sign_path, active, op_user_id],
+            )
+        _audit.record_save(request, cursor, "masters.interviewer_mapping", new_id, _before)
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def interviewer_mapping_delete_api(request, rec_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.interviewer_mapping", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.interviewer_mapping", rec_id)
+        dbq(cursor, "DELETE FROM eos_Mst_Interviewer WHERE Interviewer_Id=%s", [rec_id])
+    _audit.record_delete(request, "masters.interviewer_mapping", rec_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Project Contract (Header + Detail) ────────────────────────────────────────
+
+@require_permission("masters.project_contract", "view")
+def project_contract_page(request):
+    return render(request, "chatbot/masters/project_contract.html")
+
+
+@require_GET
+def project_contract_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT Operator_Id, Operator_Name FROM eos_Mst_Operator ORDER BY Operator_Name")
+        operators = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+        dbq(cursor, "SELECT Rig_Id, Rig_Name FROM eos_Mst_Rig WHERE Rig_Active = 'Y' ORDER BY Rig_Name")
+        rigs = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+    return JsonResponse({"operators": operators, "rigs": rigs})
+
+
+@require_GET
+def mapping_locations_search_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0) or 0))
+    limit  = min(50, max(1, int(request.GET.get("limit", 20) or 20)))
+    with connections["default"].cursor() as cursor:
+        params = [f"%{q}%"]
+        sql = (
+            "SELECT Location_Id, Location_Name FROM Mst_Location "
+            "WHERE location_active = 'Y' AND Location_Name LIKE %s"
+            " ORDER BY Location_Name LIMIT %s OFFSET %s"
+        )
+        params += [limit + 1, offset]
+        dbq(cursor, sql, params)
+        rows = cursor.fetchall()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    results = [{"id": r[0], "name": r[1]} for r in rows]
+    return JsonResponse({"results": results, "has_more": has_more})
+
+
+@require_GET
+def project_contract_list_api(request):
+    from django.db import connections
+    _ps = request.GET.get("page_size", "25")
+    page_size = int(_ps) if _ps and _ps.isdigit() and int(_ps) in (25, 50, 75, 100) else 25
+    page = max(int(request.GET.get("page", 1)), 1)
+    offset = (page - 1) * page_size
+    operator_id = request.GET.get("operator_id", "")
+    status      = request.GET.get("status", "")
+    q           = request.GET.get("q", "").strip()
+
+    where, params = ["1=1"], []
+    if operator_id:
+        where.append("h.Operator_Id = %s"); params.append(operator_id)
+    if status == "active":
+        where.append("h.Prj_End_Dt IS NULL")
+    elif status == "closed":
+        where.append("h.Prj_End_Dt IS NOT NULL")
+    if q:
+        like = f"%{q}%"
+        where.append("(h.Prj_Contract_No LIKE %s OR h.Prj_Short_Name LIKE %s OR l.Location_Name LIKE %s OR o.Operator_Name LIKE %s)")
+        params += [like, like, like, like]
+
+    sql_base = """
+        FROM eos_Mst_Project_Contract h
+        JOIN Mst_Location l      ON l.Location_Id = h.Location_Id
+        JOIN eos_Mst_Operator o  ON o.Operator_Id = h.Operator_Id
+        WHERE """ + " AND ".join(where)
+
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "SELECT COUNT(*) " + sql_base, params)
+        total = cursor.fetchone()[0]
+        dbq(cursor,
+            "SELECT h.Prj_Contract_Id, l.Location_Name, o.Operator_Name, h.Prj_Short_Name, "
+            "h.Prj_Contract_No, h.Prj_Start_Dt, h.Prj_End_Dt "
+            + sql_base + " ORDER BY h.Prj_Start_Dt DESC LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        rows = [
+            {"id": row[0], "location": row[1], "operator": row[2], "short_name": row[3],
+             "contract_no": row[4],
+             "date_from": row[5].isoformat() if row[5] else None,
+             "date_to": row[6].isoformat() if row[6] else None}
+            for row in cursor.fetchall()
+        ]
+    return JsonResponse({"records": rows, "total": total, "page": page, "page_size": page_size})
+
+
+@require_GET
+def project_contract_get_api(request, hdr_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor,
+            "SELECT h.Prj_Contract_Id, h.Location_Id, l.Location_Name, h.Operator_Id, o.Operator_Name, "
+            "h.Prj_Short_Name, h.Prj_Contract_No, h.Prj_Start_Dt, h.Prj_End_Dt "
+            "FROM eos_Mst_Project_Contract h "
+            "JOIN Mst_Location l ON l.Location_Id = h.Location_Id "
+            "JOIN eos_Mst_Operator o ON o.Operator_Id = h.Operator_Id "
+            "WHERE h.Prj_Contract_Id=%s", [hdr_id]
+        )
+        h = cursor.fetchone()
+        if not h:
+            return JsonResponse({"error": "Not found"}, status=404)
+        dbq(cursor,
+            "SELECT d.Prj_Contract_Dtl_Id, d.Rig_Id, r.Rig_Name, d.Rig_Active_From, d.Rig_Active_To "
+            "FROM eos_Mst_Project_Contract_dtl d JOIN eos_Mst_Rig r ON r.Rig_Id = d.Rig_Id "
+            "WHERE d.Prj_Contract_Id=%s ORDER BY d.Rig_Active_From", [hdr_id]
+        )
+        lines = [
+            {"id": r[0], "rig_id": r[1], "rig_name": r[2],
+             "date_from": r[3].isoformat() if r[3] else None,
+             "date_to": r[4].isoformat() if r[4] else None}
+            for r in cursor.fetchall()
+        ]
+    return JsonResponse({
+        "id": h[0], "location_id": h[1], "location": h[2], "operator_id": h[3], "operator": h[4],
+        "short_name": h[5], "contract_no": h[6],
+        "date_from": h[7].isoformat() if h[7] else None,
+        "date_to": h[8].isoformat() if h[8] else None,
+        "lines": lines,
+    })
+
+
+@csrf_exempt
+def project_contract_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.project_contract", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    import json as _json
+    from django.db import connections
+    body        = _json.loads(request.body)
+    rec_id      = body.get("id")
+    location_id = body.get("location_id")
+    operator_id = body.get("operator_id")
+    short_name  = (body.get("short_name") or "").strip() or None
+    contract_no = (body.get("contract_no") or "").strip()
+    date_from   = body.get("date_from")
+    date_to     = body.get("date_to") or None
+    op_user_id  = _audit.ops_user_id(request)
+
+    if not all([location_id, operator_id, contract_no, date_from]):
+        return JsonResponse({"error": "location_id, operator_id, contract_no and date_from are required"}, status=400)
+
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.project_contract", rec_id)
+        if rec_id:
+            dbq(cursor,
+                "UPDATE eos_Mst_Project_Contract SET Location_Id=%s, Operator_Id=%s, Prj_Short_Name=%s, "
+                "Prj_Contract_No=%s, Prj_Start_Dt=%s, Prj_End_Dt=%s, Mod_User_Id=%s, Mod_Dt=NOW() "
+                "WHERE Prj_Contract_Id=%s",
+                [location_id, operator_id, short_name, contract_no, date_from, date_to, op_user_id, rec_id],
+            )
+            new_id = rec_id
+        else:
+            dbq(cursor, "SELECT COALESCE(MAX(Prj_Contract_Id), 0) + 1 FROM eos_Mst_Project_Contract")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor,
+                "INSERT INTO eos_Mst_Project_Contract "
+                "(Prj_Contract_Id, Location_Id, Operator_Id, Prj_Short_Name, Prj_Contract_No, Prj_Start_Dt, Prj_End_Dt, Cr_User_Id, Cr_Dt) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())",
+                [new_id, location_id, operator_id, short_name, contract_no, date_from, date_to, op_user_id],
+            )
+        _audit.record_save(request, cursor, "masters.project_contract", new_id, _before)
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def project_contract_delete_api(request, hdr_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.project_contract", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.project_contract", hdr_id)
+        dbq(cursor, "DELETE FROM eos_Mst_Project_Contract_dtl WHERE Prj_Contract_Id=%s", [hdr_id])
+        dbq(cursor, "DELETE FROM eos_Mst_Project_Contract WHERE Prj_Contract_Id=%s", [hdr_id])
+    _audit.record_delete(request, "masters.project_contract", hdr_id, _before)
+    return JsonResponse({"success": True})
+
+
+@csrf_exempt
+def project_contract_save_dtl_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.project_contract", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    import json as _json
+    from django.db import connections
+    body       = _json.loads(request.body)
+    dtl_id     = body.get("id")
+    hdr_id     = body.get("hdr_id")
+    rig_id     = body.get("rig_id")
+    date_from  = body.get("date_from")
+    date_to    = body.get("date_to") or None
+    op_user_id = _audit.ops_user_id(request)
+
+    if not all([hdr_id, rig_id, date_from]):
+        return JsonResponse({"error": "hdr_id, rig_id and date_from are required"}, status=400)
+
+    with connections["default"].cursor() as cursor:
+        if dtl_id:
+            dbq(cursor,
+                "UPDATE eos_Mst_Project_Contract_dtl SET Rig_Id=%s, Rig_Active_From=%s, Rig_Active_To=%s, "
+                "Mod_User_Id=%s, Mod_Dt=NOW() WHERE Prj_Contract_Dtl_Id=%s",
+                [rig_id, date_from, date_to, op_user_id, dtl_id],
+            )
+            new_id = dtl_id
+        else:
+            dbq(cursor, "SELECT COALESCE(MAX(Prj_Contract_Dtl_Id), 0) + 1 FROM eos_Mst_Project_Contract_dtl")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor,
+                "INSERT INTO eos_Mst_Project_Contract_dtl "
+                "(Prj_Contract_Dtl_Id, Prj_Contract_Id, Rig_Id, Rig_Active_From, Rig_Active_To, Cr_User_Id, Cr_Dt) "
+                "VALUES (%s, %s, %s, %s, %s, %s, NOW())",
+                [new_id, hdr_id, rig_id, date_from, date_to, op_user_id],
+            )
+    _audit.record_action(request, ("update" if dtl_id else "create"), "masters.project_contract",
+                         new_id, f"Rig line (contract #{hdr_id})",
+                         {"Rig_Id": {"old": None, "new": rig_id}})
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def project_contract_delete_dtl_api(request, dtl_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.project_contract", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, "DELETE FROM eos_Mst_Project_Contract_dtl WHERE Prj_Contract_Dtl_Id=%s", [dtl_id])
+    _audit.record_action(request, "delete", "masters.project_contract", dtl_id,
+                         f"Rig line #{dtl_id}", None)
+    return JsonResponse({"success": True})
+
+
+# ── Project Drilling Rates ─────────────────────────────────────────────────────
+
+@require_permission("masters.project_drilling_rates", "view")
+def project_drilling_rates_page(request):
+    return render(request, "chatbot/masters/project_drilling_rates.html")
+
+
+@require_GET
+def project_drilling_rates_meta_api(request):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor,
+            "SELECT h.Prj_Contract_Id, h.Prj_Contract_No, l.Location_Name, o.Operator_Name, h.Prj_Start_Dt "
+            "FROM eos_Mst_Project_Contract h "
+            "JOIN Mst_Location l ON l.Location_Id = h.Location_Id "
+            "JOIN eos_Mst_Operator o ON o.Operator_Id = h.Operator_Id "
+            "WHERE h.Prj_End_Dt IS NULL ORDER BY h.Prj_Contract_No"
+        )
+        projects = [
+            {"id": r[0], "contract_no": r[1], "location": r[2], "operator": r[3],
+             "date_from": r[4].isoformat() if r[4] else None}
+            for r in cursor.fetchall()
+        ]
+        dbq(cursor, "SELECT Drilling_Rate_Id, Rate_Code FROM eos_Mst_Drilling_Rate WHERE Rate_Active = 'Y' ORDER BY Rate_Code")
+        rate_types = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+        dbq(cursor, "SELECT Currency_Id, Currency_Abrv FROM Mst_Currency WHERE Currency_Active = 'Y' ORDER BY Currency_Abrv")
+        currencies = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+    return JsonResponse({"projects": projects, "rate_types": rate_types, "currencies": currencies})
+
+
+@require_GET
+def project_drilling_rigs_api(request, project_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor,
+            "SELECT DISTINCT d.Rig_Id, r.Rig_Name FROM eos_Mst_Project_Contract_dtl d "
+            "JOIN eos_Mst_Rig r ON r.Rig_Id = d.Rig_Id "
+            "WHERE d.Prj_Contract_Id = %s ORDER BY r.Rig_Name", [project_id]
+        )
+        rigs = [{"id": r[0], "name": r[1]} for r in cursor.fetchall()]
+    return JsonResponse({"rigs": rigs})
+
+
+@require_GET
+def project_drilling_rates_list_api(request):
+    from django.db import connections
+    project_id = request.GET.get("project_id", "")
+    rig_id     = request.GET.get("rig_id", "")
+    if not project_id or not rig_id:
+        return JsonResponse({"error": "project_id and rig_id are required"}, status=400)
+    with connections["default"].cursor() as cursor:
+        dbq(cursor,
+            "SELECT pdr.Prj_Drilling_Rate_Id, pdr.Drilling_Rate_Id, dr.Rate_Code, "
+            "pdr.Currency_Id, cur.Currency_Abrv, pdr.Rate "
+            "FROM eos_Prj_Drilling_Rate pdr "
+            "JOIN eos_Mst_Drilling_Rate dr ON dr.Drilling_Rate_Id = pdr.Drilling_Rate_Id "
+            "LEFT JOIN Mst_Currency cur ON cur.Currency_Id = pdr.Currency_Id "
+            "WHERE pdr.Prj_Contract_Id = %s AND pdr.Rig_Id = %s "
+            "ORDER BY dr.Rate_Code", [project_id, rig_id]
+        )
+        rows = [
+            {"id": r[0], "rate_type_id": r[1], "rate_type": r[2],
+             "currency_id": r[3], "currency": r[4],
+             "rate": float(r[5]) if r[5] is not None else None}
+            for r in cursor.fetchall()
+        ]
+    return JsonResponse({"records": rows})
+
+
+@csrf_exempt
+def project_drilling_rates_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.project_drilling_rates", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    import json as _json
+    from django.db import connections
+    body        = _json.loads(request.body)
+    rec_id      = body.get("id")
+    project_id  = body.get("project_id")
+    rig_id      = body.get("rig_id")
+    rate_type_id = body.get("rate_type_id")
+    currency_id = body.get("currency_id") or None
+    rate        = body.get("rate")
+    op_user_id  = _audit.ops_user_id(request)
+
+    if not all([project_id, rig_id, rate_type_id]):
+        return JsonResponse({"error": "project_id, rig_id and rate_type_id are required"}, status=400)
+
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.project_drilling_rates", rec_id)
+        if rec_id:
+            dbq(cursor,
+                "UPDATE eos_Prj_Drilling_Rate SET Drilling_Rate_Id=%s, Currency_Id=%s, Rate=%s, "
+                "Mod_User_Id=%s, Mod_Dt=NOW() WHERE Prj_Drilling_Rate_Id=%s",
+                [rate_type_id, currency_id, rate, op_user_id, rec_id],
+            )
+            new_id = rec_id
+        else:
+            dbq(cursor, "SELECT COALESCE(MAX(Prj_Drilling_Rate_Id), 0) + 1 FROM eos_Prj_Drilling_Rate")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor,
+                "INSERT INTO eos_Prj_Drilling_Rate "
+                "(Prj_Drilling_Rate_Id, Drilling_Rate_Id, Prj_Contract_Id, Rig_Id, Currency_Id, Rate, Cr_User_Id, Cr_Dt) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())",
+                [new_id, rate_type_id, project_id, rig_id, currency_id, rate, op_user_id],
+            )
+        _audit.record_save(request, cursor, "masters.project_drilling_rates", new_id, _before)
+    return JsonResponse({"success": True, "id": new_id})
+
+
+@csrf_exempt
+def project_drilling_rates_delete_api(request, rec_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.project_drilling_rates", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.project_drilling_rates", rec_id)
+        dbq(cursor, "DELETE FROM eos_Prj_Drilling_Rate WHERE Prj_Drilling_Rate_Id=%s", [rec_id])
+    _audit.record_delete(request, "masters.project_drilling_rates", rec_id, _before)
     return JsonResponse({"success": True})
 
 

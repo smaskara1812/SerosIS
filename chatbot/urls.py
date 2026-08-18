@@ -278,6 +278,65 @@ urlpatterns = [
     path("api/masters/competency/<int:rec_id>/", views.competency_get_api, name="competency_get"),
     path("api/masters/competency/<int:rec_id>/delete/", views.competency_delete_api, name="competency_delete"),
 
+    # ── Mapping Masters ────────────────────────────────────────────────────────
+    path("api/masters/users-search/", views.mapping_users_search_api, name="mapping_users_search"),
+
+    path("masters/user-rig-mapping/", views.user_rig_mapping_page, name="user_rig_mapping"),
+    path("api/masters/user-rig-mapping/meta/", views.user_rig_mapping_meta_api, name="user_rig_mapping_meta"),
+    path("api/masters/user-rig-mapping/", views.user_rig_mapping_list_api, name="user_rig_mapping_list"),
+    path("api/masters/user-rig-mapping/save/", views.user_rig_mapping_save_api, name="user_rig_mapping_save"),
+    path("api/masters/user-rig-mapping/<int:rec_id>/", views.user_rig_mapping_get_api, name="user_rig_mapping_get"),
+    path("api/masters/user-rig-mapping/<int:rec_id>/delete/", views.user_rig_mapping_delete_api, name="user_rig_mapping_delete"),
+
+    path("masters/user-category-mapping/", views.user_category_mapping_page, name="user_category_mapping"),
+    path("api/masters/user-category-mapping/meta/", views.user_category_mapping_meta_api, name="user_category_mapping_meta"),
+    path("api/masters/user-category-mapping/", views.user_category_mapping_list_api, name="user_category_mapping_list"),
+    path("api/masters/user-category-mapping/save/", views.user_category_mapping_save_api, name="user_category_mapping_save"),
+    path("api/masters/user-category-mapping/<int:rec_id>/", views.user_category_mapping_get_api, name="user_category_mapping_get"),
+    path("api/masters/user-category-mapping/<int:rec_id>/delete/", views.user_category_mapping_delete_api, name="user_category_mapping_delete"),
+
+    path("masters/rig-to-email-mapping/", views.rig_to_email_mapping_page, name="rig_to_email_mapping"),
+    path("api/masters/rig-to-email-mapping/meta/", views.rig_to_email_mapping_meta_api, name="rig_to_email_mapping_meta"),
+    path("api/masters/rig-to-email-mapping/", views.rig_to_email_mapping_list_api, name="rig_to_email_mapping_list"),
+    path("api/masters/rig-to-email-mapping/save/", views.rig_to_email_mapping_save_api, name="rig_to_email_mapping_save"),
+    path("api/masters/rig-to-email-mapping/<int:rec_id>/", views.rig_to_email_mapping_get_api, name="rig_to_email_mapping_get"),
+    path("api/masters/rig-to-email-mapping/<int:rec_id>/delete/", views.rig_to_email_mapping_delete_api, name="rig_to_email_mapping_delete"),
+
+    path("api/masters/employees-search/", views.mapping_employees_search_api, name="mapping_employees_search"),
+
+    path("masters/doc-to-sign-mapping/", views.doc_to_sign_mapping_page, name="doc_to_sign_mapping"),
+    path("api/masters/doc-to-sign-mapping/meta/", views.doc_to_sign_mapping_meta_api, name="doc_to_sign_mapping_meta"),
+    path("api/masters/doc-to-sign-mapping/", views.doc_to_sign_mapping_list_api, name="doc_to_sign_mapping_list"),
+    path("api/masters/doc-to-sign-mapping/save/", views.doc_to_sign_mapping_save_api, name="doc_to_sign_mapping_save"),
+    path("api/masters/doc-to-sign-mapping/<int:rec_id>/", views.doc_to_sign_mapping_get_api, name="doc_to_sign_mapping_get"),
+    path("api/masters/doc-to-sign-mapping/<int:rec_id>/delete/", views.doc_to_sign_mapping_delete_api, name="doc_to_sign_mapping_delete"),
+
+    path("masters/interviewer-mapping/", views.interviewer_mapping_page, name="interviewer_mapping"),
+    path("api/masters/interviewer-mapping/meta/", views.interviewer_mapping_meta_api, name="interviewer_mapping_meta"),
+    path("api/masters/interviewer-mapping/sign-upload/", views.interviewer_sign_upload_api, name="interviewer_sign_upload"),
+    path("api/masters/interviewer-mapping/", views.interviewer_mapping_list_api, name="interviewer_mapping_list"),
+    path("api/masters/interviewer-mapping/save/", views.interviewer_mapping_save_api, name="interviewer_mapping_save"),
+    path("api/masters/interviewer-mapping/<int:rec_id>/", views.interviewer_mapping_get_api, name="interviewer_mapping_get"),
+    path("api/masters/interviewer-mapping/<int:rec_id>/delete/", views.interviewer_mapping_delete_api, name="interviewer_mapping_delete"),
+
+    path("api/masters/locations-search/", views.mapping_locations_search_api, name="mapping_locations_search"),
+
+    path("masters/project-contract/", views.project_contract_page, name="project_contract"),
+    path("api/masters/project-contract/meta/", views.project_contract_meta_api, name="project_contract_meta"),
+    path("api/masters/project-contract/", views.project_contract_list_api, name="project_contract_list"),
+    path("api/masters/project-contract/save/", views.project_contract_save_api, name="project_contract_save"),
+    path("api/masters/project-contract/<int:hdr_id>/", views.project_contract_get_api, name="project_contract_get"),
+    path("api/masters/project-contract/<int:hdr_id>/delete/", views.project_contract_delete_api, name="project_contract_delete"),
+    path("api/masters/project-contract/dtl/save/", views.project_contract_save_dtl_api, name="project_contract_save_dtl"),
+    path("api/masters/project-contract/dtl/<int:dtl_id>/delete/", views.project_contract_delete_dtl_api, name="project_contract_delete_dtl"),
+
+    path("masters/project-drilling-rates/", views.project_drilling_rates_page, name="project_drilling_rates"),
+    path("api/masters/project-drilling-rates/meta/", views.project_drilling_rates_meta_api, name="project_drilling_rates_meta"),
+    path("api/masters/project-drilling-rates/rigs/<int:project_id>/", views.project_drilling_rigs_api, name="project_drilling_rigs"),
+    path("api/masters/project-drilling-rates/", views.project_drilling_rates_list_api, name="project_drilling_rates_list"),
+    path("api/masters/project-drilling-rates/save/", views.project_drilling_rates_save_api, name="project_drilling_rates_save"),
+    path("api/masters/project-drilling-rates/<int:rec_id>/delete/", views.project_drilling_rates_delete_api, name="project_drilling_rates_delete"),
+
     path("api/manuals/upload/", views.manual_upload, name="manual_upload"),
     path("api/manuals/ingest/", views.manual_ingest_start, name="manual_ingest_start"),
     path("api/manuals/ingest/status/", views.manual_ingest_status, name="manual_ingest_status"),

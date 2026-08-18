@@ -44,6 +44,13 @@ ENTITY_TABLES = {
     # These two have no single human-name column (they're FK combos) — label_col=None.
     "masters.travel_eligibility":       ("eos_Travel_Eligibility",       "Travel_Eligibility_Id", None),
     "masters.reporting_structure":      ("eos_Reporting_Structure",      "Reporting_Structure_Id", None),
+    "masters.user_rig_mapping":         ("eos_Mst_User_Rig_Mapping",     "User_Rig_Mapping_Id", None),
+    "masters.user_category_mapping":    ("eos_Mst_User_Fs_Catg_Mapping", "User_Fs_Catg_Mapping_Id", None),
+    "masters.rig_to_email_mapping":     ("eos_Rig_To_Email_Mapping",     "Rig_To_Email_Mapping_Id", None),
+    "masters.doc_to_sign_mapping":       ("eos_Doc_To_Sign_Mapping",     "Doc_To_Sign_Id", None),
+    "masters.interviewer_mapping":       ("eos_Mst_Interviewer",         "Interviewer_Id", None),
+    "masters.project_contract":          ("eos_Mst_Project_Contract",    "Prj_Contract_Id", None),
+    "masters.project_drilling_rates":    ("eos_Prj_Drilling_Rate",       "Prj_Drilling_Rate_Id", None),
     # Job Descriptions: snap the section header; detail lines are logged via record_action.
     "masters.job_descriptions":         ("eos_Job_Description_Hdr",      "JD_Hdr_Id",           "JD_Hdr_Description"),
 }

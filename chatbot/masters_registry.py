@@ -40,6 +40,13 @@ _I = {
     "hse_act":     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
     "hse_cons":    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M6 2h12l-1 7H7L6 2z"/><path d="M7 9v11a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9"/><line x1="9" y1="14" x2="15" y2="14"/></svg>',
     "hazard":      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    "user_rig_map":  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><circle cx="8" cy="8" r="3"/><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15 20v-2a4 4 0 0 0-4-4"/><path d="M22 20V8l-5-3-5 3v2"/></svg>',
+    "user_catg_map": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><circle cx="8" cy="8" r="3"/><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><rect x="15" y="4" width="7" height="7" rx="1"/><path d="M15 20v-4a3 3 0 0 1 3-3h4"/></svg>',
+    "rig_email_map": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',
+    "doc_sign_map": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 16s1.5-2 4-2 4 2 4 2"/><path d="M9 12h.01M15 12h.01"/></svg>',
+    "interviewer_map": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M22 21c0-3-2-5.5-5-6.5"/></svg>',
+    "project_contract": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>',
+    "drilling_rate": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
 }
 
 # ── Group header icons (14×14) ─────────────────────────────────────────────────
@@ -48,6 +55,7 @@ _GI = {
     "hr":       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     "qhse":     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
     "projects": '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',
+    "mapping":  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M8 3v18M16 3v18M3 8h18M3 16h18"/></svg>',
 }
 
 MASTER_GROUPS = [
@@ -86,9 +94,25 @@ MASTER_GROUPS = [
             {"key": "masters.hazard_types", "slug": "hazard_types", "label": "Hazard Type", "url": "/masters/hazard-type/", "sub": "QHSE MASTER", "meta": "eos_Mst_Hazard_Type · Add / Edit / Delete", "card_bg": "#fff1f2", "icon": _I["hazard"]},
         ],
     },
+    {
+        "id": "mapping", "label": "Mapping", "icon_bg": "#eff6ff", "icon": _GI["mapping"],
+        "items": [
+            {"key": "masters.user_rig_mapping",      "slug": "user_rig_mapping",      "label": "User Rig Mapping",      "url": "/masters/user-rig-mapping/",      "sub": "MAPPING MASTER", "meta": "eos_Mst_User_Rig_Mapping · Add / Edit / Delete",      "card_bg": "#eff6ff", "icon": _I["user_rig_map"]},
+            {"key": "masters.user_category_mapping", "slug": "user_category_mapping", "label": "User Category Mapping", "url": "/masters/user-category-mapping/", "sub": "MAPPING MASTER", "meta": "eos_Mst_User_Fs_Catg_Mapping · Add / Edit / Delete", "card_bg": "#f0fdf4", "icon": _I["user_catg_map"]},
+            {"key": "masters.rig_to_email_mapping", "slug": "rig_to_email_mapping", "label": "Rig To Email Mapping", "url": "/masters/rig-to-email-mapping/", "sub": "MAPPING MASTER", "meta": "eos_Rig_To_Email_Mapping · Add / Edit / Delete", "card_bg": "#fff7ed", "icon": _I["rig_email_map"]},
+            {"key": "masters.doc_to_sign_mapping", "slug": "doc_to_sign_mapping", "label": "Document To Sign Mapping", "url": "/masters/doc-to-sign-mapping/", "sub": "MAPPING MASTER", "meta": "eos_Doc_To_Sign_Mapping · Add / Edit / Delete", "card_bg": "#fdf4ff", "icon": _I["doc_sign_map"]},
+            {"key": "masters.interviewer_mapping", "slug": "interviewer_mapping", "label": "Department To Interviewer Mapping", "url": "/masters/interviewer-mapping/", "sub": "MAPPING MASTER", "meta": "eos_Mst_Interviewer · Add / Edit / Delete", "card_bg": "#fff1f2", "icon": _I["interviewer_map"]},
+        ],
+    },
     # Placeholder group (no masters built yet) — kept here so the section list is
     # fully data-driven. Add items above when their masters are built.
-    {"id": "projects", "label": "Projects", "icon_bg": "#fdf4ff", "icon": _GI["projects"], "items": []},
+    {
+        "id": "projects", "label": "Projects", "icon_bg": "#fdf4ff", "icon": _GI["projects"],
+        "items": [
+            {"key": "masters.project_contract", "slug": "project_contract", "label": "Project Contract", "url": "/masters/project-contract/", "sub": "PROJECT MASTER", "meta": "eos_Mst_Project_Contract / _Dtl · Add / Edit / Delete", "card_bg": "#fdf4ff", "icon": _I["project_contract"]},
+            {"key": "masters.project_drilling_rates", "slug": "project_drilling_rates", "label": "Project Drilling Rates", "url": "/masters/project-drilling-rates/", "sub": "PROJECT MASTER", "meta": "eos_Prj_Drilling_Rate · Add / Edit / Delete", "card_bg": "#fff7ed", "icon": _I["drilling_rate"]},
+        ],
+    },
 ]
 
 

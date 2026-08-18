@@ -260,10 +260,12 @@ def _translate_eos_tables(sql: str) -> str:
 # so a pattern-based rule would silently miss exactly the most-used one.
 # NOTE: if the app starts querying another bare Mst_*/Mstx_* table, add it here too.
 _DBO_TABLES = (
-    "Mst_Cert", "Mst_Company", "Mst_Country", "Mst_Department", "Mst_Emp_Type",
+    "Mst_Cert", "Mst_Company", "Mst_Country", "Mst_Currency", "Mst_Department", "Mst_Emp_Type",
+    "Mst_Employee",
     "Mst_Fs_Category", "Mst_Location", "Mst_Rank", "Mst_Rig_Subtype", "Mst_Rig_Type",
     "Mst_user",
     "Mstx_Incident_Type", "Mstx_Vendor", "Mstx_Work_Location",
+    "Mail_Alert_Dtl",
 )
 _DBO_TABLES_RE = re.compile(
     r"(?<!\.)\b(" + "|".join(re.escape(t) for t in sorted(_DBO_TABLES, key=len, reverse=True)) + r")\b"

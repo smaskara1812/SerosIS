@@ -1,0 +1,878 @@
+{% extends 'chatbot/masters/base.html' %}
+{% load static %}
+
+{% block title %}Project Contract — Seros{% endblock %}
+
+{% block styles %}
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #F2F4F8; --surface: #fff; --border: #E4E8EF;
+    --primary: #1a3f7a; --accent: #2563eb; --accent-light: #EEF3FF;
+    --text: #111827; --text-2: #4B5563; --text-3: #9CA3AF;
+    --success: #059669; --success-bg: #D1FAE5;
+    --danger: #DC2626; --danger-bg: #FEE2E2;
+    --row-hover: rgba(37,99,235,0.035); --row-sel: #EEF3FF; --row-sel-b: #2563eb;
+    --radius: 12px; --radius-sm: 6px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
+  body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; -webkit-font-smoothing: antialiased; }
+
+  /* Header */
+  .page-header { flex-shrink: 0; padding: 16px 24px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 0.74rem; color: var(--text-3); margin-bottom: 7px; }
+  .breadcrumb a { color: var(--text-3); text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .breadcrumb-sep { opacity: 0.45; }
+  .page-title-row { display: flex; align-items: center; justify-content: space-between; }
+  .page-title { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+  .page-stats { display: flex; gap: 8px; align-items: center; }
+  .stat-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+  .stat-chip.total { background: #F1F5F9; color: #475569; }
+  .sdot-sm { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .btn-new { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 6px; background: #1a3f7a; color: #fff; border: none; font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: background .15s; letter-spacing: .02em; }
+  .btn-new:hover { background: #2563eb; }
+
+  /* Layout */
+  .main-layout { flex: 1; display: grid; grid-template-columns: 1fr 460px; overflow: hidden; }
+
+  /* List panel */
+  .records-panel { display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+  .panel-controls { flex-shrink: 0; background: var(--surface); padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--border); }
+  .search-wrap { position: relative; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+  .search-input { width: 100%; padding: 7px 12px 7px 32px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.83rem; color: var(--text); background: var(--bg); outline: none; transition: border-color .15s, box-shadow .15s; }
+  .search-input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .search-input::placeholder { color: var(--text-3); }
+  .filter-row { display: flex; gap: 8px; }
+  .filter-select { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.82rem; color: var(--text); background: var(--bg); outline: none; cursor: pointer; }
+  .filter-select:focus { border-color: var(--accent); background: var(--surface); }
+
+  /* Table */
+  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; background: var(--surface); }
+  .table-wrap::-webkit-scrollbar { width: 5px; }
+  .table-wrap::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead { position: sticky; top: 0; z-index: 2; }
+  thead th { background: #f8faff; border-bottom: 2px solid var(--border); padding: 9px 12px; text-align: left; font-size: 0.7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid #f3f4f6; cursor: pointer; transition: background .1s; }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr.selected { background: var(--row-sel); border-left: 3px solid var(--row-sel-b); }
+  tbody td { padding: 8px 12px; color: var(--text-2); vertical-align: middle; }
+  .td-primary { color: var(--text) !important; font-weight: 600; }
+  .contract-no { font-family: 'SF Mono', monospace; font-size: 0.75rem; color: var(--text-2); }
+  .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+  .status-badge.active { background: var(--success-bg); color: var(--success); }
+  .status-badge.ended { background: #F1F5F9; color: #64748B; }
+  .empty-state { padding: 48px 24px; text-align: center; color: var(--text-3); font-size: 0.85rem; }
+
+  .pagination { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid var(--border); background: var(--surface); font-size: 0.78rem; color: var(--text-2); }
+  .pag-btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-family: inherit; font-size: 0.78rem; cursor: pointer; color: var(--text-2); }
+  .pag-btn:hover:not(:disabled) { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+  .pag-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* Detail panel */
+  .detail-panel { display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }
+
+  /* Placeholder */
+  .placeholder-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; color: var(--text-3); text-align: center; padding: 40px; }
+  .placeholder-state svg { opacity: .35; }
+  .placeholder-state h3 { font-size: 1rem; font-weight: 700; color: var(--text-2); }
+  .placeholder-state p { font-size: 0.82rem; }
+
+  /* Form area */
+  #form-area { display: none; flex-direction: column; height: 100%; }
+  .detail-head { flex-shrink: 0; padding: 16px 20px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; }
+  .detail-head-title { font-size: 0.95rem; font-weight: 700; color: var(--primary); }
+  .detail-head-sub { font-size: 0.73rem; color: var(--text-3); margin-top: 2px; }
+  .detail-body { flex: 1; overflow-y: auto; }
+  .detail-body::-webkit-scrollbar { width: 5px; }
+  .detail-body::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
+
+  /* HDR form */
+  .hdr-form { padding: 18px 20px; border-bottom: 1px solid var(--border); }
+  .form-row { display: grid; gap: 12px; margin-bottom: 12px; }
+  .form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+  .form-row.cols-1 { grid-template-columns: 1fr; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 0.72rem; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+  .form-label .req { color: var(--danger); margin-left: 2px; }
+  .form-input, .form-select { width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; color: var(--text); background: var(--bg); outline: none; transition: border-color .15s, box-shadow .15s; }
+  .form-input:focus, .form-select:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+  /* Combobox */
+  .combo-wrap { position: relative; }
+  .combo-input { width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; color: var(--text); background: var(--bg); outline: none; transition: border-color .15s, box-shadow .15s; }
+  .combo-input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .combo-dd { position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: var(--surface); border: 1.5px solid var(--accent); border-radius: var(--radius-sm); box-shadow: var(--shadow); z-index: 100; max-height: 200px; overflow-y: auto; display: none; }
+  .combo-dd.combo-dd-tall { max-height: 280px; }
+  .combo-dd.open { display: block; }
+  .combo-opt { padding: 7px 10px; font-size: 0.82rem; cursor: pointer; color: var(--text-2); }
+  .combo-opt:hover, .combo-opt.highlighted { background: var(--accent-light); color: var(--accent); }
+  .combo-empty { padding: 8px 10px; font-size: 0.8rem; color: var(--text-3); font-style: italic; }
+  .combo-loading-row { padding: 7px 10px; font-size: 0.76rem; color: var(--text-3); text-align: center; border-top: 1px solid var(--border); }
+
+  /* HDR footer */
+  .hdr-footer { display: flex; gap: 8px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--border); background: #FAFBFD; }
+  .btn-save { flex: 1; padding: 9px 14px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: background .15s; }
+  .btn-save:hover { background: #1d4ed8; }
+  .btn-cancel { padding: 9px 14px; background: var(--bg); color: var(--text-2); border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .btn-cancel:hover { background: #e5e7eb; }
+  .btn-delete-hdr { padding: 9px 10px; background: var(--bg); color: var(--danger); border: 1.5px solid #fecaca; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; }
+  .btn-delete-hdr:hover { background: var(--danger-bg); }
+
+  /* Detail lines (Rig grid) */
+  .dtl-section { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .dtl-section-hdr { flex-shrink: 0; padding: 12px 20px 8px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .dtl-section-title { font-size: 0.78rem; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
+  .dtl-count-badge { font-size: 0.7rem; font-weight: 600; background: #f1f5f9; color: #64748b; padding: 2px 8px; border-radius: 10px; }
+  .dtl-table-wrap { flex: 1; overflow-y: auto; }
+  .dtl-table-wrap::-webkit-scrollbar { width: 4px; }
+  .dtl-table-wrap::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
+  .dtl-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .dtl-table th { padding: 7px 10px; text-align: left; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); background: #f8faff; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+  .dtl-table td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+  .dtl-table input.form-input { padding: 6px 8px; font-size: 0.8rem; }
+  .dtl-del-btn { width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-3); transition: background .12s, color .12s; }
+  .dtl-del-btn:hover { background: var(--danger-bg); color: var(--danger); border-color: #fca5a5; }
+  .dtl-empty-row td { text-align: center; color: var(--text-3); font-size: 0.8rem; padding: 20px; }
+
+  .add-row-area { flex-shrink: 0; padding: 12px 20px; border-top: 2px solid var(--border); background: var(--surface); }
+  .add-row-btn { padding: 8px 16px; background: var(--primary); color: #fff; border: none; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .add-row-btn:hover { background: var(--accent); }
+
+  /* Modal */
+  @keyframes mIn { from { opacity:0; transform:scale(.93) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+  .overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.55); backdrop-filter: blur(3px); z-index: 500; display: none; align-items: center; justify-content: center; }
+  .overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.22); width: 560px; max-width: 95vw; max-height: 92vh; display: flex; flex-direction: column; animation: mIn 0.28s cubic-bezier(0.34,1.4,0.64,1); overflow: hidden; }
+  .modal-head { flex-shrink: 0; padding: 18px 24px 16px; background: linear-gradient(150deg, #0d2147 0%, #1d4a8c 100%); display: flex; align-items: flex-start; justify-content: space-between; }
+  .modal-head-title { font-size: 1rem; font-weight: 700; color: #fff; }
+  .modal-head-sub { font-size: 0.73rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .modal-close { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.8); width: 30px; height: 30px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: inherit; }
+  .modal-close:hover { background: rgba(255,255,255,0.24); }
+  .modal-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .modal-foot { flex-shrink: 0; padding: 14px 24px; border-top: 1px solid var(--border); background: #FAFBFD; display: flex; justify-content: flex-end; gap: 10px; }
+  .btn { padding: 9px 20px; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; border: none; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-ghost { background: transparent; color: var(--text-2); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { background: var(--bg); }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 9999; transform: translateY(20px); opacity: 0; transition: all .25s ease; pointer-events: none; }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { background: var(--success); }
+  #toast.error { background: var(--danger); }
+  #btn-save.dirty, .btn-save.dirty { background: #d97706 !important; box-shadow: 0 0 0 3px rgba(217,119,6,0.25) !important; }
+  #btn-save.dirty:hover, .btn-save.dirty:hover { background: #b45309 !important; }
+</style>
+{% endblock %}
+
+{% block ms_content %}
+<div class="page-header">
+  <div class="breadcrumb">
+    <a href="/">Home</a><span class="breadcrumb-sep">/</span>
+    <a href="/masters/">Masters</a><span class="breadcrumb-sep">/</span>
+    <span>Projects</span><span class="breadcrumb-sep">/</span>
+    <span>Project Contract</span>
+  </div>
+  <div class="page-title-row">
+    <div class="page-title">Project Contract</div>
+    <div class="page-stats">
+      <span class="stat-chip total"><span class="sdot-sm"></span><span id="total-count">—</span> contracts</span>
+      <button class="btn-new" onclick="openAddModal()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="main-layout">
+
+  <!-- List panel -->
+  <div class="records-panel">
+    <div class="panel-controls">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search-input" id="search-input" type="text" placeholder="Search contract no, location or operator…" oninput="debounceSearch()">
+      </div>
+      <div class="filter-row">
+        <select class="filter-select" id="filter-operator" onchange="applyFilters()">
+          <option value="">All Operators</option>
+        </select>
+        <select class="filter-select" id="filter-status" onchange="applyFilters()" style="max-width:130px">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Location / Operator</th>
+            <th>Contract No.</th>
+            <th style="text-align:center">Status</th>
+          </tr>
+        </thead>
+        <tbody id="records-body">
+          <tr><td colspan="3" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <button class="pag-btn" id="prev-btn" onclick="changePage(-1)" disabled>← Prev</button>
+      <span id="page-info">—</span>
+      <button class="pag-btn" id="next-btn" onclick="changePage(1)" disabled>Next →</button>
+    </div>
+  </div>
+
+  <!-- Detail panel -->
+  <div class="detail-panel" id="detail-panel">
+
+    <div class="placeholder-state" id="placeholder">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
+      <h3>No contract selected</h3>
+      <p>Click a row to view or edit, or click New to add a project contract.</p>
+    </div>
+
+    <div id="form-area">
+      <div class="detail-head">
+        <div>
+          <div class="detail-head-title" id="form-title">Edit Contract</div>
+          <div class="detail-head-sub" id="form-sub"></div>
+        </div>
+      </div>
+
+      <div class="detail-body">
+        <input type="hidden" id="rec-id">
+
+        <!-- HDR fields -->
+        <div class="hdr-form">
+          <div class="form-row cols-1">
+            <div class="form-group">
+              <label class="form-label">Location <span class="req">*</span></label>
+              <div class="combo-wrap">
+                <input class="combo-input" id="loc-text" type="text" placeholder="Search location…" autocomplete="off">
+                <input type="hidden" id="loc-id">
+                <div class="combo-dd combo-dd-tall" id="loc-dd"></div>
+              </div>
+            </div>
+          </div>
+          <div class="form-row cols-1">
+            <div class="form-group">
+              <label class="form-label">Operator <span class="req">*</span></label>
+              <div class="combo-wrap">
+                <input class="combo-input" id="op-text" type="text" placeholder="Search operator…" autocomplete="off">
+                <input type="hidden" id="op-id">
+                <div class="combo-dd" id="op-dd"></div>
+              </div>
+            </div>
+          </div>
+          <div class="form-row cols-2">
+            <div class="form-group">
+              <label class="form-label">Short Name</label>
+              <input class="form-input" id="short-name" type="text" maxlength="10">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Contract No. <span class="req">*</span></label>
+              <input class="form-input" id="contract-no" type="text" maxlength="110">
+            </div>
+          </div>
+          <div class="form-row cols-2">
+            <div class="form-group">
+              <label class="form-label">Start Date <span class="req">*</span></label>
+              <input class="form-input" id="date-from" type="date">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Close Date</label>
+              <input class="form-input" id="date-to" type="date">
+            </div>
+          </div>
+        </div>
+
+        <!-- HDR actions -->
+        <div class="hdr-footer">
+          <button class="btn-delete-hdr" id="btn-delete-hdr" onclick="deleteHdr()" title="Delete contract and all rig rows" style="display:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+          <button class="btn-cancel" onclick="cancelEdit()">Cancel</button>
+          <button class="btn-save" onclick="saveHdr()">Save Contract</button>
+        </div>
+
+        <!-- DTL: Rig rows -->
+        <div class="dtl-section">
+          <div class="dtl-section-hdr">
+            <span class="dtl-section-title">Rigs</span>
+            <span class="dtl-count-badge" id="dtl-count">0 rigs</span>
+          </div>
+          <div class="dtl-table-wrap">
+            <table class="dtl-table">
+              <thead>
+                <tr>
+                  <th style="width:34px"></th>
+                  <th>Rig</th>
+                  <th>Active From</th>
+                  <th>Active To</th>
+                </tr>
+              </thead>
+              <tbody id="dtl-body">
+                <tr class="dtl-empty-row"><td colspan="4">Save the contract first to add rig rows.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="add-row-area" id="add-row-area" style="display:none">
+            <button class="add-row-btn" onclick="addNewRow()">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add New Row
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- New Contract Modal -->
+<div class="overlay" id="add-modal" onclick="bgClose(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">New Project Contract</div>
+        <div class="modal-head-sub">Location · Operator · Contract No · Start Date</div>
+      </div>
+      <button class="modal-close" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Location <span class="req">*</span></label>
+        <div class="combo-wrap">
+          <input class="combo-input" id="d-loc-text" type="text" placeholder="Search location…" autocomplete="off">
+          <input type="hidden" id="d-loc-id">
+          <div class="combo-dd combo-dd-tall" id="d-loc-dd"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Operator <span class="req">*</span></label>
+        <div class="combo-wrap">
+          <input class="combo-input" id="d-op-text" type="text" placeholder="Search operator…" autocomplete="off">
+          <input type="hidden" id="d-op-id">
+          <div class="combo-dd" id="d-op-dd"></div>
+        </div>
+      </div>
+      <div class="form-row cols-2">
+        <div class="form-group">
+          <label class="form-label">Short Name</label>
+          <input class="form-input" id="d-short-name" type="text" maxlength="10">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contract No. <span class="req">*</span></label>
+          <input class="form-input" id="d-contract-no" type="text" maxlength="110">
+        </div>
+      </div>
+      <div class="form-row cols-2">
+        <div class="form-group">
+          <label class="form-label">Start Date <span class="req">*</span></label>
+          <input class="form-input" id="d-date-from" type="date">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Close Date</label>
+          <input class="form-input" id="d-date-to" type="date">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewHdr()">Create Contract</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let allOperators = [], allRigs = [];
+let currentPage = 1, totalRecords = 0;
+const PAGE_SIZE = 25;
+let currentHdrId = null;
+let locCombo, opCombo, modalLocCombo, modalOpCombo;
+
+(async function init() {
+  await loadMeta();
+  await loadRecords();
+})();
+
+async function loadMeta() {
+  const res = await fetch('/api/masters/project-contract/meta/');
+  const data = await res.json();
+  allOperators = data.operators;
+  allRigs = data.rigs;
+
+  const opFilter = document.getElementById('filter-operator');
+  allOperators.forEach(o => opFilter.insertAdjacentHTML('beforeend', `<option value="${o.id}">${o.name}</option>`));
+
+  locCombo      = makeLocationCombo('loc-text', 'loc-id', 'loc-dd');
+  opCombo       = makeStaticCombo('op-text', 'op-id', 'op-dd', () => allOperators.map(o => ({ id: o.id, label: o.name })));
+  modalLocCombo = makeLocationCombo('d-loc-text', 'd-loc-id', 'd-loc-dd');
+  modalOpCombo  = makeStaticCombo('d-op-text', 'd-op-id', 'd-op-dd', () => allOperators.map(o => ({ id: o.id, label: o.name })));
+}
+
+let searchTimer;
+function debounceSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(() => applyFilters(), 300); }
+function applyFilters() { loadRecords(1); }
+function changePage(dir) { loadRecords(currentPage + dir); }
+
+async function loadRecords(page = currentPage) {
+  currentPage = page;
+  const operatorId = document.getElementById('filter-operator').value;
+  const status      = document.getElementById('filter-status').value;
+  const q           = document.getElementById('search-input').value.trim();
+  const params = new URLSearchParams({ page, page_size: PAGE_SIZE });
+  if (operatorId) params.set('operator_id', operatorId);
+  if (status)     params.set('status', status);
+  if (q)          params.set('q', q);
+
+  const res  = await fetch('/api/masters/project-contract/?' + params);
+  const data = await res.json();
+  totalRecords = data.total;
+  document.getElementById('total-count').textContent = totalRecords.toLocaleString();
+
+  const tbody = document.getElementById('records-body');
+  if (!data.records.length) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No records found</td></tr>';
+  } else {
+    tbody.innerHTML = data.records.map(r => `
+      <tr onclick="selectRow(${r.id})" data-id="${r.id}">
+        <td class="td-primary">${r.location}<br>
+          <span style="font-size:.75rem;color:var(--text-3);font-weight:500">${r.operator}</span>
+        </td>
+        <td class="contract-no">${r.contract_no}</td>
+        <td style="text-align:center">${r.date_to ? `<span class="status-badge ended">Closed ${r.date_to}</span>` : `<span class="status-badge active">Active</span>`}</td>
+      </tr>`).join('');
+  }
+
+  const totalPages = Math.ceil(totalRecords / PAGE_SIZE);
+  document.getElementById('page-info').textContent = `${currentPage} / ${totalPages || 1}`;
+  document.getElementById('prev-btn').disabled = currentPage <= 1;
+  document.getElementById('next-btn').disabled = currentPage >= totalPages;
+}
+
+async function selectRow(id) {
+  document.querySelectorAll('#records-body tr').forEach(tr =>
+    tr.classList.toggle('selected', +tr.dataset.id === id));
+  const res  = await fetch(`/api/masters/project-contract/${id}/`);
+  const data = await res.json();
+  showForm(data);
+}
+
+function showForm(data) {
+  currentHdrId = data.id;
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('form-area').style.display = 'flex';
+  setDirty(false);
+  document.getElementById('form-title').textContent = 'Edit Contract';
+  document.getElementById('form-sub').textContent = `ID #${data.id} · ${data.lines.length} rig${data.lines.length !== 1 ? 's' : ''}`;
+  document.getElementById('btn-delete-hdr').style.display = 'flex';
+  document.getElementById('rec-id').value = data.id;
+
+  locCombo.set(data.location_id, data.location);
+  opCombo.set(data.operator_id);
+  document.getElementById('short-name').value = data.short_name || '';
+  document.getElementById('contract-no').value = data.contract_no || '';
+  document.getElementById('date-from').value = data.date_from || '';
+  document.getElementById('date-to').value = data.date_to || '';
+
+  renderDtls(data.lines);
+  document.getElementById('add-row-area').style.display = '';
+  _applySaveSectionPerm();
+}
+
+function cancelEdit() {
+  setDirty(false);
+  currentHdrId = null;
+  document.getElementById('placeholder').style.display = '';
+  document.getElementById('form-area').style.display = 'none';
+  document.querySelectorAll('#records-body tr').forEach(tr => tr.classList.remove('selected'));
+}
+
+async function saveHdr() {
+  const id         = document.getElementById('rec-id').value;
+  const locId      = document.getElementById('loc-id').value;
+  const opId       = document.getElementById('op-id').value;
+  const shortName  = document.getElementById('short-name').value.trim();
+  const contractNo = document.getElementById('contract-no').value.trim();
+  const dateFrom   = document.getElementById('date-from').value;
+  const dateTo     = document.getElementById('date-to').value;
+
+  if (!locId || !opId || !contractNo || !dateFrom) {
+    showToast('Location, Operator, Contract No. and Start Date are required', 'error'); return;
+  }
+  const res = await fetch('/api/masters/project-contract/save/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+    body: JSON.stringify({ id, location_id: locId, operator_id: opId, short_name: shortName, contract_no: contractNo, date_from: dateFrom, date_to: dateTo || null }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showToast('Contract saved', 'success'); setDirty(false);
+    await loadRecords();
+    selectRow(data.id);
+  } else {
+    showToast(data.error || 'Save failed', 'error');
+  }
+}
+
+async function deleteHdr() {
+  if (!currentHdrId || !confirm('Delete this contract AND all its rig rows?')) return;
+  const res  = await fetch(`/api/masters/project-contract/${currentHdrId}/delete/`, {
+    method: 'POST', headers: { 'X-CSRFToken': getCsrf() },
+  });
+  const data = await res.json();
+  if (data.success) { showToast('Deleted', 'success'); cancelEdit(); loadRecords(); }
+  else showToast(data.error || 'Delete failed', 'error');
+}
+
+// ── Detail (rig) rows ────────────────────────────────────────────────────────
+function renderDtls(lines) {
+  const tbody = document.getElementById('dtl-body');
+  document.getElementById('dtl-count').textContent = `${lines.length} rig${lines.length !== 1 ? 's' : ''}`;
+
+  if (!lines.length) {
+    tbody.innerHTML = '<tr class="dtl-empty-row"><td colspan="4">No rigs added yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lines.map(l => `
+    <tr data-dtl-id="${l.id}">
+      <td><button class="dtl-del-btn" onclick="deleteDtlRow(${l.id})" title="Delete">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </button></td>
+      <td>${l.rig_name}</td>
+      <td>${l.date_from || '—'}</td>
+      <td>
+        <input class="form-input" type="date" value="${l.date_to || ''}"
+               onchange="updateDtlRow(${l.id}, ${l.rig_id}, '${l.date_from}', this.value)">
+      </td>
+    </tr>`).join('');
+}
+
+async function updateDtlRow(dtlId, rigId, dateFrom, dateTo) {
+  const res = await fetch('/api/masters/project-contract/dtl/save/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+    body: JSON.stringify({ id: dtlId, hdr_id: currentHdrId, rig_id: rigId, date_from: dateFrom, date_to: dateTo || null }),
+  });
+  const data = await res.json();
+  if (data.success) { showToast('Rig row updated', 'success'); await refreshDtls(); }
+  else showToast(data.error || 'Save failed', 'error');
+}
+
+async function deleteDtlRow(dtlId) {
+  if (!confirm('Delete this rig row?')) return;
+  const res = await fetch(`/api/masters/project-contract/dtl/${dtlId}/delete/`, {
+    method: 'POST', headers: { 'X-CSRFToken': getCsrf() },
+  });
+  const data = await res.json();
+  if (data.success) { showToast('Rig row deleted', 'success'); await refreshDtls(); }
+  else showToast(data.error || 'Delete failed', 'error');
+}
+
+async function refreshDtls() {
+  if (!currentHdrId) return;
+  const res  = await fetch(`/api/masters/project-contract/${currentHdrId}/`);
+  const data = await res.json();
+  renderDtls(data.lines);
+  document.getElementById('form-sub').textContent = `ID #${currentHdrId} · ${data.lines.length} rig${data.lines.length !== 1 ? 's' : ''}`;
+}
+
+function addNewRow() {
+  if (!currentHdrId) return;
+  openAddRowModal();
+}
+
+// Lightweight inline "add rig row" modal, built on demand
+let addRowRigCombo;
+function openAddRowModal() {
+  let modal = document.getElementById('add-row-modal');
+  if (!modal) {
+    document.body.insertAdjacentHTML('beforeend', `
+      <div class="overlay" id="add-row-modal" onclick="if(event.target.id==='add-row-modal') closeAddRowModal()">
+        <div class="modal" style="width:420px">
+          <div class="modal-head">
+            <div>
+              <div class="modal-head-title">Add Rig Row</div>
+              <div class="modal-head-sub">Rig · Active From · Active To</div>
+            </div>
+            <button class="modal-close" onclick="closeAddRowModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label">Rig <span class="req">*</span></label>
+              <div class="combo-wrap">
+                <input class="combo-input" id="ar-rig-text" type="text" placeholder="Search rig…" autocomplete="off">
+                <input type="hidden" id="ar-rig-id">
+                <div class="combo-dd" id="ar-rig-dd"></div>
+              </div>
+            </div>
+            <div class="form-row cols-2">
+              <div class="form-group">
+                <label class="form-label">Active From <span class="req">*</span></label>
+                <input class="form-input" id="ar-date-from" type="date">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Active To</label>
+                <input class="form-input" id="ar-date-to" type="date">
+              </div>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-ghost" onclick="closeAddRowModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveNewDtlRow()">Add Row</button>
+          </div>
+        </div>
+      </div>`);
+    addRowRigCombo = makeStaticCombo('ar-rig-text', 'ar-rig-id', 'ar-rig-dd', () => allRigs.map(r => ({ id: r.id, label: r.name })));
+  }
+  addRowRigCombo.reset();
+  document.getElementById('ar-date-from').value = '';
+  document.getElementById('ar-date-to').value = '';
+  document.getElementById('add-row-modal').classList.add('open');
+  setTimeout(() => document.getElementById('ar-rig-text').focus(), 80);
+}
+function closeAddRowModal() { document.getElementById('add-row-modal').classList.remove('open'); }
+
+async function saveNewDtlRow() {
+  const rigId    = document.getElementById('ar-rig-id').value;
+  const dateFrom = document.getElementById('ar-date-from').value;
+  const dateTo   = document.getElementById('ar-date-to').value;
+  if (!rigId || !dateFrom) { showToast('Rig and Active From are required', 'error'); return; }
+
+  const res = await fetch('/api/masters/project-contract/dtl/save/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+    body: JSON.stringify({ id: null, hdr_id: currentHdrId, rig_id: rigId, date_from: dateFrom, date_to: dateTo || null }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showToast('Rig row added', 'success');
+    closeAddRowModal();
+    await refreshDtls();
+  } else {
+    showToast(data.error || 'Save failed', 'error');
+  }
+}
+
+// ── New Contract Modal ──────────────────────────────────────────────────────
+function openAddModal() {
+  document.querySelectorAll('#records-body tr').forEach(tr => tr.classList.remove('selected'));
+  modalLocCombo.reset();
+  modalOpCombo.reset();
+  document.getElementById('d-short-name').value = '';
+  document.getElementById('d-contract-no').value = '';
+  document.getElementById('d-date-from').value = '';
+  document.getElementById('d-date-to').value = '';
+  document.getElementById('add-modal').classList.add('open');
+  setTimeout(() => document.getElementById('d-loc-text').focus(), 80);
+}
+
+function closeAddModal() { document.getElementById('add-modal').classList.remove('open'); }
+function bgClose(e) { if (e.target.id === 'add-modal') closeAddModal(); }
+
+async function saveNewHdr() {
+  const locId      = document.getElementById('d-loc-id').value;
+  const opId       = document.getElementById('d-op-id').value;
+  const shortName  = document.getElementById('d-short-name').value.trim();
+  const contractNo = document.getElementById('d-contract-no').value.trim();
+  const dateFrom   = document.getElementById('d-date-from').value;
+  const dateTo     = document.getElementById('d-date-to').value;
+
+  if (!locId || !opId || !contractNo || !dateFrom) {
+    showToast('Location, Operator, Contract No. and Start Date are required', 'error'); return;
+  }
+  const res = await fetch('/api/masters/project-contract/save/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+    body: JSON.stringify({ id: null, location_id: locId, operator_id: opId, short_name: shortName, contract_no: contractNo, date_from: dateFrom, date_to: dateTo || null }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showToast('Contract created', 'success'); setDirty(false);
+    closeAddModal();
+    await loadRecords();
+    selectRow(data.id);
+  } else {
+    showToast(data.error || 'Save failed', 'error');
+  }
+}
+
+// ── Comboboxes ────────────────────────────────────────────────────────────────
+function makeStaticCombo(textId, hiddenId, ddId, getOptions) {
+  const inp = document.getElementById(textId);
+  const hid = document.getElementById(hiddenId);
+  const dd  = document.getElementById(ddId);
+  let hi = -1;
+
+  function render(q) {
+    const opts = getOptions().filter(o => !q || o.label.toLowerCase().includes(q.toLowerCase()));
+    dd.innerHTML = opts.length
+      ? opts.map((o, i) => `<div class="combo-opt" data-id="${o.id}" data-idx="${i}">${o.label}</div>`).join('')
+      : '<div class="combo-empty">No results</div>';
+    dd.querySelectorAll('.combo-opt').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault(); inp.value = el.textContent; hid.value = el.dataset.id;
+        dd.classList.remove('open'); hi = -1;
+        if (typeof setDirty === 'function') setDirty(true);
+      });
+    });
+    dd.classList.add('open'); hi = -1;
+  }
+
+  inp.addEventListener('focus', () => render(inp.value));
+  inp.addEventListener('input', () => render(inp.value));
+  inp.addEventListener('blur',  () => setTimeout(() => dd.classList.remove('open'), 150));
+  inp.addEventListener('keydown', e => {
+    const opts = dd.querySelectorAll('.combo-opt');
+    if (e.key === 'ArrowDown') { hi = Math.min(hi+1, opts.length-1); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { hi = Math.max(hi-1, 0); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); e.preventDefault(); }
+    else if (e.key === 'Enter' && hi >= 0) {
+      const s = opts[hi]; inp.value = s.textContent; hid.value = s.dataset.id;
+      dd.classList.remove('open'); hi = -1; e.preventDefault();
+    } else if (e.key === 'Escape') dd.classList.remove('open');
+  });
+
+  return {
+    set(id) { const opt = getOptions().find(o => o.id == id); inp.value = opt ? opt.label : ''; hid.value = id || ''; },
+    reset() { inp.value = ''; hid.value = ''; },
+  };
+}
+
+function makeLocationCombo(textId, hiddenId, ddId) {
+  const inp = document.getElementById(textId);
+  const hid = document.getElementById(hiddenId);
+  const dd  = document.getElementById(ddId);
+  const PAGE = 20;
+  let hi = -1, debTimer;
+  let query = '', offset = 0, loading = false, hasMore = false, loaded = [];
+
+  function bindOptionClicks() {
+    dd.querySelectorAll('.combo-opt').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault(); inp.value = el.dataset.label; hid.value = el.dataset.id;
+        dd.classList.remove('open'); hi = -1;
+        if (typeof setDirty === 'function') setDirty(true);
+      });
+    });
+  }
+
+  function render() {
+    if (!loaded.length) {
+      dd.innerHTML = loading
+        ? '<div class="combo-empty">Searching…</div>'
+        : '<div class="combo-empty">No locations found</div>';
+      return;
+    }
+    dd.innerHTML = loaded.map((o, i) =>
+      `<div class="combo-opt" data-id="${o.id}" data-idx="${i}" data-label="${o.name}">${o.name}</div>`
+    ).join('') + (
+      loading ? '<div class="combo-loading-row">Loading more…</div>'
+      : hasMore ? '<div class="combo-loading-row">Scroll for more</div>'
+      : ''
+    );
+    bindOptionClicks();
+  }
+
+  async function search(q) {
+    query = q; offset = 0; loaded = []; loading = true; hasMore = false;
+    dd.classList.add('open');
+    render();
+    const res = await fetch(`/api/masters/locations-search/?q=${encodeURIComponent(q || '')}&offset=0&limit=${PAGE}`);
+    const data = await res.json();
+    loading = false;
+    loaded = data.results || [];
+    hasMore = !!data.has_more;
+    offset = loaded.length;
+    render();
+  }
+
+  async function loadMore() {
+    if (loading || !hasMore) return;
+    loading = true;
+    render();
+    const res = await fetch(`/api/masters/locations-search/?q=${encodeURIComponent(query || '')}&offset=${offset}&limit=${PAGE}`);
+    const data = await res.json();
+    loading = false;
+    loaded = loaded.concat(data.results || []);
+    hasMore = !!data.has_more;
+    offset = loaded.length;
+    render();
+  }
+
+  inp.addEventListener('focus', () => search(inp.value));
+  inp.addEventListener('input', () => { clearTimeout(debTimer); debTimer = setTimeout(() => search(inp.value), 250); });
+  inp.addEventListener('blur',  () => setTimeout(() => dd.classList.remove('open'), 150));
+  dd.addEventListener('scroll', () => {
+    if (hasMore && !loading && dd.scrollTop + dd.clientHeight >= dd.scrollHeight - 40) loadMore();
+  });
+  inp.addEventListener('keydown', e => {
+    const opts = dd.querySelectorAll('.combo-opt');
+    if (e.key === 'ArrowDown') { hi = Math.min(hi+1, opts.length-1); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { hi = Math.max(hi-1, 0); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); e.preventDefault(); }
+    else if (e.key === 'Enter' && hi >= 0) {
+      const sel = opts[hi]; inp.value = sel.dataset.label; hid.value = sel.dataset.id;
+      dd.classList.remove('open'); hi = -1; e.preventDefault();
+    } else if (e.key === 'Escape') dd.classList.remove('open');
+  });
+
+  return {
+    set(id, label) { inp.value = label || ''; hid.value = id || ''; },
+    reset() { inp.value = ''; hid.value = ''; },
+  };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getCsrf() {
+  return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
+
+let toastTimer;
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+// ── Dirty-state tracking ──────────────────────────────────────────────────
+let _formDirty = false;
+function setDirty(v) {
+  _formDirty = v;
+  document.querySelectorAll('.btn-save').forEach(b => b.classList.toggle('dirty', v));
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const fa = document.getElementById('form-area');
+  if (!fa) return;
+  fa.addEventListener('input',  () => setDirty(true));
+  fa.addEventListener('change', () => setDirty(true));
+});
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.project_contract')
+    .then(r => r.json())
+    .then(p => { _applyPermUI(p); _applySaveSectionPerm(); });
+})();
+
+function _applySaveSectionPerm() {
+  const p = window._pagePerms;
+  if (!p) return;
+  const showEdit = p.canEdit ? '' : 'none';
+  document.querySelectorAll('.btn-save, .add-row-btn, .add-row-area').forEach(el => el.style.display = showEdit);
+  if (!p.canDelete) document.querySelectorAll('.dtl-del-btn').forEach(el => el.style.display = 'none');
+}
+</script>
+{% endblock %}

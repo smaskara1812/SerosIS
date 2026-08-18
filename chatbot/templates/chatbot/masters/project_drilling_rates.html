@@ -1,0 +1,416 @@
+{% extends 'chatbot/masters/base.html' %}
+{% load static %}
+
+{% block title %}Project Drilling Rates — Seros{% endblock %}
+
+{% block styles %}
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #F2F4F8; --surface: #fff; --border: #E4E8EF;
+    --primary: #1a3f7a; --accent: #2563eb; --accent-light: #EEF3FF;
+    --text: #111827; --text-2: #4B5563; --text-3: #9CA3AF;
+    --success: #059669; --success-bg: #D1FAE5;
+    --danger: #DC2626; --danger-bg: #FEE2E2;
+    --radius: 12px; --radius-sm: 6px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
+  body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; -webkit-font-smoothing: antialiased; }
+
+  .page-header { flex-shrink: 0; padding: 16px 24px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 0.74rem; color: var(--text-3); margin-bottom: 7px; }
+  .breadcrumb a { color: var(--text-3); text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .breadcrumb-sep { opacity: 0.45; }
+  .page-title { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+
+  .content-scroll { flex: 1; overflow-y: auto; padding: 24px; }
+  .content-scroll::-webkit-scrollbar { width: 6px; }
+  .content-scroll::-webkit-scrollbar-thumb { background: #dde3ee; border-radius: 4px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 24px; max-width: 900px; margin: 0 auto 20px; }
+  .card-title { font-size: 0.78rem; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 16px; }
+
+  .form-row { display: grid; gap: 14px; margin-bottom: 14px; }
+  .form-row.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 0.72rem; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+  .form-label .req { color: var(--danger); margin-left: 2px; }
+  .form-input, .form-select { width: 100%; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; color: var(--text); background: var(--bg); outline: none; transition: border-color .15s, box-shadow .15s; }
+  .form-input:focus, .form-select:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .form-input:disabled, .form-select:disabled { opacity: 0.6; cursor: not-allowed; }
+  .form-input.readonly { background: #EEF3FF; color: var(--text-2); }
+
+  .combo-wrap { position: relative; }
+  .combo-input { width: 100%; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; color: var(--text); background: var(--bg); outline: none; transition: border-color .15s, box-shadow .15s; }
+  .combo-input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .combo-input:disabled { opacity: 0.6; cursor: not-allowed; }
+  .combo-dd { position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: var(--surface); border: 1.5px solid var(--accent); border-radius: var(--radius-sm); box-shadow: var(--shadow); z-index: 100; max-height: 220px; overflow-y: auto; display: none; }
+  .combo-dd.open { display: block; }
+  .combo-opt { padding: 8px 11px; font-size: 0.84rem; cursor: pointer; color: var(--text-2); }
+  .combo-opt:hover, .combo-opt.highlighted { background: var(--accent-light); color: var(--accent); }
+  .combo-empty { padding: 8px 11px; font-size: 0.82rem; color: var(--text-3); font-style: italic; }
+
+  .btn-row { display: flex; gap: 10px; margin-top: 4px; }
+  .btn { padding: 9px 20px; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; border: none; transition: background .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-ghost { background: var(--bg); color: var(--text-2); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { background: #e5e7eb; }
+
+  /* Rate table */
+  .rate-table-wrap { overflow-x: auto; }
+  .rate-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .rate-table th { background: #f8faff; border-bottom: 2px solid var(--border); padding: 9px 12px; text-align: left; font-size: 0.7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+  .rate-table td { padding: 9px 12px; border-bottom: 1px solid #f3f4f6; color: var(--text-2); vertical-align: middle; }
+  .rate-table tr:last-child td { border-bottom: none; }
+  .rate-val { font-family: 'SF Mono', monospace; }
+  .link-btn { background: none; border: none; color: var(--accent); font-family: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; padding: 0; }
+  .link-btn:hover { text-decoration: underline; }
+  .link-btn.danger { color: var(--danger); }
+  .rate-empty { padding: 28px; text-align: center; color: var(--text-3); font-size: 0.85rem; }
+  .insert-row select, .insert-row input { padding: 7px 9px; font-size: 0.82rem; }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 9999; transform: translateY(20px); opacity: 0; transition: all .25s ease; pointer-events: none; }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { background: var(--success); }
+  #toast.error { background: var(--danger); }
+</style>
+{% endblock %}
+
+{% block ms_content %}
+<div class="page-header">
+  <div class="breadcrumb">
+    <a href="/">Home</a><span class="breadcrumb-sep">/</span>
+    <a href="/masters/">Masters</a><span class="breadcrumb-sep">/</span>
+    <span>Projects</span><span class="breadcrumb-sep">/</span>
+    <span>Project Drilling Rates</span>
+  </div>
+  <div class="page-title">Project Drilling Rates</div>
+</div>
+
+<div class="content-scroll">
+
+  <div class="card">
+    <div class="card-title">Select Project &amp; Rig</div>
+
+    <div class="form-row cols-4">
+      <div class="form-group" style="grid-column: 1 / 5">
+        <label class="form-label">Project <span class="req">*</span></label>
+        <div class="combo-wrap">
+          <input class="combo-input" id="proj-text" type="text" placeholder="Search by contract no…" autocomplete="off">
+          <input type="hidden" id="proj-id">
+          <div class="combo-dd" id="proj-dd"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row cols-4">
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <input class="form-input readonly" id="proj-location" type="text" readonly>
+      </div>
+      <div class="form-group" style="grid-column: 2 / 4">
+        <label class="form-label">Operator</label>
+        <input class="form-input readonly" id="proj-operator" type="text" readonly>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Start Date</label>
+        <input class="form-input readonly" id="proj-start" type="text" readonly>
+      </div>
+    </div>
+
+    <div class="form-row cols-4">
+      <div class="form-group" style="grid-column: 1 / 5">
+        <label class="form-label">Rig <span class="req">*</span></label>
+        <div class="combo-wrap">
+          <input class="combo-input" id="rig-text" type="text" placeholder="Select a project first…" autocomplete="off" disabled>
+          <input type="hidden" id="rig-id">
+          <div class="combo-dd" id="rig-dd"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-search" onclick="searchRates()" disabled>Search</button>
+      <button class="btn btn-ghost" onclick="clearForm()">Clear</button>
+    </div>
+  </div>
+
+  <div class="card" id="rates-card" style="display:none">
+    <div class="card-title">Drilling Rates</div>
+    <div class="rate-table-wrap">
+      <table class="rate-table">
+        <thead>
+          <tr>
+            <th>Rate <span class="req" style="color:var(--danger)">*</span></th>
+            <th>Currency</th>
+            <th>Rate</th>
+            <th style="width:60px">Edit</th>
+            <th style="width:60px">Delete</th>
+          </tr>
+        </thead>
+        <tbody id="rates-body">
+        </tbody>
+        <tbody id="insert-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+let allProjects = [], allRateTypes = [], allCurrencies = [];
+let allRigsForProject = [];
+let projCombo, rigCombo;
+let currentProjectId = null, currentRigId = null;
+let currentRates = [];
+
+(async function init() {
+  const res = await fetch('/api/masters/project-drilling-rates/meta/');
+  const data = await res.json();
+  allProjects = data.projects;
+  allRateTypes = data.rate_types;
+  allCurrencies = data.currencies;
+
+  projCombo = makeStaticCombo('proj-text', 'proj-id', 'proj-dd',
+    () => allProjects.map(p => ({ id: p.id, label: p.contract_no })),
+    onProjectPicked);
+  rigCombo = makeStaticCombo('rig-text', 'rig-id', 'rig-dd',
+    () => allRigsForProject.map(r => ({ id: r.id, label: r.name })),
+    onRigPicked);
+})();
+
+async function onProjectPicked(projectId) {
+  currentProjectId = projectId;
+  const p = allProjects.find(x => x.id == projectId);
+  document.getElementById('proj-location').value = p ? p.location : '';
+  document.getElementById('proj-operator').value = p ? p.operator : '';
+  document.getElementById('proj-start').value = p && p.date_from ? p.date_from.split('-').reverse().join('/') : '';
+
+  rigCombo.reset();
+  document.getElementById('rig-text').disabled = true;
+  document.getElementById('rig-text').placeholder = 'Loading rigs…';
+  document.getElementById('btn-search').disabled = true;
+  document.getElementById('rates-card').style.display = 'none';
+
+  if (!projectId) { allRigsForProject = []; return; }
+
+  const res = await fetch(`/api/masters/project-drilling-rates/rigs/${projectId}/`);
+  const data = await res.json();
+  allRigsForProject = data.rigs;
+  document.getElementById('rig-text').disabled = false;
+  document.getElementById('rig-text').placeholder = allRigsForProject.length ? 'Search rig…' : 'No rigs on this contract';
+}
+
+function onRigPicked(rigId) {
+  currentRigId = rigId;
+  document.getElementById('btn-search').disabled = !(currentProjectId && rigId);
+  document.getElementById('rates-card').style.display = 'none';
+}
+
+async function searchRates() {
+  if (!currentProjectId || !currentRigId) return;
+  const res = await fetch(`/api/masters/project-drilling-rates/?project_id=${currentProjectId}&rig_id=${currentRigId}`);
+  const data = await res.json();
+  currentRates = data.records;
+  renderRates();
+  document.getElementById('rates-card').style.display = '';
+}
+
+function clearForm() {
+  projCombo.reset();
+  rigCombo.reset();
+  currentProjectId = null; currentRigId = null; allRigsForProject = [];
+  document.getElementById('proj-location').value = '';
+  document.getElementById('proj-operator').value = '';
+  document.getElementById('proj-start').value = '';
+  document.getElementById('rig-text').disabled = true;
+  document.getElementById('rig-text').placeholder = 'Select a project first…';
+  document.getElementById('btn-search').disabled = true;
+  document.getElementById('rates-card').style.display = 'none';
+}
+
+function currencyOptions(selectedId) {
+  return allCurrencies.map(c => `<option value="${c.id}" ${c.id == selectedId ? 'selected' : ''}>${c.name}</option>`).join('');
+}
+function rateTypeOptions(excludeIds) {
+  return allRateTypes
+    .filter(t => !excludeIds.includes(t.id))
+    .map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+}
+
+function renderRates() {
+  const tbody = document.getElementById('rates-body');
+  if (!currentRates.length) {
+    tbody.innerHTML = '';
+  } else {
+    tbody.innerHTML = currentRates.map(r => `
+      <tr data-id="${r.id}">
+        <td>${r.rate_type}</td>
+        <td>${r.currency || '—'}</td>
+        <td class="rate-val">${r.rate != null ? r.rate.toFixed(2) : '—'}</td>
+        <td><button class="link-btn" onclick="editRate(${r.id})">Edit</button></td>
+        <td><button class="link-btn danger" onclick="deleteRate(${r.id})">Delete</button></td>
+      </tr>`).join('');
+  }
+  renderInsertRow();
+}
+
+function editRate(id) {
+  const r = currentRates.find(x => x.id === id);
+  if (!r) return;
+  const tr = document.querySelector(`#rates-body tr[data-id="${id}"]`);
+  tr.innerHTML = `
+    <td><select id="edit-type-${id}">${rateTypeOptions(currentRates.filter(x => x.id !== id).map(x => x.rate_type_id))}</select></td>
+    <td><select id="edit-cur-${id}">${currencyOptions(r.currency_id)}</select></td>
+    <td><input type="number" step="0.01" id="edit-rate-${id}" value="${r.rate != null ? r.rate : ''}" style="width:110px"></td>
+    <td colspan="2"><button class="link-btn" onclick="saveEditedRate(${id})">Save</button>
+      &nbsp;<button class="link-btn danger" onclick="renderRates()">Cancel</button></td>
+  `;
+  document.getElementById(`edit-type-${id}`).value = r.rate_type_id;
+}
+
+async function saveEditedRate(id) {
+  const rateTypeId = document.getElementById(`edit-type-${id}`).value;
+  const currencyId = document.getElementById(`edit-cur-${id}`).value;
+  const rateVal = document.getElementById(`edit-rate-${id}`).value;
+  const res = await fetch('/api/masters/project-drilling-rates/save/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+    body: JSON.stringify({
+      id, project_id: currentProjectId, rig_id: currentRigId,
+      rate_type_id: rateTypeId, currency_id: currencyId || null,
+      rate: rateVal === '' ? null : rateVal,
+    }),
+  });
+  const data = await res.json();
+  if (data.success) { showToast('Rate saved', 'success'); await searchRates(); }
+  else showToast(data.error || 'Save failed', 'error');
+}
+
+async function deleteRate(id) {
+  if (!confirm('Delete this rate?')) return;
+  const res = await fetch(`/api/masters/project-drilling-rates/${id}/delete/`, {
+    method: 'POST', headers: { 'X-CSRFToken': getCsrf() },
+  });
+  const data = await res.json();
+  if (data.success) { showToast('Deleted', 'success'); await searchRates(); }
+  else showToast(data.error || 'Delete failed', 'error');
+}
+
+function renderInsertRow() {
+  const usedIds = currentRates.map(r => r.rate_type_id);
+  const remaining = allRateTypes.filter(t => !usedIds.includes(t.id));
+  const tbody = document.getElementById('insert-body');
+  if (!remaining.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="rate-empty">All rate types have been added for this rig.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = `
+    <tr class="insert-row">
+      <td><select id="ins-type">${rateTypeOptions(usedIds)}</select></td>
+      <td><select id="ins-cur">${currencyOptions(allCurrencies[0] ? allCurrencies[0].id : null)}</select></td>
+      <td><input type="number" step="0.01" id="ins-rate" style="width:110px"></td>
+      <td colspan="2"><button class="link-btn" onclick="insertRate()">Insert</button></td>
+    </tr>`;
+}
+
+async function insertRate() {
+  const rateTypeId = document.getElementById('ins-type').value;
+  const currencyId = document.getElementById('ins-cur').value;
+  const rateVal = document.getElementById('ins-rate').value;
+  if (!rateTypeId) { showToast('Select a rate type', 'error'); return; }
+
+  const res = await fetch('/api/masters/project-drilling-rates/save/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+    body: JSON.stringify({
+      id: null, project_id: currentProjectId, rig_id: currentRigId,
+      rate_type_id: rateTypeId, currency_id: currencyId || null,
+      rate: rateVal === '' ? null : rateVal,
+    }),
+  });
+  const data = await res.json();
+  if (data.success) { showToast('Rate inserted', 'success'); await searchRates(); }
+  else showToast(data.error || 'Save failed', 'error');
+}
+
+// ── Static combobox ─────────────────────────────────────────────────────────
+function makeStaticCombo(textId, hiddenId, ddId, getOptions, onPick) {
+  const inp = document.getElementById(textId);
+  const hid = document.getElementById(hiddenId);
+  const dd  = document.getElementById(ddId);
+  let hi = -1;
+
+  function render(q) {
+    const opts = getOptions().filter(o => !q || o.label.toLowerCase().includes(q.toLowerCase()));
+    dd.innerHTML = opts.length
+      ? opts.map((o, i) => `<div class="combo-opt" data-id="${o.id}" data-idx="${i}">${o.label}</div>`).join('')
+      : '<div class="combo-empty">No results</div>';
+    dd.querySelectorAll('.combo-opt').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault(); inp.value = el.textContent; hid.value = el.dataset.id;
+        dd.classList.remove('open'); hi = -1;
+        if (onPick) onPick(el.dataset.id);
+      });
+    });
+    dd.classList.add('open'); hi = -1;
+  }
+
+  inp.addEventListener('focus', () => { if (!inp.disabled) render(inp.value); });
+  inp.addEventListener('input', () => render(inp.value));
+  inp.addEventListener('blur',  () => setTimeout(() => dd.classList.remove('open'), 150));
+  inp.addEventListener('keydown', e => {
+    const opts = dd.querySelectorAll('.combo-opt');
+    if (e.key === 'ArrowDown') { hi = Math.min(hi+1, opts.length-1); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { hi = Math.max(hi-1, 0); opts.forEach((o,i)=>o.classList.toggle('highlighted',i===hi)); e.preventDefault(); }
+    else if (e.key === 'Enter' && hi >= 0) {
+      const s = opts[hi]; inp.value = s.textContent; hid.value = s.dataset.id;
+      dd.classList.remove('open'); hi = -1; if (onPick) onPick(s.dataset.id); e.preventDefault();
+    } else if (e.key === 'Escape') dd.classList.remove('open');
+  });
+
+  return {
+    set(id) { const opt = getOptions().find(o => o.id == id); inp.value = opt ? opt.label : ''; hid.value = id || ''; },
+    reset() { inp.value = ''; hid.value = ''; if (onPick) onPick(null); },
+  };
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function getCsrf() {
+  return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
+
+let toastTimer;
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+// ── Permission-aware UI ─────────────────────────────────────────────────────
+(function() {
+  fetch('/api/me/perms/?key=masters.project_drilling_rates')
+    .then(r => r.json())
+    .then(p => { _applyPermUI(p); _applyRatePerms(); });
+})();
+
+function _applyRatePerms() {
+  const p = window._pagePerms;
+  if (!p) return;
+  if (!p.canAdd && !p.canEdit) {
+    document.querySelectorAll('.link-btn').forEach(el => { if (!el.classList.contains('danger')) el.style.display = 'none'; });
+  }
+  if (!p.canDelete) {
+    document.querySelectorAll('.link-btn.danger').forEach(el => el.style.display = 'none');
+  }
+}
+</script>
+{% endblock %}

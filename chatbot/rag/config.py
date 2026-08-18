@@ -26,6 +26,7 @@ EMBED_MODEL = LOCAL_EMBED_MODEL if LLM_PROVIDER == "gemini" else OLLAMA_EMBED_MO
 
 # --- Paths ---
 MANUALS_DIR = BASE_DIR / "data" / "manuals"
+INTERVIEWER_SIGN_DIR = BASE_DIR / "data" / "interviewer_signatures"
 VECTORSTORE_DIR = BASE_DIR / "vectorstore"
 DOCSTORE_PATH = BASE_DIR / "docstore" / "parents.pkl"
 
