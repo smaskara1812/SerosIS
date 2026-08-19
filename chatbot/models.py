@@ -1,6 +1,8 @@
 import uuid
 from django.db import models
 
+from .fields import PortableJSONField
+
 
 class UserProfile(models.Model):
     user_id       = models.IntegerField(primary_key=True)   # USER_ID from Mst_user
@@ -93,7 +95,7 @@ class CbAuditLog(models.Model):
     entity_label = models.CharField(max_length=80, blank=True)               # human label, e.g. "Hazard Type"
     record_id    = models.CharField(max_length=40, blank=True)               # affected row PK (string; blank if N/A)
     record_label = models.CharField(max_length=200, blank=True)              # affected row's name
-    changes      = models.JSONField(null=True, blank=True)                   # {column: {"old": ..., "new": ...}}
+    changes      = PortableJSONField(null=True, blank=True)                  # {column: {"old": ..., "new": ...}}
     ip           = models.CharField(max_length=45, blank=True)
     user_agent   = models.CharField(max_length=300, blank=True)
 
@@ -133,7 +135,7 @@ class Message(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="messages")
     role         = models.CharField(max_length=10, choices=ROLE_CHOICES)
     content      = models.TextField()
-    sources      = models.JSONField(default=list, blank=True)
+    sources      = PortableJSONField(default=list, blank=True)
     created_at   = models.DateTimeField(auto_now_add=True)
 
     class Meta:
