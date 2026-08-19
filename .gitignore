@@ -21,3 +21,4 @@ docstore/
 
 # Claude Code
 .claude/
+chatbot/migrations/
