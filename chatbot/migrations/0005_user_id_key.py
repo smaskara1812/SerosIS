@@ -45,24 +45,24 @@ class Migration(migrations.Migration):
         # ── cb_user_permissions: user_id column exists but needs cleanup ───────
         migrations.SeparateDatabaseAndState(
             database_operations=[
+                # Standalone CREATE/DROP INDEX statements (not ALTER TABLE ... ADD
+                # INDEX, which is MySQL-only syntax) so this runs unchanged on both
+                # MySQL and SQL Server.
                 migrations.RunSQL(
                     sql=[
                         # Rows are stale (user_id=0 for all). Safe to clear in dev.
                         "TRUNCATE TABLE cb_user_permissions;",
-                        # Add index and unique constraint (not yet present).
-                        "ALTER TABLE cb_user_permissions "
-                        "  ADD UNIQUE INDEX cb_user_perms_uid_menu_uniq (user_id, menu_key), "
-                        "  ADD INDEX cb_user_perms_uid_idx (user_id);",
+                        "CREATE UNIQUE INDEX cb_user_perms_uid_menu_uniq ON cb_user_permissions (user_id, menu_key);",
+                        "CREATE INDEX cb_user_perms_uid_idx ON cb_user_permissions (user_id);",
                     ],
                     reverse_sql=[
                         "TRUNCATE TABLE cb_user_permissions;",
-                        "ALTER TABLE cb_user_permissions "
-                        "  DROP INDEX cb_user_perms_uid_menu_uniq, "
-                        "  DROP INDEX cb_user_perms_uid_idx, "
-                        "  ADD COLUMN user_login_id VARCHAR(20) NOT NULL DEFAULT '' AFTER id, "
-                        "  ADD INDEX cb_user_perms_login_idx (user_login_id), "
-                        "  ADD UNIQUE INDEX cb_user_perms_login_menu_uniq (user_login_id, menu_key), "
-                        "  DROP COLUMN user_id;",
+                        "DROP INDEX cb_user_perms_uid_menu_uniq ON cb_user_permissions;",
+                        "DROP INDEX cb_user_perms_uid_idx ON cb_user_permissions;",
+                        "ALTER TABLE cb_user_permissions ADD user_login_id VARCHAR(20) NOT NULL DEFAULT '';",
+                        "CREATE INDEX cb_user_perms_login_idx ON cb_user_permissions (user_login_id);",
+                        "CREATE UNIQUE INDEX cb_user_perms_login_menu_uniq ON cb_user_permissions (user_login_id, menu_key);",
+                        "ALTER TABLE cb_user_permissions DROP COLUMN user_id;",
                     ],
                 ),
             ],
