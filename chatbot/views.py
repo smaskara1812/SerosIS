@@ -6411,6 +6411,259 @@ def project_drilling_rates_delete_api(request, rec_id):
     return JsonResponse({"success": True})
 
 
+# ── Drilling Operations Master ────────────────────────────────────────────────
+
+_DRILLING_OPS_REF_TABLES = (
+    ("eos_Drilling_Dtl_Ops", "Drilling Detail Operation record(s)"),
+)
+
+
+@require_permission("masters.drilling_operations", "view")
+def drilling_operations_page(request):
+    return render(request, "chatbot/masters/drilling_operations.html")
+
+
+@require_GET
+def drilling_operations_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, """
+            SELECT Drilling_Ops_Id, Drilling_Ops_Code_No, Drilling_Ops_Name
+            FROM eos_Mst_Drilling_Operations
+            WHERE Drilling_Ops_Name LIKE %s
+            ORDER BY Drilling_Ops_Code_No
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def drilling_operations_get_api(request, ops_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, """
+            SELECT Drilling_Ops_Id, Drilling_Ops_Code_No, Drilling_Ops_Name
+            FROM eos_Mst_Drilling_Operations
+            WHERE Drilling_Ops_Id=%s
+        """, [ops_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def drilling_operations_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("ops_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.drilling_operations", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body    = json.loads(request.body)
+    ops_id  = body.get("ops_id")
+    code_no = body.get("code_no")
+    name    = (body.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"error": "Operations Name is required"}, status=400)
+    try:
+        code_no = int(code_no)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Code No is required and must be a number"}, status=400)
+
+    now = datetime.now()
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.drilling_operations", ops_id)
+        if ops_id:
+            dbq(cursor, """
+                UPDATE eos_Mst_Drilling_Operations
+                SET Drilling_Ops_Code_No=%s, Drilling_Ops_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Drilling_Ops_Id=%s
+            """, [code_no, name, _uid, now, ops_id])
+        else:
+            dbq(cursor, "SELECT COALESCE(MAX(Drilling_Ops_Id),0)+1 FROM eos_Mst_Drilling_Operations")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor, """
+                INSERT INTO eos_Mst_Drilling_Operations
+                    (Drilling_Ops_Id, Drilling_Ops_Code_No, Drilling_Ops_Name, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s, %s)
+            """, [new_id, code_no, name, _uid, now])
+            ops_id = new_id
+        _audit.record_save(request, cursor, "masters.drilling_operations", ops_id, _before)
+    return JsonResponse({"success": True, "ops_id": ops_id})
+
+
+@require_GET
+def drilling_operations_check_delete_api(request, ops_id):
+    from django.db import connections
+    refs = []
+    with connections["default"].cursor() as cursor:
+        for table, label in _DRILLING_OPS_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Drilling_Ops_Id=%s", [ops_id])
+            n = cursor.fetchone()[0]
+            if n:
+                refs.append({"count": n, "label": label})
+    return JsonResponse({"can_delete": not refs, "references": refs})
+
+
+@csrf_exempt
+def drilling_operations_delete_api(request, ops_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.drilling_operations", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        for table, _label in _DRILLING_OPS_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Drilling_Ops_Id=%s", [ops_id])
+            if cursor.fetchone()[0]:
+                return JsonResponse({"error": "Cannot delete: referenced by Drilling Detail Operation records"}, status=409)
+        _before = _audit.snap(cursor, "masters.drilling_operations", ops_id)
+        dbq(cursor, "DELETE FROM eos_Mst_Drilling_Operations WHERE Drilling_Ops_Id=%s", [ops_id])
+    _audit.record_delete(request, "masters.drilling_operations", ops_id, _before)
+    return JsonResponse({"success": True})
+
+
+# ── Drilling Sections Master ──────────────────────────────────────────────────
+
+_DRILLING_SECTION_REF_TABLES = (
+    ("eos_Drilling_Dtl_Ops", "Drilling Detail Operation record(s)"),
+)
+
+
+@require_permission("masters.drilling_sections", "view")
+def drilling_sections_page(request):
+    return render(request, "chatbot/masters/drilling_sections.html")
+
+
+@require_GET
+def drilling_sections_list_api(request):
+    from django.db import connections
+    q      = request.GET.get("q", "").strip()
+    offset = max(0, int(request.GET.get("offset", 0)))
+    limit  = min(200, max(1, int(request.GET.get("limit", 200))))
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, """
+            SELECT Drilling_Section_Id, Drilling_Section_Name
+            FROM eos_Mst_Drilling_Section
+            WHERE Drilling_Section_Name LIKE %s
+            ORDER BY Drilling_Section_Id
+            LIMIT %s OFFSET %s
+        """, [f"%{q}%", limit, offset])
+        cols = [c[0] for c in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
+    return JsonResponse({"results": rows})
+
+
+@require_GET
+def drilling_sections_get_api(request, sec_id):
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        dbq(cursor, """
+            SELECT Drilling_Section_Id, Drilling_Section_Name
+            FROM eos_Mst_Drilling_Section
+            WHERE Drilling_Section_Id=%s
+        """, [sec_id])
+        cols = [c[0] for c in cursor.description]
+        row  = cursor.fetchone()
+    if not row:
+        return JsonResponse({"error": "Not found"}, status=404)
+    return JsonResponse(dict(zip(cols, row)))
+
+
+@csrf_exempt
+def drilling_sections_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"]:
+        try:
+            _bpk = json.loads(request.body)
+            _has_id = bool(_bpk.get("sec_id"))
+        except Exception:
+            _has_id = False
+        _pact = "edit" if _has_id else "add"
+        if not _a["perms"].get("masters.drilling_sections", {}).get(_pact):
+            return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    import json
+    body   = json.loads(request.body)
+    sec_id = body.get("sec_id")
+    name   = (body.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"error": "Section is required"}, status=400)
+
+    now = datetime.now()
+    _uid = _audit.ops_user_id(request)
+    with connections["default"].cursor() as cursor:
+        _before = _audit.snap(cursor, "masters.drilling_sections", sec_id)
+        if sec_id:
+            dbq(cursor, """
+                UPDATE eos_Mst_Drilling_Section
+                SET Drilling_Section_Name=%s, Mod_User_Id=%s, Mod_Dt=%s
+                WHERE Drilling_Section_Id=%s
+            """, [name, _uid, now, sec_id])
+        else:
+            dbq(cursor, "SELECT COALESCE(MAX(Drilling_Section_Id),0)+1 FROM eos_Mst_Drilling_Section")
+            new_id = cursor.fetchone()[0]
+            dbq(cursor, """
+                INSERT INTO eos_Mst_Drilling_Section
+                    (Drilling_Section_Id, Drilling_Section_Name, Cr_User_Id, Cr_Dt)
+                VALUES (%s, %s, %s, %s)
+            """, [new_id, name, _uid, now])
+            sec_id = new_id
+        _audit.record_save(request, cursor, "masters.drilling_sections", sec_id, _before)
+    return JsonResponse({"success": True, "sec_id": sec_id})
+
+
+@require_GET
+def drilling_sections_check_delete_api(request, sec_id):
+    from django.db import connections
+    refs = []
+    with connections["default"].cursor() as cursor:
+        for table, label in _DRILLING_SECTION_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Drilling_Section_Id=%s", [sec_id])
+            n = cursor.fetchone()[0]
+            if n:
+                refs.append({"count": n, "label": label})
+    return JsonResponse({"can_delete": not refs, "references": refs})
+
+
+@csrf_exempt
+def drilling_sections_delete_api(request, sec_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _a = _get_access(request)
+    if not _a["is_admin"] and not _a["perms"].get("masters.drilling_sections", {}).get("delete"):
+        return JsonResponse({"error": "Permission denied"}, status=403)
+    from django.db import connections
+    with connections["default"].cursor() as cursor:
+        for table, _label in _DRILLING_SECTION_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Drilling_Section_Id=%s", [sec_id])
+            if cursor.fetchone()[0]:
+                return JsonResponse({"error": "Cannot delete: referenced by Drilling Detail Operation records"}, status=409)
+        _before = _audit.snap(cursor, "masters.drilling_sections", sec_id)
+        dbq(cursor, "DELETE FROM eos_Mst_Drilling_Section WHERE Drilling_Section_Id=%s", [sec_id])
+    _audit.record_delete(request, "masters.drilling_sections", sec_id, _before)
+    return JsonResponse({"success": True})
+
+
 # ── User permission self-query ───────────────────────────────────────────────
 
 @require_GET

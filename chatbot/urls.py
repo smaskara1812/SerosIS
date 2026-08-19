@@ -337,6 +337,20 @@ urlpatterns = [
     path("api/masters/project-drilling-rates/save/", views.project_drilling_rates_save_api, name="project_drilling_rates_save"),
     path("api/masters/project-drilling-rates/<int:rec_id>/delete/", views.project_drilling_rates_delete_api, name="project_drilling_rates_delete"),
 
+    path("masters/drilling-operations/", views.drilling_operations_page, name="drilling_operations"),
+    path("api/masters/drilling-operations/", views.drilling_operations_list_api, name="drilling_operations_list"),
+    path("api/masters/drilling-operations/save/", views.drilling_operations_save_api, name="drilling_operations_save"),
+    path("api/masters/drilling-operations/<int:ops_id>/", views.drilling_operations_get_api, name="drilling_operations_get"),
+    path("api/masters/drilling-operations/<int:ops_id>/check-delete/", views.drilling_operations_check_delete_api, name="drilling_operations_check_delete"),
+    path("api/masters/drilling-operations/<int:ops_id>/delete/", views.drilling_operations_delete_api, name="drilling_operations_delete"),
+
+    path("masters/drilling-sections/", views.drilling_sections_page, name="drilling_sections"),
+    path("api/masters/drilling-sections/", views.drilling_sections_list_api, name="drilling_sections_list"),
+    path("api/masters/drilling-sections/save/", views.drilling_sections_save_api, name="drilling_sections_save"),
+    path("api/masters/drilling-sections/<int:sec_id>/", views.drilling_sections_get_api, name="drilling_sections_get"),
+    path("api/masters/drilling-sections/<int:sec_id>/check-delete/", views.drilling_sections_check_delete_api, name="drilling_sections_check_delete"),
+    path("api/masters/drilling-sections/<int:sec_id>/delete/", views.drilling_sections_delete_api, name="drilling_sections_delete"),
+
     path("api/manuals/upload/", views.manual_upload, name="manual_upload"),
     path("api/manuals/ingest/", views.manual_ingest_start, name="manual_ingest_start"),
     path("api/manuals/ingest/status/", views.manual_ingest_status, name="manual_ingest_status"),

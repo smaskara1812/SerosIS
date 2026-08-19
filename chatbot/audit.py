@@ -51,6 +51,8 @@ ENTITY_TABLES = {
     "masters.interviewer_mapping":       ("eos_Mst_Interviewer",         "Interviewer_Id", None),
     "masters.project_contract":          ("eos_Mst_Project_Contract",    "Prj_Contract_Id", None),
     "masters.project_drilling_rates":    ("eos_Prj_Drilling_Rate",       "Prj_Drilling_Rate_Id", None),
+    "masters.drilling_operations":       ("eos_Mst_Drilling_Operations", "Drilling_Ops_Id", "Drilling_Ops_Name"),
+    "masters.drilling_sections":         ("eos_Mst_Drilling_Section",    "Drilling_Section_Id", "Drilling_Section_Name"),
     # Job Descriptions: snap the section header; detail lines are logged via record_action.
     "masters.job_descriptions":         ("eos_Job_Description_Hdr",      "JD_Hdr_Id",           "JD_Hdr_Description"),
 }

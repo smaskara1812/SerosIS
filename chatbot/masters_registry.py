@@ -47,6 +47,8 @@ _I = {
     "interviewer_map": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M22 21c0-3-2-5.5-5-6.5"/></svg>',
     "project_contract": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>',
     "drilling_rate": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+    "drilling_ops": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><path d="M12 2v11"/><path d="M8 13l4 9 4-9"/><path d="M6 6l6-4 6 4"/></svg>',
+    "drilling_section": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><rect x="4" y="4" width="16" height="4" rx="1"/><rect x="4" y="10" width="16" height="4" rx="1"/><rect x="4" y="16" width="16" height="4" rx="1"/></svg>',
 }
 
 # ── Group header icons (14×14) ─────────────────────────────────────────────────
@@ -56,6 +58,7 @@ _GI = {
     "qhse":     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
     "projects": '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',
     "mapping":  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M8 3v18M16 3v18M3 8h18M3 16h18"/></svg>',
+    "drilling": '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><path d="M12 2v11"/><path d="M8 13l4 9 4-9"/><path d="M6 6l6-4 6 4"/></svg>',
 }
 
 MASTER_GROUPS = [
@@ -111,6 +114,13 @@ MASTER_GROUPS = [
         "items": [
             {"key": "masters.project_contract", "slug": "project_contract", "label": "Project Contract", "url": "/masters/project-contract/", "sub": "PROJECT MASTER", "meta": "eos_Mst_Project_Contract / _Dtl · Add / Edit / Delete", "card_bg": "#fdf4ff", "icon": _I["project_contract"]},
             {"key": "masters.project_drilling_rates", "slug": "project_drilling_rates", "label": "Project Drilling Rates", "url": "/masters/project-drilling-rates/", "sub": "PROJECT MASTER", "meta": "eos_Prj_Drilling_Rate · Add / Edit / Delete", "card_bg": "#fff7ed", "icon": _I["drilling_rate"]},
+        ],
+    },
+    {
+        "id": "drilling", "label": "Drilling", "icon_bg": "#ecfeff", "icon": _GI["drilling"],
+        "items": [
+            {"key": "masters.drilling_operations", "slug": "drilling_operations", "label": "Drilling Operations", "url": "/masters/drilling-operations/", "sub": "DRILLING MASTER", "meta": "eos_Mst_Drilling_Operations · Add / Edit / Delete", "card_bg": "#ecfeff", "icon": _I["drilling_ops"]},
+            {"key": "masters.drilling_sections", "slug": "drilling_sections", "label": "Drilling Sections", "url": "/masters/drilling-sections/", "sub": "DRILLING MASTER", "meta": "eos_Mst_Drilling_Section · Add / Edit / Delete", "card_bg": "#f0fdfa", "icon": _I["drilling_section"]},
         ],
     },
 ]
