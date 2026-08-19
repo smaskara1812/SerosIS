@@ -411,12 +411,21 @@ function saveRecord() {
   });
 }
 
-function deleteRecord() {
+async function deleteRecord() {
   const id = document.getElementById('rec-id').value;
-  if (!id || !confirm('Delete this competency?')) return;
+  if (!id) return;
+  const checkRes = await fetch(`/api/masters/competency/${id}/check-delete/`);
+  const check = await checkRes.json();
+  if (!check.can_delete) {
+    const refs = check.references.map(r => `${r.count} ${r.label}`).join(', ');
+    showToast(`Cannot delete: referenced by ${refs}`, 'error');
+    return;
+  }
+  if (!confirm('Delete this competency?')) return;
   fetch(`/api/masters/competency/${id}/delete/`, {method:'POST'})
     .then(r=>r.json()).then(d => {
       if (d.success) { showToast('Deleted', 'success'); cancelEdit(); loadRecords(1); }
+      else showToast(d.error || 'Delete failed', 'error');
     });
 }
 

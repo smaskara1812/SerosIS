@@ -2492,6 +2492,10 @@ def chat_api(request, conversation_id):
 
 # ── Contractor Master ─────────────────────────────────────────────────────────
 
+_CONTRACTOR_REF_TABLES = (
+    ("eos_Incident_Details", "Incident Detail record(s)"),
+    ("eos_Wkg_Incident_Dtl", "Working Incident Detail record(s)"),
+)
 
 
 @require_permission("masters.contractors", "view")
@@ -2580,7 +2584,15 @@ def contractor_save_api(request):
 
 @require_GET
 def contractor_check_delete_api(request, contractor_id):
-    return JsonResponse({"can_delete": True, "references": []})
+    from django.db import connections
+    refs = []
+    with connections["default"].cursor() as cursor:
+        for table, label in _CONTRACTOR_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Contractor_Id=%s", [contractor_id])
+            n = cursor.fetchone()[0]
+            if n:
+                refs.append({"count": n, "label": label})
+    return JsonResponse({"can_delete": not refs, "references": refs})
 
 
 @csrf_exempt
@@ -2592,6 +2604,10 @@ def contractor_delete_api(request, contractor_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        for table, _label in _CONTRACTOR_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Contractor_Id=%s", [contractor_id])
+            if cursor.fetchone()[0]:
+                return JsonResponse({"error": "Cannot delete: referenced by Incident Detail records"}, status=409)
         _before = _audit.snap(cursor, "masters.contractors", contractor_id)
         dbq(cursor, "DELETE FROM eos_Mst_Contractor WHERE Contractor_Id=%s", [contractor_id])
     _audit.record_delete(request, "masters.contractors", contractor_id, _before)
@@ -2599,6 +2615,11 @@ def contractor_delete_api(request, contractor_id):
 
 
 # ── Rig Operation Master ──────────────────────────────────────────────────────
+
+_RIG_OPERATION_REF_TABLES = (
+    ("eos_Incident_Details", "Incident Detail record(s)"),
+    ("eos_Wkg_Incident_Dtl", "Working Incident Detail record(s)"),
+)
 
 @require_permission("masters.rig_operations", "view")
 def rig_operation_page(request):
@@ -2686,7 +2707,15 @@ def rig_operation_save_api(request):
 
 @require_GET
 def rig_operation_check_delete_api(request, op_id):
-    return JsonResponse({"can_delete": True, "references": []})
+    from django.db import connections
+    refs = []
+    with connections["default"].cursor() as cursor:
+        for table, label in _RIG_OPERATION_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Rig_Operation_Id=%s", [op_id])
+            n = cursor.fetchone()[0]
+            if n:
+                refs.append({"count": n, "label": label})
+    return JsonResponse({"can_delete": not refs, "references": refs})
 
 
 @csrf_exempt
@@ -2698,6 +2727,10 @@ def rig_operation_delete_api(request, op_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        for table, _label in _RIG_OPERATION_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Rig_Operation_Id=%s", [op_id])
+            if cursor.fetchone()[0]:
+                return JsonResponse({"error": "Cannot delete: referenced by Incident Detail records"}, status=409)
         _before = _audit.snap(cursor, "masters.rig_operations", op_id)
         dbq(cursor, "DELETE FROM eos_Mst_Rig_Operation WHERE Rig_Operation_Id=%s", [op_id])
     _audit.record_delete(request, "masters.rig_operations", op_id, _before)
@@ -2705,6 +2738,11 @@ def rig_operation_delete_api(request, op_id):
 
 
 # ── Contact Exposure Type Master ──────────────────────────────────────────────
+
+_CONTACT_EXPO_REF_TABLES = (
+    ("eos_Incident_Details", "Incident Detail record(s)"),
+    ("eos_Wkg_Incident_Dtl", "Working Incident Detail record(s)"),
+)
 
 @require_permission("masters.contact_exposure_types", "view")
 def contact_exposure_type_page(request):
@@ -2792,7 +2830,15 @@ def contact_exposure_type_save_api(request):
 
 @require_GET
 def contact_exposure_type_check_delete_api(request, type_id):
-    return JsonResponse({"can_delete": True, "references": []})
+    from django.db import connections
+    refs = []
+    with connections["default"].cursor() as cursor:
+        for table, label in _CONTACT_EXPO_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Contact_Expo_Type_Id=%s", [type_id])
+            n = cursor.fetchone()[0]
+            if n:
+                refs.append({"count": n, "label": label})
+    return JsonResponse({"can_delete": not refs, "references": refs})
 
 
 @csrf_exempt
@@ -2804,6 +2850,10 @@ def contact_exposure_type_delete_api(request, type_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        for table, _label in _CONTACT_EXPO_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Contact_Expo_Type_Id=%s", [type_id])
+            if cursor.fetchone()[0]:
+                return JsonResponse({"error": "Cannot delete: referenced by Incident Detail records"}, status=409)
         _before = _audit.snap(cursor, "masters.contact_exposure_types", type_id)
         dbq(cursor, "DELETE FROM eos_Mst_Contact_Exposure_Type WHERE Contact_Expo_Type_Id=%s", [type_id])
     _audit.record_delete(request, "masters.contact_exposure_types", type_id, _before)
@@ -4655,6 +4705,24 @@ def travel_eligibility_save_api(request):
     return JsonResponse({"success": True, "id": new_id})
 
 
+_TRAVEL_ELIGIBILITY_REF_TABLES = (
+    ("eos_Fs_Offer_Letter", "Offer Letter record(s)"),
+)
+
+
+@require_GET
+def travel_eligibility_check_delete_api(request, rec_id):
+    from django.db import connections
+    refs = []
+    with connections["default"].cursor() as cursor:
+        for table, label in _TRAVEL_ELIGIBILITY_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Travel_Eligibility_Id=%s", [rec_id])
+            n = cursor.fetchone()[0]
+            if n:
+                refs.append({"count": n, "label": label})
+    return JsonResponse({"can_delete": not refs, "references": refs})
+
+
 @csrf_exempt
 def travel_eligibility_delete_api(request, rec_id):
     if request.method != "POST":
@@ -4664,8 +4732,12 @@ def travel_eligibility_delete_api(request, rec_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cursor:
+        for table, _label in _TRAVEL_ELIGIBILITY_REF_TABLES:
+            dbq(cursor, f"SELECT COUNT(*) FROM {table} WHERE Travel_Eligibility_Id=%s", [rec_id])
+            if cursor.fetchone()[0]:
+                return JsonResponse({"error": "Cannot delete: referenced by Offer Letter records"}, status=409)
         _before = _audit.snap(cursor, "masters.travel_eligibility", rec_id)
-        dbq(cursor, 
+        dbq(cursor,
             "DELETE FROM eos_Travel_Eligibility WHERE Travel_Eligibility_Id=%s", [rec_id]
         )
     _audit.record_delete(request, "masters.travel_eligibility", rec_id, _before)
@@ -5028,9 +5100,10 @@ def job_description_delete_dtl_api(request, dtl_id):
 COMPETENCY_DEPT_IDS = (3, 14, 35)
 
 def _get_competency_depts(cur):
-    dbq(cur, 
-        "SELECT Dept_Id, Dept_Name FROM Mst_Department WHERE Dept_Id IN %s ORDER BY Dept_Name",
-        [COMPETENCY_DEPT_IDS],
+    placeholders = ",".join(["%s"] * len(COMPETENCY_DEPT_IDS))
+    dbq(cur,
+        f"SELECT Dept_Id, Dept_Name FROM Mst_Department WHERE Dept_Id IN ({placeholders}) ORDER BY Dept_Name",
+        list(COMPETENCY_DEPT_IDS),
     )
     return [{"id": r[0], "name": r[1]} for r in cur.fetchall()]
 
@@ -5140,6 +5213,24 @@ def competency_save_api(request):
     return JsonResponse({"success": True, "id": new_id})
 
 
+_COMPETENCY_REF_TABLES = (
+    ("eos_Candidate_Interview_Competency", "Candidate Interview Competency record(s)"),
+)
+
+
+@require_GET
+def competency_check_delete_api(request, rec_id):
+    from django.db import connections
+    refs = []
+    with connections["default"].cursor() as cur:
+        for table, label in _COMPETENCY_REF_TABLES:
+            dbq(cur, f"SELECT COUNT(*) FROM {table} WHERE Competency_Id=%s", [rec_id])
+            n = cur.fetchone()[0]
+            if n:
+                refs.append({"count": n, "label": label})
+    return JsonResponse({"can_delete": not refs, "references": refs})
+
+
 @csrf_exempt
 def competency_delete_api(request, rec_id):
     if request.method != "POST":
@@ -5149,6 +5240,10 @@ def competency_delete_api(request, rec_id):
         return JsonResponse({"error": "Permission denied"}, status=403)
     from django.db import connections
     with connections["default"].cursor() as cur:
+        for table, _label in _COMPETENCY_REF_TABLES:
+            dbq(cur, f"SELECT COUNT(*) FROM {table} WHERE Competency_Id=%s", [rec_id])
+            if cur.fetchone()[0]:
+                return JsonResponse({"error": "Cannot delete: referenced by Candidate Interview Competency records"}, status=409)
         _before = _audit.snap(cur, "masters.competency", rec_id)
         dbq(cur, "DELETE FROM eos_Mst_Competency WHERE Competency_Id=%s", [rec_id])
     _audit.record_delete(request, "masters.competency", rec_id, _before)

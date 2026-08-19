@@ -134,6 +134,7 @@ urlpatterns = [
     path("api/masters/travel-eligibility/", views.travel_eligibility_list_api, name="travel_eligibility_list"),
     path("api/masters/travel-eligibility/save/", views.travel_eligibility_save_api, name="travel_eligibility_save"),
     path("api/masters/travel-eligibility/<int:rec_id>/", views.travel_eligibility_get_api, name="travel_eligibility_get"),
+    path("api/masters/travel-eligibility/<int:rec_id>/check-delete/", views.travel_eligibility_check_delete_api, name="travel_eligibility_check_delete"),
     path("api/masters/travel-eligibility/<int:rec_id>/delete/", views.travel_eligibility_delete_api, name="travel_eligibility_delete"),
     path("api/masters/reporting-structure/meta/", views.reporting_structure_meta_api, name="reporting_structure_meta"),
     path("api/masters/reporting-structure/", views.reporting_structure_list_api, name="reporting_structure_list"),
@@ -276,6 +277,7 @@ urlpatterns = [
     path("api/masters/competency/", views.competency_list_api, name="competency_list"),
     path("api/masters/competency/save/", views.competency_save_api, name="competency_save"),
     path("api/masters/competency/<int:rec_id>/", views.competency_get_api, name="competency_get"),
+    path("api/masters/competency/<int:rec_id>/check-delete/", views.competency_check_delete_api, name="competency_check_delete"),
     path("api/masters/competency/<int:rec_id>/delete/", views.competency_delete_api, name="competency_delete"),
 
     # ── Mapping Masters ────────────────────────────────────────────────────────
